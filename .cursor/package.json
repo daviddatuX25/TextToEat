@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Local install for Stitch MCP so Cursor does not run npx at startup",
+  "dependencies": {
+    "@_davideast/stitch-mcp": "0.4.0"
+  }
+}

@@ -1,0 +1,2 @@
+Paste your Stitch API key here (single line). Get it from stitch.withgoogle.com → profile → Stitch Settings → API Keys.
+Then copy this file to .cursor/stitch-api-key (without .example).

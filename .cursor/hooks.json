@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      { "command": ".cursor/hooks/post-edit-sync.sh" }
+    ],
+    "stop": [
+      { "command": ".cursor/hooks/session-end-sync.sh" }
+    ]
+  }
+}

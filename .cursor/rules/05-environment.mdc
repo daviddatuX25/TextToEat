@@ -1,0 +1,30 @@
+---
+description: Environment defaults — use Docker for runtime tasks
+alwaysApply: true
+---
+
+# Environment
+
+## Docker by Default
+
+- Use **Docker** for all runtime, build, and test tasks unless the user overrides.
+- Prefer `docker compose` or `docker run` over local installs.
+- Assume dependencies (Node, Python, DBs, etc.) run inside containers.
+
+## Examples
+
+```bash
+# ✅ Laravel Sail (backend/): use Sail for npm
+./vendor/bin/sail npm install
+./vendor/bin/sail npm run build
+
+# ✅ Generic docker compose
+docker compose run --rm app npm install
+
+# ✅ One-off
+docker run --rm -v $(pwd):/app -w /app node:20 npm install
+```
+
+## Override
+
+If the user says "run locally", "no docker", or "use host", skip Docker and use host tooling.

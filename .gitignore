@@ -1,0 +1,4 @@
+# Keep MCP config and Stitch API key out of version control
+.cursor/mcp.json
+.cursor/stitch-api-key
+.cursor/node_modules

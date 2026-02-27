@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "stitch": {
+      "command": "npx",
+      "args": ["@_davideast/stitch-mcp", "proxy"],
+      "env": {
+        "STITCH_API_KEY": "YOUR_STITCH_API_KEY"
+      },
+      "description": "Google Stitch — generate UI designs from prompts, extract design context, fetch screens/code"
+    }
+  }
+}

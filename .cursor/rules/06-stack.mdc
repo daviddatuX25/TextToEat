@@ -1,0 +1,27 @@
+---
+description: Stack — Laravel + React Inertia; shadcn/ui + lucide for frontend
+alwaysApply: true
+---
+
+# Stack
+
+## Backend
+
+- **Laravel** — API, routing, Inertia responses
+- **Sail** — Docker environment (PHP, PostgreSQL, Node/Vite)
+- **PostgreSQL** — Database (per TEXTTOEAT_SPECIFICATION.md)
+
+## Frontend
+
+- **React + Inertia** — SPA-like UX, server-side routing
+- **Vite** — Build
+- **TailwindCSS** — Styling
+- **shadcn/ui** — UI components (Radix primitives, CVA, clsx, tailwind-merge)
+- **lucide-react** — Icons
+
+## Conventions
+
+- Run **npm** via Sail: `./vendor/bin/sail npm install`, `./vendor/bin/sail npx ...`
+- Use **shadcn/ui** for buttons, dialogs, forms, etc.: `./vendor/bin/sail npx shadcn@latest add button`
+- Use **lucide-react** for icons: `import { Plus, Menu } from 'lucide-react'`
+- Components live in `resources/js/components/ui/` (shadcn)

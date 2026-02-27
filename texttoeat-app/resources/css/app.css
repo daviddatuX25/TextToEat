@@ -1,0 +1,115 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.jsx';
+
+/* Theme aligned with TextToEat v2 Premium UI Kit */
+
+@theme {
+    /* Typography — Premium UI kit: Outfit */
+    --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    
+    /* Semantic Colors from UI Kit */
+    --color-primary-50: #fff7ed;
+    --color-primary-100: #ffedd5;
+    --color-primary-200: #fed7aa;
+    --color-primary-300: #fdba74;
+    --color-primary-400: #fb923c;
+    --color-primary-500: #f97316;
+    --color-primary-600: #ea580c;
+    --color-primary-700: #c2410c;
+    --color-primary-800: #9a3412;
+    --color-primary-900: #7c2d12;
+    --color-primary-950: #431407;
+
+    --color-surface-50: #fafaf9;
+    --color-surface-100: #f5f5f4;
+    --color-surface-200: #e7e5e4;
+    --color-surface-300: #d6d3d1;
+    --color-surface-400: #a8a29e;
+    --color-surface-500: #78716c;
+    --color-surface-600: #57534e;
+    --color-surface-700: #44403c;
+    --color-surface-800: #292524;
+    --color-surface-900: #1c1917;
+    --color-surface-950: #0c0a09;
+
+    /* Shadcn UI compatibility mappings to new premium colors */
+    --color-background: var(--color-surface-50);
+    --color-foreground: var(--color-surface-900);
+    --color-primary: var(--color-primary-600);
+    --color-primary-foreground: #ffffff;
+    --color-muted: var(--color-surface-100);
+    --color-muted-foreground: var(--color-surface-500);
+    --color-destructive: oklch(64% 0.24 25);
+    --color-destructive-foreground: oklch(98.5% 0 0);
+    --color-border: var(--color-surface-200);
+    --color-input: var(--color-surface-200);
+    --color-ring: var(--color-primary-500);
+    --color-card: #ffffff;
+    --color-card-foreground: var(--color-surface-900);
+
+    /* Elevation and Shadows */
+    --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    --shadow-float: 0 20px 40px -10px rgba(234, 88, 12, 0.15);
+
+    /* Animations */
+    --animate-bounce-subtle: bounceSubtle 2s infinite;
+    --animate-fade-in: fadeIn 0.5s ease-out forwards;
+
+    @keyframes bounceSubtle {
+        0%, 100% { transform: translateY(-2%) }
+        50% { transform: translateY(0) }
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px) }
+        to { opacity: 1; transform: translateY(0) }
+    }
+
+    @keyframes highlightRing {
+        0%, 100% { box-shadow: 0 0 0 3px var(--color-primary-400), 0 0 0 6px var(--color-primary-200); }
+        50% { box-shadow: 0 0 0 6px var(--color-primary-500), 0 0 0 12px var(--color-primary-300); }
+    }
+}
+
+/* Base custom utilities */
+@layer utilities {
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+    }
+    
+    .dark .glass-panel {
+        background: rgba(28, 25, 23, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    
+    .smooth-hover {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .no-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    
+    .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+
+    .highlight-ring {
+        animation: highlightRing 1.5s ease-in-out infinite;
+    }
+}
+
+/* Preserve original section heading styles if still used elsewhere */
+.section-heading {
+    @apply mb-4 text-2xl font-bold;
+}
