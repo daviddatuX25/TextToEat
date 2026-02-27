@@ -6,6 +6,7 @@ use App\Chatbot\ChatbotFsm;
 use App\Chatbot\ChatbotInventoryException;
 use App\Chatbot\ChatbotOrderService;
 use App\Models\ChatbotSession;
+use App\Models\DeliveryArea;
 use App\Models\MenuItem;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -76,20 +77,32 @@ class ChatbotWebhookController extends Controller
             'price' => (float) $m->price,
         ])->values()->all();
 
+        $deliveryAreas = DeliveryArea::query()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get()
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'is_free' => (bool) $a->is_free,
+                'fee' => $a->fee !== null ? (float) $a->fee : null,
+            ])
+            ->values()
+            ->all();
+
         $fsm = new ChatbotFsm();
-        [$nextState, $reply, $statePayload] = $fsm->transition($currentState, $body, $state, $menuItems, $locale);
+        [$nextState, $reply, $statePayload] = $fsm->transition($currentState, $body, $state, $menuItems, $deliveryAreas, $locale);
 
         $newState = array_merge($state, ['current_state' => $nextState], $statePayload);
 
         if ($nextState === 'order_placed') {
-            $orderChannel = $channel === 'web' ? 'web' : 'sms';
             $selectedItems = $this->normalizeSelectedItems($newState['selected_items'] ?? []);
             $customerName = $newState['customer_name'] ?? 'Anonymous';
             try {
                 $orderService = new ChatbotOrderService();
                 $result = $orderService->createOrder(
                     $selectedItems,
-                    $orderChannel,
+                    $channel,
                     $newState,
                     $customerName,
                     $externalId
@@ -110,12 +123,26 @@ class ChatbotWebhookController extends Controller
             }
         }
 
-        $session->update([
+        $update = [
             'state' => $newState,
             'language' => $newState['selected_language'] ?? $session->language,
             'saved_customer_name' => $newState['saved_customer_name'] ?? $session->saved_customer_name,
             'last_activity_at' => now(),
-        ]);
+        ];
+
+        if ($nextState === 'order_placed') {
+            if (array_key_exists('delivery_type', $newState)) {
+                $update['saved_delivery_type'] = $newState['delivery_type'];
+            }
+            if (array_key_exists('delivery_place', $newState)) {
+                $update['saved_delivery_place'] = $newState['delivery_place'];
+            }
+            if (array_key_exists('delivery_fee', $newState)) {
+                $update['saved_delivery_fee'] = $newState['delivery_fee'];
+            }
+        }
+
+        $session->update($update);
 
         $replies = array_filter(explode("\n\n", $reply));
         if ($replies === []) {

@@ -25,10 +25,11 @@ class ChatbotKeywordMatcher
         'delivery' => ['delivery', 'deliver'],
         'help' => ['help'],
         'menu' => ['menu'],
-        'cancel' => ['cancel', 'no'],
+        'back' => ['back', 'previous', 'prev', 'b'],
+        'cancel' => ['cancel'],
         'status' => ['status', 'track', 'my order'],
         'human_takeover' => ['tao', 'person', 'human', 'agent'],
-        'main_menu' => ['main', 'main menu', 'back', 'home'],
+        'main_menu' => ['main', 'main menu', 'home'],
     ];
 
     /**
@@ -38,7 +39,7 @@ class ChatbotKeywordMatcher
      */
     public function match(string $body): ?string
     {
-        return $this->matchIntent($body, ['help', 'menu', 'cancel', 'status', 'human_takeover', 'main_menu']);
+        return $this->matchIntent($body, ['help', 'menu', 'back', 'cancel', 'status', 'human_takeover', 'main_menu']);
     }
 
     /**

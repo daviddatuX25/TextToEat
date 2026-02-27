@@ -54,16 +54,80 @@ export default function Orders({
         return window.localStorage?.getItem(ORDERS_VIEW_MODE_KEY) || 'columns';
     });
     const [singleIndex, setSingleIndex] = useState(0);
-    const highlightRef = useRef(null);
+    const [activeHighlight, setActiveHighlight] = useState(() => (highlight ? String(highlight) : null));
     const swipeRef = useRef({ startX: 0, startY: 0 });
+    const highlightTimeoutRef = useRef(null);
 
     const groups = useMemo(() => groupOrders(orders), [orders]);
 
     useEffect(() => {
-        if (highlight && highlightRef.current) {
-            highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!highlight) {
+            setActiveHighlight(null);
+            return;
         }
+        setActiveHighlight(String(highlight));
+
+        // In single-column view, automatically switch to the section
+        // that contains the highlighted order so it is rendered.
+        if (viewMode === 'single') {
+            const sectionIdx = SECTIONS.findIndex((s) =>
+                (groups[s.ordersKey] ?? []).some((o) => String(o.id) === String(highlight))
+            );
+            if (sectionIdx !== -1) setSingleIndex(sectionIdx);
+        }
+        if (highlightTimeoutRef.current) {
+            clearTimeout(highlightTimeoutRef.current);
+        }
+        highlightTimeoutRef.current = setTimeout(() => {
+            setActiveHighlight(null);
+        }, 5000);
+        return () => {
+            if (highlightTimeoutRef.current) {
+                clearTimeout(highlightTimeoutRef.current);
+            }
+        };
     }, [highlight]);
+
+    useEffect(() => {
+        if (!activeHighlight) return;
+        const handle = window.setTimeout(() => {
+            try {
+                // Find the visible card element for this highlighted order.
+                const candidates = document.querySelectorAll(`[data-order-id="${activeHighlight}"]`);
+                let el = null;
+                for (const candidate of candidates) {
+                    if (candidate.getBoundingClientRect().height > 0) {
+                        el = candidate;
+                        break;
+                    }
+                }
+                if (!el) return;
+
+                const container = el.closest('[data-scroll-container="1"]');
+                const containerOverflow = container ? window.getComputedStyle(container).overflowY : 'none';
+                const isScrollable =
+                    container instanceof HTMLElement &&
+                    (containerOverflow === 'auto' || containerOverflow === 'scroll');
+
+                if (isScrollable) {
+                    const containerTop = container.getBoundingClientRect().top;
+                    const elTop = el.getBoundingClientRect().top;
+                    // Account for the sticky header so the card isn't hidden behind it.
+                    const stickyOffset = 60;
+                    const targetTop = container.scrollTop + (elTop - containerTop) - stickyOffset;
+                    container.scrollTo({ top: Math.max(targetTop, 0), behavior: 'smooth' });
+                } else {
+                    // Mobile columns (no inner overflow) — let the page scroll.
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } catch (e) {
+                // ignore
+            }
+        }, 80);
+        return () => {
+            window.clearTimeout(handle);
+        };
+    }, [activeHighlight, viewMode, singleIndex]);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && viewMode) {
@@ -173,7 +237,7 @@ export default function Orders({
                                         key={section.key}
                                         className="flex flex-col min-h-0 rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/30 p-4 min-h-[200px] max-h-[calc(100vh-12rem)]"
                                     >
-                                        <div className="sticky top-0 z-10 -mx-4 -mt-4 px-4 pt-4 pb-3 mb-2 flex items-start justify-between gap-2 rounded-t-2xl bg-surface-50/95 dark:bg-surface-800/95 backdrop-blur-sm border-b border-surface-200/50 dark:border-surface-700/50">
+                                        <div className="sticky top-0 z-10 -mx-4 -mt-4 px-4 pt-4 pb-3 mb-3 flex items-start justify-between gap-2 rounded-t-2xl bg-surface-50/95 dark:bg-surface-800/95 backdrop-blur-sm border-b border-surface-200/50 dark:border-surface-700/50">
                                             <div>
                                                 <h2 className="text-sm font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400">{section.title}</h2>
                                                 {section.subtitle && <p className="text-xs text-surface-500 mt-0.5">{section.subtitle}</p>}
@@ -183,11 +247,14 @@ export default function Orders({
                                             </div>
                                             {Icon && <Icon className="h-5 w-5 shrink-0 text-surface-400 dark:text-surface-500" aria-hidden />}
                                         </div>
-                                        <div className="flex flex-col gap-3 overflow-y-auto min-h-0 flex-1 -mx-4 px-4">
+                                        <div
+                                            className="flex flex-col gap-3 overflow-y-auto min-h-0 flex-1 -mx-4 px-4"
+                                            data-scroll-container="1"
+                                        >
                                             {list.map((order) => {
-                                                const isHighlight = String(order.id) === String(highlight);
+                                                const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
                                                 return (
-                                                    <div key={order.id} ref={isHighlight ? highlightRef : null} className={isHighlight ? 'p-2 -m-2' : ''}>
+                                                    <div key={order.id} data-order-id={order.id} className={isHighlight ? 'p-2 -m-2' : ''}>
                                                         <OrderListRow order={order} isHighlighted={isHighlight} />
                                                     </div>
                                                 );
@@ -206,7 +273,7 @@ export default function Orders({
                                         key={section.key}
                                         className="flex flex-col min-h-0 rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/30 p-4 min-h-[120px]"
                                     >
-                                        <div className="sticky top-0 z-10 -mx-4 -mt-4 px-4 pt-4 pb-3 mb-2 flex items-start justify-between gap-2 rounded-t-2xl bg-surface-50/95 dark:bg-surface-800/95 backdrop-blur-sm border-b border-surface-200/50 dark:border-surface-700/50">
+                                        <div className="sticky top-0 z-10 -mx-4 -mt-4 px-4 pt-4 pb-3 mb-3 flex items-start justify-between gap-2 rounded-t-2xl bg-surface-50/95 dark:bg-surface-800/95 backdrop-blur-sm border-b border-surface-200/50 dark:border-surface-700/50">
                                             <div>
                                                 <h2 className="text-sm font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400">{section.title}</h2>
                                                 {section.subtitle && <p className="text-xs text-surface-500 mt-0.5">{section.subtitle}</p>}
@@ -216,11 +283,11 @@ export default function Orders({
                                             </div>
                                             {Icon && <Icon className="h-5 w-5 shrink-0 text-surface-400 dark:text-surface-500" aria-hidden />}
                                         </div>
-                                        <div className="flex flex-col gap-3 -mx-4 px-4">
+                                        <div className="flex flex-col gap-3 -mx-4 px-4" data-scroll-container="1">
                                             {list.map((order) => {
-                                                const isHighlight = String(order.id) === String(highlight);
+                                                const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
                                                 return (
-                                                    <div key={order.id} ref={isHighlight ? highlightRef : null} className={isHighlight ? 'p-2 -m-2' : ''}>
+                                                    <div key={order.id} data-order-id={order.id} className={isHighlight ? 'p-2 -m-2' : ''}>
                                                         <OrderListRow order={order} isHighlighted={isHighlight} />
                                                     </div>
                                                 );
@@ -272,8 +339,11 @@ export default function Orders({
                                         </button>
                                     </div>
                                 </div>
-                                <div className="flex flex-col min-h-0 rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/30 p-4 min-h-[200px] max-h-[calc(100vh-14rem)] overflow-y-auto">
-                                        <div className="sticky top-0 z-10 -mx-4 -mt-4 px-4 pt-4 pb-3 mb-2 flex items-start justify-between gap-2 rounded-t-2xl bg-surface-50/95 dark:bg-surface-800/95 backdrop-blur-sm border-b border-surface-200/50 dark:border-surface-700/50">
+                                <div
+                                    className="flex flex-col min-h-0 rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/30 p-4 min-h-[200px] max-h-[calc(100vh-14rem)] overflow-y-auto"
+                                    data-scroll-container="1"
+                                >
+                                        <div className="sticky top-0 z-10 -mx-4 -mt-4 px-4 pt-4 pb-3 mb-3 flex items-start justify-between gap-2 rounded-t-2xl bg-surface-50/95 dark:bg-surface-800/95 backdrop-blur-sm border-b border-surface-200/50 dark:border-surface-700/50">
                                         <div>
                                             <h2 className="text-sm font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400">{section.title}</h2>
                                             {section.subtitle && <p className="text-xs text-surface-500 mt-0.5">{section.subtitle}</p>}
@@ -285,9 +355,9 @@ export default function Orders({
                                     </div>
                                     <div className="flex flex-col gap-3 -mx-4 px-4">
                                         {list.map((order) => {
-                                            const isHighlight = String(order.id) === String(highlight);
+                                            const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
                                             return (
-                                                <div key={order.id} ref={isHighlight ? highlightRef : null} className={isHighlight ? 'p-2 -m-2' : ''}>
+                                                <div key={order.id} data-order-id={order.id} className={isHighlight ? 'p-2 -m-2' : ''}>
                                                     <OrderListRow order={order} isHighlighted={isHighlight} />
                                                 </div>
                                             );

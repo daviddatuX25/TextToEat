@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
+use App\Models\ActionLog;
 use App\Models\DeliveryArea;
 use App\Models\DiningMarker;
 use App\Models\MenuItem;
@@ -92,6 +93,9 @@ class OrdersController extends Controller
             'payment_status' => ['sometimes', 'string', 'in:unpaid,paid'],
         ]);
 
+        $originalStatus = $order->status;
+        $originalPaymentStatus = $order->payment_status;
+
         if (isset($validated['status'])) {
             if ($validated['status'] === 'completed' && $order->payment_status !== 'paid') {
                 return redirect()->back()->with('error', 'Mark the order as paid before completing.');
@@ -102,6 +106,24 @@ class OrdersController extends Controller
             $order->payment_status = $validated['payment_status'];
         }
         $order->save();
+
+        if (
+            ($originalStatus !== $order->status)
+            || ($originalPaymentStatus !== $order->payment_status)
+        ) {
+            ActionLog::create([
+                'user_id' => $request->user()?->id,
+                'action' => 'order_updated',
+                'model' => 'Order',
+                'model_id' => $order->id,
+                'payload' => [
+                    'from_status' => $originalStatus,
+                    'to_status' => $order->status,
+                    'from_payment_status' => $originalPaymentStatus,
+                    'to_payment_status' => $order->payment_status,
+                ],
+            ]);
+        }
 
         return redirect()->back()->with('success', 'Order updated.');
     }

@@ -255,12 +255,42 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
     const { errors } = usePage().props;
     const highlightRef = useRef(null);
     const [manageOpen, setManageOpen] = useState(false);
+    const [activeHighlight, setActiveHighlight] = useState(() => (highlight ? String(highlight) : null));
+    const highlightTimeoutRef = useRef(null);
 
     useEffect(() => {
-        if (highlight && highlightRef.current) {
-            highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!highlight) {
+            setActiveHighlight(null);
+            return;
         }
+        setActiveHighlight(String(highlight));
+        if (highlightTimeoutRef.current) {
+            clearTimeout(highlightTimeoutRef.current);
+        }
+        highlightTimeoutRef.current = setTimeout(() => {
+            setActiveHighlight(null);
+        }, 5000);
+        return () => {
+            if (highlightTimeoutRef.current) {
+                clearTimeout(highlightTimeoutRef.current);
+            }
+        };
     }, [highlight]);
+
+    useEffect(() => {
+        if (!activeHighlight) return;
+        const handle = window.setTimeout(() => {
+            if (!highlightRef.current) return;
+            try {
+                highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) {
+                // ignore
+            }
+        }, 50);
+        return () => {
+            window.clearTimeout(handle);
+        };
+    }, [activeHighlight]);
 
     const slotToOrder = {};
     orders.forEach((o) => {
@@ -312,7 +342,7 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
                     ) : (
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             {orders.map((order) => {
-                                const isHighlight = String(order.id) === String(highlight);
+                                const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
                                 return (
                                     <div key={order.id} ref={isHighlight ? highlightRef : null} className={isHighlight ? 'p-2 -m-2' : ''}>
                                         <PickupOrderCard order={order} pickupSlots={pickupSlots} slotToOrder={slotToOrder} isHighlighted={isHighlight} />

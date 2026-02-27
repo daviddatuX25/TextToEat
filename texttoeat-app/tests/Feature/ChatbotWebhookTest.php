@@ -1197,6 +1197,43 @@ class ChatbotWebhookTest extends TestCase
         $this->assertDatabaseCount('orders', 0);
     }
 
+    public function test_session_saves_delivery_preferences_after_order(): void
+    {
+        MenuItem::create([
+            'name' => 'Pancit',
+            'price' => 80.00,
+            'category' => 'main',
+            'units_today' => 5,
+            'is_sold_out' => false,
+            'menu_date' => now()->toDateString(),
+        ]);
+
+        $externalId = 'prefs_user';
+
+        // Start SMS flow and choose language.
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => $externalId, 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => $externalId, 'body' => '1']);
+
+        // Go to menu and add one item.
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => $externalId, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => $externalId, 'body' => '1']);
+
+        // Confirm cart, provide name, and choose pickup (option 1).
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => $externalId, 'body' => 'done']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => $externalId, 'body' => 'Juan']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => $externalId, 'body' => '1']);
+
+        // Place the order.
+        $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => $externalId, 'body' => 'yes']);
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
+
+        $session = ChatbotSession::where('channel', 'sms')->where('external_id', $externalId)->first();
+        $this->assertNotNull($session);
+        $this->assertSame('pickup', $session->saved_delivery_type);
+        $this->assertNull($session->saved_delivery_place);
+        $this->assertSame(0.0, (float) $session->saved_delivery_fee);
+    }
+
     public function test_cart_ux_view_cart_and_confirm(): void
     {
         MenuItem::create([
@@ -1225,6 +1262,63 @@ class ChatbotWebhookTest extends TestCase
         $this->assertNotNull($order);
         $this->assertSame(1, $order->orderItems()->count());
         $this->assertSame(20.0, (float) $order->total);
+    }
+
+    public function test_cart_change_item_flow_allows_edit_and_remove(): void
+    {
+        MenuItem::create([
+            'name' => 'Item A',
+            'price' => 10.00,
+            'category' => 'main',
+            'units_today' => 5,
+            'is_sold_out' => false,
+            'menu_date' => now()->toDateString(),
+        ]);
+
+        // Build a cart with quantity 2 of Item A
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '1']); // language
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '1']); // main menu -> menu
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '1']); // pick Item A
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '2']); // qty 2
+
+        // Enter change/remove flow and select the first cart line
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '3']);
+        $resp = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '1']);
+        $resp->assertStatus(200);
+        $this->assertStringContainsString('Item A', $resp->json('reply'));
+        $this->assertStringContainsString('1=Change quantity', $resp->json('reply'));
+
+        // Choose to change quantity
+        $resp = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '1']);
+        $resp->assertStatus(200);
+        $this->assertStringContainsString('Item A', $resp->json('reply'));
+
+        // Set new quantity to 5
+        $resp = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '5']);
+        $resp->assertStatus(200)->assertJsonPath('state.item_selection_mode', 'cart_menu');
+        $this->assertSame(5, $resp->json('state.selected_items.0.quantity'));
+
+        // Now test remove path in a fresh session
+        MenuItem::create([
+            'name' => 'Item B',
+            'price' => 15.00,
+            'category' => 'main',
+            'units_today' => 5,
+            'is_sold_out' => false,
+            'menu_date' => now()->toDateString(),
+        ]);
+
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'remove_user', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'remove_user', 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'remove_user', 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'remove_user', 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'remove_user', 'body' => '2']); // qty 2
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'remove_user', 'body' => '3']); // change/remove
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'remove_user', 'body' => '1']); // select first line
+        $resp = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'remove_user', 'body' => '2']); // remove
+        $resp->assertStatus(200)->assertJsonPath('state.item_selection_mode', 'cart_menu');
+        $this->assertEmpty($resp->json('state.selected_items') ?? []);
     }
 
     public function test_session_timeout_returns_to_main_menu(): void

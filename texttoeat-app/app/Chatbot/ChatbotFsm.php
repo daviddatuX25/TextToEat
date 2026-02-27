@@ -19,6 +19,7 @@ class ChatbotFsm
     /**
      * @param array<string, mixed> $statePayload
      * @param array<int, array{id: int, name: string, price: float}> $menuItems
+     * @param array<int, array{id: int, name: string, is_free: bool, fee: float|null}> $deliveryAreas
      * @return array{string, string, array<string, mixed>} [next_state, reply, state_payload]
      */
     public function transition(
@@ -26,6 +27,7 @@ class ChatbotFsm
         string $body,
         array $statePayload,
         array $menuItems = [],
+        array $deliveryAreas = [],
         string $locale = 'en'
     ): array {
         $body = trim($body);
@@ -38,8 +40,8 @@ class ChatbotFsm
             'menu' => $this->fromMenu($body, $statePayload, $menuItems, $locale),
             'item_selection' => $this->fromItemSelection($body, $statePayload, $menuItems, $locale),
             'collect_name' => $this->fromCollectName($body, $statePayload, $menuItems, $locale),
-            'delivery_choice' => $this->fromDeliveryChoice($body, $statePayload, $menuItems, $locale),
-            'confirm' => $this->fromConfirm($body, $statePayload, $menuItems, $locale),
+            'delivery_choice' => $this->fromDeliveryChoice($body, $statePayload, $menuItems, $deliveryAreas, $locale),
+            'confirm' => $this->fromConfirm($body, $statePayload, $menuItems, $deliveryAreas, $locale),
             'order_placed' => $this->fromOrderPlaced($body, $menuItems, $locale),
             'human_takeover' => $this->fromHumanTakeover($body, $locale),
             default => $this->fromWelcome($locale),
@@ -66,6 +68,16 @@ class ChatbotFsm
     private function fromLanguageSelection(string $body, array $statePayload, array $menuItems, string $locale): array
     {
         $keyword = $this->keywordMatcher->match($body);
+        if ($keyword === 'back') {
+            return [
+                'language_selection',
+                __('chatbot.language_prompt', [], $locale),
+                [],
+            ];
+        }
+        if ($keyword !== null) {
+            return $this->handleKeywordInState($keyword, $statePayload, $menuItems, $locale, 'language_selection');
+        }
         if ($keyword === 'help') {
             return [
                 'language_selection',
@@ -99,6 +111,16 @@ class ChatbotFsm
     private function fromMainMenu(string $body, array $statePayload, array $menuItems, string $locale): array
     {
         $keyword = $this->keywordMatcher->match($body);
+        if ($keyword === 'back') {
+            return [
+                'main_menu',
+                __('chatbot.main_menu_prompt', [], $locale),
+                [],
+            ];
+        }
+        if ($keyword !== null) {
+            return $this->handleKeywordInState($keyword, $statePayload, $menuItems, $locale, 'main_menu');
+        }
         if ($keyword === 'help') {
             return [
                 'main_menu',
@@ -173,6 +195,13 @@ class ChatbotFsm
     private function fromMenu(string $body, array $statePayload, array $menuItems, string $locale): array
     {
         $keyword = $this->keywordMatcher->match($body);
+        if ($keyword === 'back') {
+            return [
+                'main_menu',
+                __('chatbot.main_menu_prompt', [], $locale),
+                $this->orderFlowResetPayload(),
+            ];
+        }
         if ($keyword !== null) {
             return $this->handleKeywordInState($keyword, $statePayload, $menuItems, $locale, 'menu');
         }
@@ -220,6 +249,36 @@ class ChatbotFsm
     private function fromItemSelection(string $body, array $statePayload, array $menuItems, string $locale): array
     {
         $keyword = $this->keywordMatcher->match($body);
+        if ($keyword === 'back') {
+            $selectedItems = $this->normalizeSelectedItems($statePayload['selected_items'] ?? []);
+            $mode = (string) ($statePayload['item_selection_mode'] ?? 'cart_menu');
+            // In edit_* modes, back should go to the cart menu; otherwise go back to the main menu.
+            if (in_array($mode, ['edit_select', 'edit_action', 'edit_quantity'], true)) {
+                $summary = $this->buildCartSummary($selectedItems, $locale);
+                return [
+                    'item_selection',
+                    __('chatbot.cart_menu_prompt', ['summary' => $summary], $locale),
+                    [
+                        'selected_items' => $selectedItems,
+                        'pending_item' => null,
+                        'item_selection_mode' => 'cart_menu',
+                        'edit_index' => null,
+                    ],
+                ];
+            }
+
+            $menuText = $this->buildMenuText($menuItems, $locale);
+            return [
+                'menu',
+                __('chatbot.menu_header', [], $locale) . $menuText,
+                [
+                    'selected_items' => $selectedItems,
+                    'pending_item' => null,
+                    'item_selection_mode' => null,
+                    'edit_index' => null,
+                ],
+            ];
+        }
         if ($keyword !== null) {
             return $this->handleKeywordInState($keyword, $statePayload, $menuItems, $locale, 'item_selection');
         }
@@ -270,7 +329,7 @@ class ChatbotFsm
             ];
         }
 
-        if ($bodyLower === 'done' || $bodyLower === '4') {
+        if (($bodyLower === 'done' || $bodyLower === '4') && $mode === 'cart_menu') {
             if (empty($selectedItems)) {
                 $menuText = $this->buildMenuText($menuItems, $locale);
                 return [
@@ -290,7 +349,7 @@ class ChatbotFsm
             ];
         }
 
-        if ($bodyLower === '1') {
+        if ($bodyLower === '1' && $mode === 'cart_menu') {
             $menuText = $this->buildMenuText($menuItems, $locale);
             return [
                 'menu',
@@ -299,7 +358,7 @@ class ChatbotFsm
             ];
         }
 
-        if ($bodyLower === '2') {
+        if ($bodyLower === '2' && $mode === 'cart_menu') {
             $summary = $this->buildCartSummary($selectedItems, $locale);
             return [
                 'item_selection',
@@ -308,7 +367,7 @@ class ChatbotFsm
             ];
         }
 
-        if ($bodyLower === '3') {
+        if ($bodyLower === '3' && $mode === 'cart_menu') {
             if (empty($selectedItems)) {
                 $menuText = $this->buildMenuText($menuItems, $locale);
                 return [
@@ -338,13 +397,81 @@ class ChatbotFsm
             $line = $selectedItems[$index - 1];
             return [
                 'item_selection',
-                __('chatbot.cart_edit_quantity_prompt', [
+                __('chatbot.cart_edit_action_prompt', [
                     'name' => $line['name'],
                     'quantity' => $line['quantity'],
                 ], $locale),
                 [
-                    'item_selection_mode' => 'edit_quantity',
+                    'item_selection_mode' => 'edit_action',
                     'edit_index' => $index - 1,
+                ],
+            ];
+        }
+
+        if ($mode === 'edit_action' && array_key_exists('edit_index', $statePayload)) {
+            $editIndex = (int) $statePayload['edit_index'];
+            if (! isset($selectedItems[$editIndex])) {
+                $summary = $this->buildCartSummary($selectedItems, $locale);
+                return [
+                    'item_selection',
+                    __('chatbot.cart_edit_invalid_index', ['summary' => $summary], $locale),
+                    ['item_selection_mode' => 'cart_menu'],
+                ];
+            }
+
+            $choice = strtolower(trim($body));
+            $line = $selectedItems[$editIndex];
+
+            if ($choice === '1') {
+                return [
+                    'item_selection',
+                    __('chatbot.cart_edit_quantity_prompt', [
+                        'name' => $line['name'],
+                        'quantity' => $line['quantity'],
+                    ], $locale),
+                    [
+                        'item_selection_mode' => 'edit_quantity',
+                        'edit_index' => $editIndex,
+                    ],
+                ];
+            }
+
+            if ($choice === '2') {
+                array_splice($selectedItems, $editIndex, 1);
+                $summary = $this->buildCartSummary($selectedItems, $locale);
+                return [
+                    'item_selection',
+                    __('chatbot.cart_menu_prompt', ['summary' => $summary], $locale),
+                    [
+                        'selected_items' => $selectedItems,
+                        'item_selection_mode' => 'cart_menu',
+                        'edit_index' => null,
+                    ],
+                ];
+            }
+
+            if ($choice === '3') {
+                $summary = $this->buildCartSummary($selectedItems, $locale);
+                return [
+                    'item_selection',
+                    __('chatbot.cart_menu_prompt', ['summary' => $summary], $locale),
+                    [
+                        'selected_items' => $selectedItems,
+                        'item_selection_mode' => 'cart_menu',
+                        'edit_index' => null,
+                    ],
+                ];
+            }
+
+            // Invalid choice while editing an item: show cart invalid option and stay in edit_action.
+            $summary = $this->buildCartSummary($selectedItems, $locale);
+            return [
+                'item_selection',
+                __('chatbot.cart_invalid_option', ['summary' => $summary], $locale),
+                [
+                    'selected_items' => $selectedItems,
+                    'item_selection_mode' => 'edit_action',
+                    'edit_index' => $editIndex,
                 ],
             ];
         }
@@ -397,6 +524,23 @@ class ChatbotFsm
             ? __('chatbot.collect_name_prompt_with_saved', ['name' => $savedName], $locale)
             : __('chatbot.collect_name_prompt', [], $locale);
 
+        if ($keyword === 'back') {
+            $selectedItems = $this->normalizeSelectedItems($statePayload['selected_items'] ?? []);
+            $summary = $this->buildCartSummary($selectedItems, $locale);
+            return [
+                'item_selection',
+                __('chatbot.cart_menu_prompt', ['summary' => $summary], $locale),
+                [
+                    'selected_items' => $selectedItems,
+                    'pending_item' => null,
+                    'item_selection_mode' => 'cart_menu',
+                    'edit_index' => null,
+                ],
+            ];
+        }
+        if ($keyword !== null) {
+            return $this->handleKeywordInState($keyword, $statePayload, $menuItems, $locale, 'collect_name');
+        }
         if ($keyword === 'help') {
             return [
                 'collect_name',
@@ -457,27 +601,49 @@ class ChatbotFsm
      * @param array<int, array{id: int, name: string, price: float}> $menuItems
      * @return array{string, string, array<string, mixed>}
      */
-    private function fromDeliveryChoice(string $body, array $statePayload, array $menuItems, string $locale): array
+    private function fromDeliveryChoice(string $body, array $statePayload, array $menuItems, array $deliveryAreas, string $locale): array
     {
         $keyword = $this->keywordMatcher->match($body);
-        if ($keyword === 'help') {
-            return [
-                'delivery_choice',
-                __('chatbot.delivery_choice_prompt', [], $locale),
-                [],
-            ];
-        }
-        if ($keyword === 'human_takeover') {
-            return [
-                'human_takeover',
-                __('chatbot.human_takeover_reply', [], $locale),
-                [],
-            ];
-        }
+        $prompt = $this->buildDeliveryChoicePrompt($deliveryAreas, $locale);
 
         $selectedItems = $this->normalizeSelectedItems($statePayload['selected_items'] ?? []);
         $summary = $this->buildCartSummary($selectedItems, $locale);
         $bodyTrim = trim($body);
+        if ($keyword === 'back') {
+            $savedName = $statePayload['saved_customer_name'] ?? null;
+            $customerName = $statePayload['customer_name'] ?? null;
+            if (($savedName === null || $savedName === '') && is_string($customerName) && $customerName !== '' && $customerName !== 'Anonymous') {
+                $savedName = $customerName;
+            }
+            $collectPrompt = ($savedName !== null && $savedName !== '')
+                ? __('chatbot.collect_name_prompt_with_saved', ['name' => $savedName], $locale)
+                : __('chatbot.collect_name_prompt', [], $locale);
+            return [
+                'collect_name',
+                $collectPrompt,
+                [
+                    'selected_items' => $selectedItems,
+                    'saved_customer_name' => $savedName,
+                ],
+            ];
+        }
+        if ($keyword !== null) {
+            if ($keyword === 'help') {
+                return [
+                    'delivery_choice',
+                    $prompt,
+                    [],
+                ];
+            }
+            if ($keyword === 'human_takeover') {
+                return [
+                    'human_takeover',
+                    __('chatbot.human_takeover_reply', [], $locale),
+                    [],
+                ];
+            }
+            return $this->handleKeywordInState($keyword, $statePayload, $menuItems, $locale, 'delivery_choice');
+        }
         $payload = [
             'selected_items' => $selectedItems,
             'customer_name' => $statePayload['customer_name'] ?? 'Anonymous',
@@ -497,7 +663,7 @@ class ChatbotFsm
         if ($intent === 'delivery') {
             return [
                 'delivery_choice',
-                __('chatbot.delivery_choice_prompt', [], $locale),
+                $prompt,
                 [
                     'selected_items' => $selectedItems,
                     'customer_name' => $statePayload['customer_name'] ?? 'Anonymous',
@@ -515,40 +681,69 @@ class ChatbotFsm
                 $payload,
             ];
         }
-        if ($bodyTrim === '2') {
-            $payload['delivery_type'] = 'delivery';
-            $payload['delivery_place'] = 'Municipal Hall';
-            $payload['delivery_fee'] = 0;
-            return [
-                'confirm',
-                __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
-                $payload,
-            ];
-        }
-        if ($bodyTrim === '3') {
-            $payload['delivery_type'] = 'delivery';
-            $payload['delivery_place'] = 'Within Barangay Tagudin';
-            $payload['delivery_fee'] = 0;
-            return [
-                'confirm',
-                __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
-                $payload,
-            ];
-        }
-        if ($bodyTrim === '4') {
-            $payload['delivery_type'] = 'delivery';
-            $payload['delivery_place'] = 'Other (paid on delivery)';
-            $payload['delivery_fee'] = null;
-            return [
-                'confirm',
-                __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
-                $payload,
-            ];
+        if (empty($deliveryAreas)) {
+            if ($bodyTrim === '2') {
+                $payload['delivery_type'] = 'delivery';
+                $payload['delivery_place'] = 'Municipal Hall';
+                $payload['delivery_fee'] = 0;
+                return [
+                    'confirm',
+                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $payload,
+                ];
+            }
+            if ($bodyTrim === '3') {
+                $payload['delivery_type'] = 'delivery';
+                $payload['delivery_place'] = 'Within Barangay Tagudin';
+                $payload['delivery_fee'] = 0;
+                return [
+                    'confirm',
+                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $payload,
+                ];
+            }
+            if ($bodyTrim === '4') {
+                $payload['delivery_type'] = 'delivery';
+                $payload['delivery_place'] = 'Other (paid on delivery)';
+                $payload['delivery_fee'] = null;
+                return [
+                    'confirm',
+                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $payload,
+                ];
+            }
+        } else {
+            $idx = (int) $bodyTrim;
+            $maxAreaOption = count($deliveryAreas) + 1; // +1 for pickup at 1
+            $otherOption = $maxAreaOption + 1;
+            if ($idx >= 2 && $idx <= $maxAreaOption) {
+                $area = $deliveryAreas[$idx - 2];
+                $payload['delivery_type'] = 'delivery';
+                $payload['delivery_place'] = (string) ($area['name'] ?? '');
+                $isFree = (bool) ($area['is_free'] ?? false);
+                $fee = array_key_exists('fee', $area) ? $area['fee'] : null;
+                $payload['delivery_fee'] = $isFree ? 0 : ($fee === null ? null : (float) $fee);
+                return [
+                    'confirm',
+                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $payload,
+                ];
+            }
+            if ($idx === $otherOption) {
+                $payload['delivery_type'] = 'delivery';
+                $payload['delivery_place'] = 'Other (paid on delivery)';
+                $payload['delivery_fee'] = null;
+                return [
+                    'confirm',
+                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $payload,
+                ];
+            }
         }
 
         return [
             'delivery_choice',
-            __('chatbot.delivery_choice_invalid', [], $locale) . ' ' . __('chatbot.delivery_choice_prompt', [], $locale),
+            __('chatbot.delivery_choice_invalid', [], $locale) . ' ' . $prompt,
             [
                 'selected_items' => $selectedItems,
                 'customer_name' => $statePayload['customer_name'] ?? 'Anonymous',
@@ -561,9 +756,24 @@ class ChatbotFsm
      * @param array<int, array{id: int, name: string, price: float}> $menuItems
      * @return array{string, string, array<string, mixed>}
      */
-    private function fromConfirm(string $body, array $statePayload, array $menuItems, string $locale): array
+    private function fromConfirm(string $body, array $statePayload, array $menuItems, array $deliveryAreas, string $locale): array
     {
         $keyword = $this->keywordMatcher->match($body);
+        if ($keyword === 'back') {
+            $selectedItems = $this->normalizeSelectedItems($statePayload['selected_items'] ?? []);
+            $prompt = $this->buildDeliveryChoicePrompt($deliveryAreas, $locale);
+            return [
+                'delivery_choice',
+                $prompt,
+                [
+                    'selected_items' => $selectedItems,
+                    'customer_name' => $statePayload['customer_name'] ?? 'Anonymous',
+                    'delivery_type' => null,
+                    'delivery_place' => null,
+                    'delivery_fee' => null,
+                ],
+            ];
+        }
         if ($keyword !== null) {
             return $this->handleKeywordInState($keyword, $statePayload, $menuItems, $locale, 'confirm');
         }
@@ -642,7 +852,7 @@ class ChatbotFsm
             return [
                 'main_menu',
                 __('chatbot.main_menu_prompt', [], $locale),
-                [],
+                $this->orderFlowResetPayload(),
             ];
         }
         if ($keyword === 'help') {
@@ -664,11 +874,10 @@ class ChatbotFsm
             ];
         }
         if ($keyword === 'cancel') {
-            $menuText = $this->buildMenuText($menuItems, $locale);
             return [
-                'menu',
-                __('chatbot.cancel_ok', [], $locale) . ' ' . $menuText,
-                ['selected_items' => []],
+                'main_menu',
+                __('chatbot.cancel_ok', [], $locale) . ' ' . __('chatbot.main_menu_prompt', [], $locale),
+                $this->orderFlowResetPayload(),
             ];
         }
         if ($keyword === 'status') {
@@ -694,6 +903,58 @@ class ChatbotFsm
             __('chatbot.invalid_option_menu', [], $locale) . ' ' . $menuText,
             [],
         ];
+    }
+
+    /**
+     * Reset keys related to an in-progress order flow.
+     *
+     * @return array<string, mixed>
+     */
+    private function orderFlowResetPayload(): array
+    {
+        return [
+            'selected_items' => [],
+            'pending_item' => null,
+            'item_selection_mode' => null,
+            'edit_index' => null,
+            'customer_name' => null,
+            'delivery_type' => null,
+            'delivery_place' => null,
+            'delivery_fee' => null,
+        ];
+    }
+
+    /**
+     * @param array<int, array{id: int, name: string, is_free: bool, fee: float|null}> $deliveryAreas
+     */
+    private function buildDeliveryChoicePrompt(array $deliveryAreas, string $locale): string
+    {
+        if (empty($deliveryAreas)) {
+            return __('chatbot.delivery_choice_prompt', [], $locale);
+        }
+
+        $lines = [__('chatbot.delivery_choice_header', [], $locale)];
+        $lines[] = '1. ' . __('chatbot.delivery_summary_pickup', [], $locale);
+
+        foreach ($deliveryAreas as $idx => $area) {
+            $num = $idx + 2;
+            $name = (string) ($area['name'] ?? '');
+            $isFree = (bool) ($area['is_free'] ?? false);
+            $fee = array_key_exists('fee', $area) ? $area['fee'] : null;
+
+            if ($isFree) {
+                $lines[] = "{$num}. " . __('chatbot.delivery_summary_free', ['place' => $name], $locale);
+            } elseif ($fee === null) {
+                $lines[] = "{$num}. " . __('chatbot.delivery_summary_fee_on_delivery', ['place' => $name], $locale);
+            } else {
+                $lines[] = "{$num}. " . __('chatbot.delivery_summary_fee', ['place' => $name, 'fee' => number_format((float) $fee, 2)], $locale);
+            }
+        }
+
+        $otherNum = count($deliveryAreas) + 2;
+        $lines[] = "{$otherNum}. " . __('chatbot.delivery_summary_paid', [], $locale);
+
+        return implode("\n", $lines);
     }
 
     /**

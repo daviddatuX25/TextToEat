@@ -110,24 +110,6 @@ function DeliveryOrderCard({ order, isHighlighted = false }) {
                 </div>
             )}
 
-            {!isCompleted && (
-                <div className="flex flex-col gap-2 mt-4">
-                    {isReceived && <button type="button" onClick={() => updateStatus('confirmed')} className="w-full bg-surface-900 text-white dark:bg-white dark:text-surface-900 font-semibold py-2.5 rounded-xl hover:opacity-90 active:scale-[0.99]">Confirm</button>}
-                    {isConfirmed && <button type="button" onClick={() => updateStatus('ready')} className="w-full bg-amber-500 text-white font-semibold py-2.5 rounded-xl hover:bg-amber-600 active:scale-[0.99]">Mark ready</button>}
-                    {isReady && <button type="button" onClick={() => updateStatus('on_the_way')} className="w-full bg-blue-500 text-white font-semibold py-2.5 rounded-xl hover:bg-blue-600 active:scale-[0.99]">Mark on the way</button>}
-                    {isOnTheWay && (
-                        <button
-                            type="button"
-                            onClick={() => updateStatus('completed')}
-                            title={!isPaid ? 'Mark as paid first' : undefined}
-                            className={`w-full font-semibold py-2.5 rounded-xl active:scale-[0.99] ${isPaid ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400 hover:opacity-90'}`}
-                        >
-                            Complete delivery
-                        </button>
-                    )}
-                </div>
-            )}
-
             <div className="flex flex-col gap-2 mt-4">
                 <Link
                     href={`/portal/orders?highlight=${order.id}`}
@@ -142,10 +124,41 @@ function DeliveryOrderCard({ order, isHighlighted = false }) {
 }
 
 function ManageDeliveryAreasDialog({ deliveryAreas = [], open, onOpenChange }) {
-    const form = useForm({ name: '', is_free: true, fee: null, sort_order: 0 });
+    const addForm = useForm({ name: '', is_free: true, fee: null, sort_order: 0 });
+    const editForm = useForm({ name: '', is_free: true, fee: null, sort_order: 0 });
+    const [editingArea, setEditingArea] = useState(null);
+
     const addArea = (e) => {
         e.preventDefault();
-        form.post('/portal/delivery-areas', { onSuccess: () => form.reset() });
+        addForm.post('/portal/delivery-areas', { onSuccess: () => addForm.reset() });
+    };
+
+    const startEdit = (area) => {
+        setEditingArea(area);
+        editForm.setData({
+            name: area.name ?? '',
+            is_free: !!area.is_free,
+            fee: area.fee ?? null,
+            sort_order: area.sort_order ?? 0,
+        });
+        editForm.clearErrors();
+    };
+
+    const submitEdit = (e) => {
+        e.preventDefault();
+        if (!editingArea) return;
+        editForm.put(`/portal/delivery-areas/${editingArea.id}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setEditingArea(null);
+            },
+        });
+    };
+
+    const cancelEdit = () => {
+        setEditingArea(null);
+        editForm.reset();
+        editForm.clearErrors();
     };
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,20 +187,112 @@ function ManageDeliveryAreasDialog({ deliveryAreas = [], open, onOpenChange }) {
                                             {area.is_free ? 'Free' : area.fee != null && area.fee !== '' ? `₱${Number(area.fee).toFixed(2)}` : 'Fee on delivery'}
                                         </span>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => window.confirm(`Remove "${area.name}"?`) && router.delete(`/portal/delivery-areas/${area.id}`)}
-                                        className="inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-sm font-medium"
-                                        aria-label="Delete"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                        Delete
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => startEdit(area)}
+                                            className="inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg border border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 text-sm font-medium"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => window.confirm(`Remove "${area.name}"?`) && router.delete(`/portal/delivery-areas/${area.id}`)}
+                                            className="inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-sm font-medium"
+                                            aria-label="Delete"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            Delete
+                                        </button>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
                     )}
-                    <div className="border-t border-surface-200 dark:border-surface-700 pt-4">
+                    <div className="border-t border-surface-200 dark:border-surface-700 pt-4 space-y-6">
+                        {editingArea && (
+                            <form onSubmit={submitEdit} className="space-y-4">
+                                <h4 className="text-sm font-semibold text-surface-700 dark:text-surface-300">
+                                    Edit delivery area
+                                    <span className="ml-2 inline-flex items-center rounded-full bg-surface-100 dark:bg-surface-700 px-2 py-0.5 text-xs font-medium text-surface-600 dark:text-surface-300">
+                                        {editingArea.name}
+                                    </span>
+                                </h4>
+                                <label className="block">
+                                    <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Name</span>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={editForm.data.name}
+                                        onChange={(e) => editForm.setData('name', e.target.value)}
+                                        className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                        placeholder="e.g. Municipal Hall"
+                                    />
+                                </label>
+                                <div>
+                                    <span className="text-sm font-semibold text-surface-700 dark:text-surface-300 block mb-2">Charge</span>
+                                    <div className="flex gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="edit_is_free"
+                                                checked={editForm.data.is_free === true}
+                                                onChange={() => editForm.setData((d) => ({ ...d, is_free: true, fee: null }))}
+                                                className="rounded-full border-surface-300 text-primary-600"
+                                            />
+                                            <span className="text-sm">Free</span>
+                                        </label>
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="radio"
+                                                name="edit_is_free"
+                                                checked={editForm.data.is_free === false}
+                                                onChange={() => editForm.setData((d) => ({ ...d, is_free: false, fee: null }))}
+                                                className="rounded-full border-surface-300 text-primary-600"
+                                            />
+                                            <span className="text-sm">Custom charge</span>
+                                        </label>
+                                    </div>
+                                    {!editForm.data.is_free && (
+                                        <div className="mt-2">
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                value={editForm.data.fee ?? ''}
+                                                onChange={(e) => editForm.setData('fee', e.target.value === '' ? null : Number(e.target.value))}
+                                                className="w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                                placeholder="Fee (₱) — leave blank for fee on delivery"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                                {Object.keys(editForm.errors).length > 0 && (
+                                    <ul className="text-sm text-red-600 dark:text-red-400">
+                                        {Object.entries(editForm.errors).map(([k, v]) => (
+                                            <li key={k}>{v}</li>
+                                        ))}
+                                    </ul>
+                                )}
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="submit"
+                                        disabled={editForm.processing}
+                                        className="py-2 px-4 rounded-xl bg-primary-600 text-white font-semibold text-sm hover:bg-primary-700 disabled:opacity-50"
+                                    >
+                                        {editForm.processing ? 'Saving...' : 'Save changes'}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={cancelEdit}
+                                        className="py-2 px-3 rounded-xl border border-surface-300 dark:border-surface-600 text-sm font-semibold text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700"
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        )}
+
                         <form onSubmit={addArea} className="space-y-4">
                             <h4 className="text-sm font-semibold text-surface-700 dark:text-surface-300">Add delivery area</h4>
                             <label className="block">
@@ -195,8 +300,8 @@ function ManageDeliveryAreasDialog({ deliveryAreas = [], open, onOpenChange }) {
                                 <input
                                     type="text"
                                     required
-                                    value={form.data.name}
-                                    onChange={(e) => form.setData('name', e.target.value)}
+                                    value={addForm.data.name}
+                                    onChange={(e) => addForm.setData('name', e.target.value)}
                                     className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
                                     placeholder="e.g. Municipal Hall"
                                 />
@@ -208,8 +313,8 @@ function ManageDeliveryAreasDialog({ deliveryAreas = [], open, onOpenChange }) {
                                         <input
                                             type="radio"
                                             name="add_is_free"
-                                            checked={form.data.is_free === true}
-                                            onChange={() => form.setData((d) => ({ ...d, is_free: true, fee: null }))}
+                                            checked={addForm.data.is_free === true}
+                                            onChange={() => addForm.setData((d) => ({ ...d, is_free: true, fee: null }))}
                                             className="rounded-full border-surface-300 text-primary-600"
                                         />
                                         <span className="text-sm">Free</span>
@@ -218,36 +323,36 @@ function ManageDeliveryAreasDialog({ deliveryAreas = [], open, onOpenChange }) {
                                         <input
                                             type="radio"
                                             name="add_is_free"
-                                            checked={form.data.is_free === false}
-                                            onChange={() => form.setData((d) => ({ ...d, is_free: false, fee: null }))}
+                                            checked={addForm.data.is_free === false}
+                                            onChange={() => addForm.setData((d) => ({ ...d, is_free: false, fee: null }))}
                                             className="rounded-full border-surface-300 text-primary-600"
                                         />
                                         <span className="text-sm">Custom charge</span>
                                     </label>
                                 </div>
-                                {!form.data.is_free && (
+                                {!addForm.data.is_free && (
                                     <div className="mt-2">
                                         <input
                                             type="number"
                                             step="0.01"
                                             min="0"
-                                            value={form.data.fee ?? ''}
-                                            onChange={(e) => form.setData('fee', e.target.value === '' ? null : Number(e.target.value))}
+                                            value={addForm.data.fee ?? ''}
+                                            onChange={(e) => addForm.setData('fee', e.target.value === '' ? null : Number(e.target.value))}
                                             className="w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
                                             placeholder="Fee (₱) — leave blank for fee on delivery"
                                         />
                                     </div>
                                 )}
                             </div>
-                            {Object.keys(form.errors).length > 0 && (
+                            {Object.keys(addForm.errors).length > 0 && (
                                 <ul className="text-sm text-red-600 dark:text-red-400">
-                                    {Object.entries(form.errors).map(([k, v]) => (
+                                    {Object.entries(addForm.errors).map(([k, v]) => (
                                         <li key={k}>{v}</li>
                                     ))}
                                 </ul>
                             )}
-                            <button type="submit" disabled={form.processing} className="py-2 px-4 rounded-xl bg-primary-600 text-white font-semibold text-sm hover:bg-primary-700 disabled:opacity-50">
-                                {form.processing ? 'Adding...' : 'Add area'}
+                            <button type="submit" disabled={addForm.processing} className="py-2 px-4 rounded-xl bg-primary-600 text-white font-semibold text-sm hover:bg-primary-700 disabled:opacity-50">
+                                {addForm.processing ? 'Adding...' : 'Add area'}
                             </button>
                         </form>
                     </div>
@@ -260,12 +365,42 @@ function ManageDeliveryAreasDialog({ deliveryAreas = [], open, onOpenChange }) {
 export default function Deliveries({ orders = [], deliveryAreas = [], highlight }) {
     const highlightRef = useRef(null);
     const [manageOpen, setManageOpen] = useState(false);
+    const [activeHighlight, setActiveHighlight] = useState(() => (highlight ? String(highlight) : null));
+    const highlightTimeoutRef = useRef(null);
 
     useEffect(() => {
-        if (highlight && highlightRef.current) {
-            highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        if (!highlight) {
+            setActiveHighlight(null);
+            return;
         }
+        setActiveHighlight(String(highlight));
+        if (highlightTimeoutRef.current) {
+            clearTimeout(highlightTimeoutRef.current);
+        }
+        highlightTimeoutRef.current = setTimeout(() => {
+            setActiveHighlight(null);
+        }, 5000);
+        return () => {
+            if (highlightTimeoutRef.current) {
+                clearTimeout(highlightTimeoutRef.current);
+            }
+        };
     }, [highlight]);
+
+    useEffect(() => {
+        if (!activeHighlight) return;
+        const handle = window.setTimeout(() => {
+            if (!highlightRef.current) return;
+            try {
+                highlightRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (e) {
+                // ignore
+            }
+        }, 50);
+        return () => {
+            window.clearTimeout(handle);
+        };
+    }, [activeHighlight]);
 
     return (
         <PortalLayout>
@@ -304,7 +439,7 @@ export default function Deliveries({ orders = [], deliveryAreas = [], highlight 
                     <>
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             {orders.map((order) => {
-                                const isHighlight = String(order.id) === String(highlight);
+                                const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
                                 return (
                                     <div key={order.id} ref={isHighlight ? highlightRef : null} className={isHighlight ? 'p-2 -m-2' : ''}>
                                         <DeliveryOrderCard order={order} isHighlighted={isHighlight} />

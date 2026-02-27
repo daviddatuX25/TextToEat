@@ -1,6 +1,6 @@
-import { Link, router, usePage } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { useState, useRef } from 'react';
-import { LayoutGrid, ArrowRight, Globe, MessageCircle, ShoppingBag, Truck, UserRound, X } from 'lucide-react';
+import { LayoutGrid, ArrowRight, Globe, MessageCircle, ShoppingBag, Truck, UserRound, X, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const CHANNEL_BADGES = {
@@ -71,28 +71,76 @@ export function OrderListRow({ order, isHighlighted = false }) {
     const prevStatus = getPrevStatus(order);
     const walkinType = order.walkin_type ?? order.walkinType ?? null;
 
-    const fulfillmentLabel = isDelivery
-        ? (order.delivery_place === 'Other (paid on delivery)' ? 'Delivery: Other (fee on delivery)' : `Delivery: ${order.delivery_place ?? '—'} (free)`)
-        : isWalkin
-            ? (walkinType === 'dine_in' ? 'Dine in' : walkinType === 'takeout' ? 'Take out' : 'Walk-in')
-            : 'Pickup';
+    const walkinSubLabel = walkinType === 'dine_in' ? 'Dine in' : walkinType === 'takeout' ? 'Take out' : null;
 
     const badge = CHANNEL_BADGES[channel] ?? CHANNEL_BADGES.web;
     const Icon = badge.icon;
 
     const items = order.order_items ?? order.orderItems ?? [];
 
+    const hasDestination = isReady || isOnTheWay;
+    const destinationHref = hasDestination
+        ? (isWalkin
+            ? `/portal/walkin?highlight=${order.id}`
+            : isDelivery
+                ? `/portal/deliveries?highlight=${order.id}`
+                : `/portal/pickup?highlight=${order.id}`)
+        : null;
+
+    const handleCardClick = () => {
+        if (destinationHref) {
+            router.visit(destinationHref);
+        }
+    };
+
     return (
-        <div className={`glass-panel p-4 rounded-2xl border border-surface-200 dark:border-surface-700 hover:shadow-glass group relative ${isHighlighted ? 'highlight-ring' : ''}`}>
+        <div
+            className={`glass-panel p-4 rounded-2xl border border-surface-200 dark:border-surface-700 hover:shadow-glass group relative ${isHighlighted ? 'highlight-ring' : ''} ${destinationHref ? 'cursor-pointer' : ''}`}
+            onClick={handleCardClick}
+            role={destinationHref ? 'button' : undefined}
+            tabIndex={destinationHref ? 0 : undefined}
+            onKeyDown={(e) => {
+                if (!destinationHref) return;
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleCardClick();
+                }
+            }}
+        >
             <div className="flex justify-between items-start gap-2 mb-3">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
-                    <span className={`${badge.color} text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1.5 uppercase shrink-0`} title={badge.label}>
-                        <Icon className="h-3.5 w-3.5" />
-                        {channel === 'web' ? 'Online' : badge.label}
-                    </span>
-                    {isPaid && <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 text-xs font-bold px-2 py-1 rounded-md shrink-0">Paid</span>}
+                    {channel !== 'walkin' && (
+                        <span className={`${badge.color} text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1.5 uppercase shrink-0`} title={badge.label}>
+                            <Icon className="h-3.5 w-3.5" />
+                            {channel === 'web' ? 'Online' : badge.label}
+                        </span>
+                    )}
+                    {isPaid && (
+                        <span className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 text-xs font-bold px-2 py-1 rounded-md shrink-0 flex items-center gap-1.5">
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                            <span>Paid</span>
+                        </span>
+                    )}
                     <span className={`text-xs font-bold px-2 py-1 rounded-md shrink-0 ${isDelivery ? 'bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300' : isWalkin ? 'bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-300' : 'bg-surface-200 text-surface-700 dark:bg-surface-600 dark:text-surface-300'}`}>
-                        {fulfillmentLabel}
+                        {isDelivery ? (
+                            order.delivery_place === 'Other (paid on delivery)'
+                                ? 'Delivery: Other (fee on delivery)'
+                                : `Delivery: ${order.delivery_place ?? '—'} (free)`
+                        ) : isWalkin ? (
+                            <span className="inline-flex items-center gap-1.5">
+                                <UserRound className="h-3.5 w-3.5" />
+                                <span>Walk-in</span>
+                                {walkinSubLabel && (
+                                    <>
+                                        <span className="text-[10px] text-surface-400 dark:text-surface-500">|</span>
+                                        <span>{walkinSubLabel}</span>
+                                        <UserRound className="h-3.5 w-3.5" />
+                                    </>
+                                )}
+                            </span>
+                        ) : (
+                            'Pickup'
+                        )}
                     </span>
                     <span className="text-surface-400 text-sm font-medium truncate">#{order.reference ?? order.id}</span>
                     {order.order_marker && <span className="text-surface-500 text-xs font-medium truncate">({order.order_marker})</span>}
@@ -102,7 +150,7 @@ export function OrderListRow({ order, isHighlighted = false }) {
                         {cancelling && <span className="absolute inset-[-3px] rounded-full border-2 border-transparent border-t-amber-400 border-r-amber-400 animate-spin pointer-events-none" style={{ animationDuration: '3s' }} aria-hidden />}
                         <button
                             type="button"
-                            onClick={handleCancel}
+                            onClick={(e) => { e.stopPropagation(); handleCancel(); }}
                             title={cancelling ? 'Click again to cancel' : 'Cancel order'}
                             className={`relative z-10 inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors ${cancelling ? 'border-amber-400 bg-amber-50 dark:bg-amber-500/20 text-amber-700' : 'border-surface-200 dark:border-surface-600 text-surface-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 dark:hover:bg-red-500/20 dark:hover:border-red-500/30 dark:hover:text-red-400'}`}
                             aria-label={cancelling ? 'Click again to cancel' : 'Cancel order'}
@@ -125,8 +173,14 @@ export function OrderListRow({ order, isHighlighted = false }) {
                 <div
                     role="button"
                     tabIndex={0}
-                    onClick={togglePayment}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togglePayment(); } }}
+                    onClick={(e) => { e.stopPropagation(); togglePayment(); }}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            togglePayment();
+                        }
+                    }}
                     aria-label={isPaid ? 'Mark unpaid (click to toggle)' : 'Mark paid (click to toggle)'}
                     className="p-3 bg-surface-100/50 dark:bg-surface-800/50 rounded-xl space-y-2 border border-surface-200/50 dark:border-surface-700/50 cursor-pointer transition-colors hover:bg-surface-100 dark:hover:bg-surface-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                 >
@@ -176,7 +230,7 @@ export function OrderListRow({ order, isHighlighted = false }) {
                     {prevStatus ? (
                         <button
                             type="button"
-                            onClick={() => updateStatus(prevStatus)}
+                            onClick={(e) => { e.stopPropagation(); updateStatus(prevStatus); }}
                             title={`Move back to ${prevStatus.replace('_', ' ')}`}
                             className="inline-flex h-12 w-14 shrink-0 items-center justify-center rounded-xl border border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
                         >
@@ -186,7 +240,7 @@ export function OrderListRow({ order, isHighlighted = false }) {
                     {isReceived && (
                         <button
                             type="button"
-                            onClick={() => updateStatus('confirmed')}
+                            onClick={(e) => { e.stopPropagation(); updateStatus('confirmed'); }}
                             title="Confirm order"
                             className="inline-flex h-12 w-14 shrink-0 items-center justify-center rounded-xl border border-emerald-300 dark:border-emerald-500/50 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 ml-auto"
                         >
@@ -196,7 +250,7 @@ export function OrderListRow({ order, isHighlighted = false }) {
                     {isConfirmed && (
                         <button
                             type="button"
-                            onClick={() => updateStatus('ready')}
+                            onClick={(e) => { e.stopPropagation(); updateStatus('ready'); }}
                             title="Mark as ready"
                             className="inline-flex h-12 w-14 shrink-0 items-center justify-center rounded-xl border border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 ml-auto"
                         >
@@ -212,26 +266,25 @@ export function OrderListRow({ order, isHighlighted = false }) {
                         {prevStatus ? (
                             <button
                                 type="button"
-                                onClick={() => updateStatus(prevStatus)}
+                                onClick={(e) => { e.stopPropagation(); updateStatus(prevStatus); }}
                                 title={`Move back to ${prevStatus.replace('_', ' ')}`}
                                 className="inline-flex h-12 w-14 shrink-0 items-center justify-center rounded-xl border border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700"
                             >
                                 <ArrowRight className="h-6 w-6 rotate-180" />
                             </button>
                         ) : <span className="w-14 shrink-0" aria-hidden />}
-                        {isWalkin ? (
-                            <Link href={`/portal/walkin?highlight=${order.id}`} title="Go to Walk-in counter" className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-violet-300 dark:border-violet-500/60 bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/20">
-                                <ShoppingBag className="h-8 w-8" />
-                            </Link>
-                        ) : isDelivery ? (
-                            <Link href={`/portal/deliveries?highlight=${order.id}`} title="Go to deliveries" className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-blue-300 dark:border-blue-500/60 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20">
-                                <Truck className="h-8 w-8" />
-                            </Link>
-                        ) : (
-                            <Link href={`/portal/pickup?highlight=${order.id}`} title="Go to pickup" className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20">
-                                <ShoppingBag className="h-8 w-8" />
-                            </Link>
-                        )}
+                        <div
+                            className={`inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border-2 ${
+                                isWalkin
+                                    ? 'border-violet-300 dark:border-violet-500/60 bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300'
+                                    : isDelivery
+                                        ? 'border-blue-300 dark:border-blue-500/60 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300'
+                                        : 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                            }`}
+                            aria-hidden
+                        >
+                            {isDelivery ? <Truck className="h-8 w-8" /> : <ShoppingBag className="h-8 w-8" />}
+                        </div>
                     </div>
                 </div>
             )}

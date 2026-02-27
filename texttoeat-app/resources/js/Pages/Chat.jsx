@@ -35,6 +35,12 @@ export default function Chat({ webChatExternalId = '' }) {
     }, [messages]);
 
     useEffect(() => {
+        // SMS conversations are user-initiated; skip init hook for sms.
+        if (channel === 'sms') {
+            setLoading(false);
+            return;
+        }
+
         if (initFetched.current) return;
         if (!effectiveExternalId && channel !== 'web') {
             setExternalId(`sim_${channel}_${Date.now()}`);
@@ -43,7 +49,6 @@ export default function Chat({ webChatExternalId = '' }) {
         const id = channel === 'web' ? (webChatExternalId || effectiveExternalId) : effectiveExternalId;
         if (!id) {
             setLoading(false);
-            setMessages([{ role: 'bot', text: 'Starting web chat…', id: 'init' }]);
             return;
         }
 
