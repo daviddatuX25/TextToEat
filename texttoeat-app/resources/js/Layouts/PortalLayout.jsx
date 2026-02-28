@@ -140,6 +140,7 @@ export default function PortalLayout({ children }) {
 
     const navItems = [...PORTAL_NAV_ITEMS];
     if (isAdmin) {
+        navItems.push({ href: '/portal/simulate', label: 'Channel simulator', icon: 'ph-chat-circle' });
         navItems.push({ href: '/portal/users', label: 'Manage users', icon: 'ph-users-three' });
     }
 

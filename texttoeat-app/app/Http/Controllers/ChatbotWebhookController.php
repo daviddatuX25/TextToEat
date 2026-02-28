@@ -8,6 +8,8 @@ use App\Chatbot\ChatbotOrderService;
 use App\Models\ChatbotSession;
 use App\Models\DeliveryArea;
 use App\Models\MenuItem;
+use App\Models\OutboundMessenger;
+use App\Models\OutboundSms;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -91,7 +93,16 @@ class ChatbotWebhookController extends Controller
             ->all();
 
         $fsm = new ChatbotFsm();
-        [$nextState, $reply, $statePayload] = $fsm->transition($currentState, $body, $state, $menuItems, $deliveryAreas, $locale);
+        [$nextState, $reply, $statePayload] = $fsm->transition(
+            $currentState,
+            $body,
+            $state,
+            $menuItems,
+            $deliveryAreas,
+            $locale,
+            $externalId,
+            $channel
+        );
 
         $newState = array_merge($state, ['current_state' => $nextState], $statePayload);
 
@@ -158,6 +169,38 @@ class ChatbotWebhookController extends Controller
             'replies' => $replies,
             'state' => $newState,
         ]);
+    }
+
+    public function outboundMessages(Request $request): JsonResponse
+    {
+        $channel = $request->query('channel');
+        $externalId = $request->query('external_id');
+        if (! \in_array($channel, ['sms', 'messenger'], true) || ! \is_string($externalId) || $externalId === '') {
+            return response()->json(['message' => 'channel and external_id are required'], 422);
+        }
+
+        if ($channel === 'sms') {
+            $rows = OutboundSms::query()
+                ->where('to', $externalId)
+                ->where('channel', 'sms')
+                ->orderByDesc('created_at')
+                ->limit(30)
+                ->get(['id', 'body', 'created_at']);
+        } else {
+            $rows = OutboundMessenger::query()
+                ->where('to', $externalId)
+                ->orderByDesc('created_at')
+                ->limit(30)
+                ->get(['id', 'body', 'created_at']);
+        }
+
+        $messages = $rows->map(fn ($r) => [
+            'id' => $r->id,
+            'body' => $r->body,
+            'created_at' => $r->created_at->toIso8601String(),
+        ])->values()->all();
+
+        return response()->json(['messages' => $messages]);
     }
 
     /**

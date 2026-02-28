@@ -2,11 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\MessengerSenderInterface;
+use App\Contracts\SmsSenderInterface;
+use App\Models\ActionLog;
 use App\Models\ChatbotSession;
 use App\Models\OutboundSms;
 use App\Models\User;
-use App\Services\FacebookMessengerClient;
-use App\Services\OutboundSmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -59,15 +60,15 @@ class ConversationTakeoverPortalTest extends TestCase
             'last_activity_at' => now(),
         ]);
 
-        $smsMock = Mockery::mock(OutboundSmsService::class);
-        $smsMock->shouldReceive('enqueueAndSendFcm')
+        $smsMock = Mockery::mock(SmsSenderInterface::class);
+        $smsMock->shouldReceive('send')
             ->once()
             ->with('09123456789', Mockery::type('string'), 'sms', $session->id)
             ->andReturn(['success' => true, 'ids' => [1]]);
-        $this->app->instance(OutboundSmsService::class, $smsMock);
+        $this->app->instance(SmsSenderInterface::class, $smsMock);
 
-        $fbMock = Mockery::mock(FacebookMessengerClient::class);
-        $this->app->instance(FacebookMessengerClient::class, $fbMock);
+        $fbMock = Mockery::mock(MessengerSenderInterface::class);
+        $this->app->instance(MessengerSenderInterface::class, $fbMock);
 
         $this->actingAs($user)
             ->post("/portal/inbox/sessions/{$session->id}/reply", ['message' => 'Hi there'])
@@ -87,14 +88,14 @@ class ConversationTakeoverPortalTest extends TestCase
             'last_activity_at' => now(),
         ]);
 
-        $smsMock = Mockery::mock(OutboundSmsService::class);
-        $this->app->instance(OutboundSmsService::class, $smsMock);
+        $smsMock = Mockery::mock(SmsSenderInterface::class);
+        $this->app->instance(SmsSenderInterface::class, $smsMock);
 
-        $fbMock = Mockery::mock(FacebookMessengerClient::class);
-        $fbMock->shouldReceive('sendTextMessage')
+        $fbMock = Mockery::mock(MessengerSenderInterface::class);
+        $fbMock->shouldReceive('send')
             ->once()
             ->with('psid-123', Mockery::type('string'));
-        $this->app->instance(FacebookMessengerClient::class, $fbMock);
+        $this->app->instance(MessengerSenderInterface::class, $fbMock);
 
         $this->actingAs($user)
             ->post("/portal/inbox/sessions/{$session->id}/reply", ['message' => 'Hello'])
@@ -129,6 +130,51 @@ class ConversationTakeoverPortalTest extends TestCase
         $session->refresh();
         $this->assertSame('main_menu', $session->state['current_state'] ?? null);
         $this->assertFalse((bool) ($session->state['automation_disabled'] ?? true));
+
+        $this->assertDatabaseHas('action_log', [
+            'model' => 'ChatbotSession',
+            'model_id' => $session->id,
+            'action' => 'takeover_resolved',
+            'user_id' => $user->id,
+        ]);
+        $log = ActionLog::query()->where('action', 'takeover_resolved')->where('model_id', $session->id)->first();
+        $this->assertSame('human_takeover', $log->payload['previous_state'] ?? null);
+        $this->assertSame('main_menu', $log->payload['new_state'] ?? null);
+    }
+
+    public function test_takeover_automation_toggle_is_logged(): void
+    {
+        $user = User::factory()->create();
+
+        $session = ChatbotSession::create([
+            'channel' => 'sms',
+            'external_id' => '09120002222',
+            'language' => 'en',
+            'state' => ['current_state' => 'human_takeover', 'automation_disabled' => false],
+            'last_activity_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->patch("/portal/inbox/sessions/{$session->id}/automation", ['enabled' => false])
+            ->assertStatus(302);
+
+        $this->assertDatabaseHas('action_log', [
+            'model' => 'ChatbotSession',
+            'model_id' => $session->id,
+            'action' => 'takeover_automation_disabled',
+            'user_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->patch("/portal/inbox/sessions/{$session->id}/automation", ['enabled' => true])
+            ->assertStatus(302);
+
+        $this->assertDatabaseHas('action_log', [
+            'model' => 'ChatbotSession',
+            'model_id' => $session->id,
+            'action' => 'takeover_automation_enabled',
+            'user_id' => $user->id,
+        ]);
     }
 
     protected function tearDown(): void

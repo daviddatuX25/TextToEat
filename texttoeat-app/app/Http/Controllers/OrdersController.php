@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
 use App\Models\ActionLog;
+use App\Services\OrderStatusNotificationService;
 use App\Models\DeliveryArea;
 use App\Models\DiningMarker;
 use App\Models\MenuItem;
@@ -123,6 +124,10 @@ class OrdersController extends Controller
                     'to_payment_status' => $order->payment_status,
                 ],
             ]);
+
+            if ($originalStatus !== $order->status && \in_array((string) $order->channel, ['sms', 'messenger'], true)) {
+                app(OrderStatusNotificationService::class)->maybeNotify($order, (string) $originalStatus);
+            }
         }
 
         return redirect()->back()->with('success', 'Order updated.');

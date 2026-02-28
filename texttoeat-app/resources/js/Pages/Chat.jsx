@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import AppLayout from '../Layouts/AppLayout';
+import PortalLayout from '../Layouts/PortalLayout';
 import { MessageCircle, Send, Globe, Smartphone } from 'lucide-react';
 
 const CHANNELS = [
@@ -25,6 +25,7 @@ export default function Chat({ webChatExternalId = '' }) {
     const initFetched = useRef(false);
 
     const effectiveExternalId = channel === 'web' ? (webChatExternalId || externalId) : externalId || `web_${Date.now()}`;
+    const seenOutboundIds = useRef(new Set());
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,6 +77,41 @@ export default function Chat({ webChatExternalId = '' }) {
             })
             .finally(() => setLoading(false));
     }, [channel, effectiveExternalId, webChatExternalId]);
+
+    // Poll for proactive outbound messages (SMS/Messenger sim)
+    useEffect(() => {
+        if (channel !== 'sms' && channel !== 'messenger') return;
+        const id = (externalId || '').trim();
+        if (!id) return;
+
+        seenOutboundIds.current = new Set();
+
+        const poll = () => {
+            fetch(`/api/chatbot/outbound-messages?${new URLSearchParams({ channel, external_id: id })}`, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            })
+                .then((r) => (r.ok ? r.json() : null))
+                .then((data) => {
+                    if (!data?.messages?.length) return;
+                    const byCreated = [...data.messages].sort(
+                        (a, b) => new Date(a.created_at) - new Date(b.created_at)
+                    );
+                    const newOnes = byCreated.filter((m) => !seenOutboundIds.current.has(m.id));
+                    if (newOnes.length === 0) return;
+                    newOnes.forEach((m) => seenOutboundIds.current.add(m.id));
+                    setMessages((prev) => [
+                        ...prev,
+                        ...newOnes.map((m, i) => ({ role: 'bot', text: m.body, id: `out-${m.id}-${i}` })),
+                    ]);
+                })
+                .catch(() => {});
+        };
+
+        poll();
+        const interval = setInterval(poll, 2500);
+        return () => clearInterval(interval);
+    }, [channel, externalId]);
 
     const sendMessage = (e) => {
         e.preventDefault();
@@ -141,14 +177,14 @@ export default function Chat({ webChatExternalId = '' }) {
     };
 
     return (
-        <AppLayout>
+        <PortalLayout>
             <section className="flex flex-col gap-6 max-w-2xl mx-auto py-6">
                 <div>
                     <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-surface-900 dark:text-white">
-                        Chat
+                        Channel Simulator
                     </h1>
                     <p className="text-surface-600 dark:text-surface-400 mt-1">
-                        Order via chat (web). Simulate SMS or Messenger to test the same flow.
+                        Simulate SMS or Messenger to test the chatbot flow. Use phone number (SMS) or PSID (Messenger).
                     </p>
                 </div>
 
@@ -175,7 +211,7 @@ export default function Chat({ webChatExternalId = '' }) {
                                 type="text"
                                 value={externalId}
                                 onChange={(e) => setExternalId(e.target.value)}
-                                placeholder="External ID (e.g. +639171234567)"
+                                placeholder={channel === 'sms' ? 'Phone number (e.g. 09171234567)' : 'PSID (e.g. from Messenger test tools)'}
                                 className="flex-1 min-w-[140px] rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-1.5 text-sm"
                             />
                         )}
@@ -231,6 +267,6 @@ export default function Chat({ webChatExternalId = '' }) {
                     </form>
                 </div>
             </section>
-        </AppLayout>
+        </PortalLayout>
     );
 }

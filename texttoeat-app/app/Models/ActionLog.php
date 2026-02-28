@@ -51,6 +51,17 @@ class ActionLog extends Model
      * @param  Builder<ActionLog>  $query
      * @return Builder<ActionLog>
      */
+    public function scopeForTakeover(Builder $query): Builder
+    {
+        return $query
+            ->where('model', 'ChatbotSession')
+            ->whereIn('action', ['takeover_resolved', 'takeover_automation_disabled', 'takeover_automation_enabled']);
+    }
+
+    /**
+     * @param  Builder<ActionLog>  $query
+     * @return Builder<ActionLog>
+     */
     public function scopeForOrders(Builder $query): Builder
     {
         return $query->where('model', 'Order');

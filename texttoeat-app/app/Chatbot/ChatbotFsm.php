@@ -2,18 +2,25 @@
 
 namespace App\Chatbot;
 
+use App\Models\Order;
+
 /**
  * FSM for chatbot: welcome → language_selection → menu → item_selection → confirm → order_placed.
- * States: welcome, language_selection, menu, item_selection, confirm, order_placed, human_takeover.
+ * States: welcome, language_selection, main_menu, menu, item_selection, collect_name, delivery_choice,
+ * confirm, order_placed, human_takeover, track_choice, track_list, track_ref.
  * Uses $menuItems (id, name, price) for numbered menu; $locale for all replies.
+ * For track flow and status replies, pass $externalId and $channel (sms/messenger).
  */
 class ChatbotFsm
 {
     private ChatbotKeywordMatcher $keywordMatcher;
 
-    public function __construct(?ChatbotKeywordMatcher $keywordMatcher = null)
+    private ?ChatbotOrderLookupService $orderLookupService = null;
+
+    public function __construct(?ChatbotKeywordMatcher $keywordMatcher = null, ?ChatbotOrderLookupService $orderLookupService = null)
     {
         $this->keywordMatcher = $keywordMatcher ?? new ChatbotKeywordMatcher();
+        $this->orderLookupService = $orderLookupService ?? new ChatbotOrderLookupService();
     }
 
     /**
@@ -28,7 +35,9 @@ class ChatbotFsm
         array $statePayload,
         array $menuItems = [],
         array $deliveryAreas = [],
-        string $locale = 'en'
+        string $locale = 'en',
+        ?string $externalId = null,
+        ?string $channel = null
     ): array {
         $body = trim($body);
         $bodyLower = strtolower($body);
@@ -36,7 +45,7 @@ class ChatbotFsm
         return match ($currentState) {
             'welcome' => $this->fromWelcome($locale),
             'language_selection' => $this->fromLanguageSelection($body, $statePayload, $menuItems, $locale),
-            'main_menu' => $this->fromMainMenu($body, $statePayload, $menuItems, $locale),
+            'main_menu' => $this->fromMainMenu($body, $statePayload, $menuItems, $locale, $externalId, $channel),
             'menu' => $this->fromMenu($body, $statePayload, $menuItems, $locale),
             'item_selection' => $this->fromItemSelection($body, $statePayload, $menuItems, $locale),
             'collect_name' => $this->fromCollectName($body, $statePayload, $menuItems, $locale),
@@ -44,6 +53,9 @@ class ChatbotFsm
             'confirm' => $this->fromConfirm($body, $statePayload, $menuItems, $deliveryAreas, $locale),
             'order_placed' => $this->fromOrderPlaced($body, $menuItems, $locale),
             'human_takeover' => $this->fromHumanTakeover($body, $locale),
+            'track_choice' => $this->fromTrackChoice($body, $statePayload, $menuItems, $locale, $externalId, $channel),
+            'track_list' => $this->fromTrackList($body, $statePayload, $menuItems, $locale),
+            'track_ref' => $this->fromTrackRef($body, $statePayload, $menuItems, $locale),
             default => $this->fromWelcome($locale),
         };
     }
@@ -108,7 +120,7 @@ class ChatbotFsm
      * @param array<int, array{id: int, name: string, price: float}> $menuItems
      * @return array{string, string, array<string, mixed>}
      */
-    private function fromMainMenu(string $body, array $statePayload, array $menuItems, string $locale): array
+    private function fromMainMenu(string $body, array $statePayload, array $menuItems, string $locale, ?string $externalId = null, ?string $channel = null): array
     {
         $keyword = $this->keywordMatcher->match($body);
         if ($keyword === 'back') {
@@ -118,8 +130,14 @@ class ChatbotFsm
                 [],
             ];
         }
+        if ($keyword === 'status' || preg_match('/^status\s+\S+/i', $body)) {
+            $result = $this->resolveStatusReply($body, $statePayload, $locale, $externalId, $channel);
+            if ($result !== null) {
+                return $result;
+            }
+        }
         if ($keyword !== null) {
-            return $this->handleKeywordInState($keyword, $statePayload, $menuItems, $locale, 'main_menu');
+            return $this->handleKeywordInState($keyword, $statePayload, $menuItems, $locale, 'main_menu', $externalId, $channel);
         }
         if ($keyword === 'help') {
             return [
@@ -146,8 +164,8 @@ class ChatbotFsm
         }
         if ($intent === 'track') {
             return [
-                'main_menu',
-                __('chatbot.track_ask_reference', [], $locale),
+                'track_choice',
+                __('chatbot.track_choice_prompt', [], $locale),
                 [],
             ];
         }
@@ -168,8 +186,8 @@ class ChatbotFsm
         }
         if ($body === '2') {
             return [
-                'main_menu',
-                __('chatbot.track_ask_reference', [], $locale),
+                'track_choice',
+                __('chatbot.track_choice_prompt', [], $locale),
                 [],
             ];
         }
@@ -177,6 +195,13 @@ class ChatbotFsm
             return [
                 'language_selection',
                 __('chatbot.language_prompt', [], $locale),
+                [],
+            ];
+        }
+        if ($body === '4') {
+            return [
+                'human_takeover',
+                __('chatbot.human_takeover_reply', [], $locale),
                 [],
             ];
         }
@@ -846,7 +871,9 @@ class ChatbotFsm
         array $statePayload,
         array $menuItems,
         string $locale,
-        string $currentState
+        string $currentState,
+        ?string $externalId = null,
+        ?string $channel = null
     ): array {
         if ($keyword === 'main_menu') {
             return [
@@ -884,9 +911,10 @@ class ChatbotFsm
             $menuText = in_array($currentState, ['menu', 'item_selection'], true)
                 ? ' ' . $this->buildMenuText($menuItems, $locale)
                 : '';
+            $mainMenuSuffix = $currentState === 'main_menu' ? "\n\n" . __('chatbot.main_menu_prompt', [], $locale) : '';
             return [
-                $currentState,
-                __('chatbot.status_none', [], $locale) . $menuText,
+                $currentState === 'main_menu' ? 'main_menu' : $currentState,
+                __('chatbot.status_none', [], $locale) . $menuText . $mainMenuSuffix,
                 [],
             ];
         }
@@ -901,6 +929,233 @@ class ChatbotFsm
         return [
             $currentState,
             __('chatbot.invalid_option_menu', [], $locale) . ' ' . $menuText,
+            [],
+        ];
+    }
+
+    /**
+     * Resolve order and build status reply (conditional). Returns null if no order found.
+     *
+     * @return array{string, string, array<string, mixed>}|null [next_state, reply, state_payload]
+     */
+    private function resolveStatusReply(string $body, array $statePayload, string $locale, ?string $externalId, ?string $channel): ?array
+    {
+        $reference = $this->extractReferenceFromStatusBody($body);
+        $order = null;
+
+        if ($reference !== null && $reference !== '') {
+            $order = $this->orderLookupService->findByReference($reference);
+        } elseif ($externalId !== null && $channel !== null) {
+            $lastRef = $statePayload['last_order_reference'] ?? null;
+            if ($lastRef !== null && $lastRef !== '') {
+                $order = $this->orderLookupService->findByReference($lastRef);
+            }
+            if ($order === null) {
+                $orders = $this->orderLookupService->findByExternalId($externalId, $channel, 1);
+                $order = $orders->first();
+            }
+        }
+
+        if ($order === null) {
+            return null;
+        }
+
+        return [
+            'main_menu',
+            $this->buildStatusReply($order, $locale) . "\n\n" . __('chatbot.main_menu_prompt', [], $locale),
+            [],
+        ];
+    }
+
+    /**
+     * Extract reference from body like "status ABC123" or "status".
+     */
+    private function extractReferenceFromStatusBody(string $body): ?string
+    {
+        $body = trim($body);
+        $lower = strtolower($body);
+        if (str_starts_with($lower, 'status')) {
+            $rest = trim(substr($body, 6));
+            return $rest !== '' ? $rest : null;
+        }
+        return null;
+    }
+
+    /**
+     * Build status reply. Always shows actual order status (no gating).
+     */
+    private function buildStatusReply(Order $order, string $locale): string
+    {
+        $statusKey = $this->orderLookupService->statusLabelKey($order->status);
+        $statusLabel = __('chatbot.' . $statusKey, [], $locale);
+        $deliveryType = $order->delivery_type ?? 'pickup';
+        $pickupSlot = trim((string) ($order->pickup_slot ?? ''));
+
+        if ($deliveryType === 'pickup' && $order->status === 'ready' && $pickupSlot !== '') {
+            return __('chatbot.status_ready_pickup_slot', [
+                'reference' => $order->reference,
+                'slot' => $pickupSlot,
+            ], $locale);
+        }
+
+        return __('chatbot.status_order', [
+            'reference' => $order->reference,
+            'status' => $statusLabel,
+        ], $locale);
+    }
+
+    /**
+     * @param array<string, mixed> $statePayload
+     * @param array<int, array{id: int, name: string, price: float}> $menuItems
+     * @return array{string, string, array<string, mixed>}
+     */
+    private function fromTrackChoice(string $body, array $statePayload, array $menuItems, string $locale, ?string $externalId, ?string $channel): array
+    {
+        $keyword = $this->keywordMatcher->match($body);
+        if ($keyword === 'back') {
+            return [
+                'main_menu',
+                __('chatbot.main_menu_prompt', [], $locale),
+                [],
+            ];
+        }
+
+        if ($body === '1') {
+            if ($externalId === null || $channel === null || ! \in_array($channel, ['sms', 'messenger'], true)) {
+                return [
+                    'main_menu',
+                    __('chatbot.track_list_empty', [], $locale) . "\n\n" . __('chatbot.main_menu_prompt', [], $locale),
+                    [],
+                ];
+            }
+            $orders = $this->orderLookupService->findByExternalId($externalId, $channel, 10);
+            if ($orders->isEmpty()) {
+                return [
+                    'main_menu',
+                    __('chatbot.track_list_empty', [], $locale) . "\n\n" . __('chatbot.main_menu_prompt', [], $locale),
+                    [],
+                ];
+            }
+            $lines = [__('chatbot.track_list_header', [], $locale)];
+            foreach ($orders as $i => $o) {
+                $num = $i + 1;
+                $lines[] = "{$num}. {$o->reference}";
+            }
+            $lines[] = __('chatbot.track_list_reply', [], $locale);
+            $refs = $orders->pluck('reference')->values()->all();
+
+            return [
+                'track_list',
+                implode("\n", $lines),
+                ['track_order_references' => $refs],
+            ];
+        }
+
+        if ($body === '2') {
+            return [
+                'track_ref',
+                __('chatbot.track_enter_ref', [], $locale),
+                [],
+            ];
+        }
+
+        return [
+            'track_choice',
+            __('chatbot.track_choice_prompt', [], $locale),
+            [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $statePayload
+     * @param array<int, array{id: int, name: string, price: float}> $menuItems
+     * @return array{string, string, array<string, mixed>}
+     */
+    private function fromTrackList(string $body, array $statePayload, array $menuItems, string $locale): array
+    {
+        $keyword = $this->keywordMatcher->match($body);
+        if ($keyword === 'back') {
+            return [
+                'track_choice',
+                __('chatbot.track_choice_prompt', [], $locale),
+                [],
+            ];
+        }
+
+        $refs = $statePayload['track_order_references'] ?? [];
+        if (! \is_array($refs)) {
+            $refs = [];
+        }
+        $idx = (int) $body;
+        if ($idx < 1 || $idx > count($refs)) {
+            return [
+                'main_menu',
+                __('chatbot.main_menu_invalid', [], $locale) . ' ' . __('chatbot.main_menu_prompt', [], $locale),
+                [],
+            ];
+        }
+        $reference = $refs[$idx - 1] ?? null;
+        if ($reference === null) {
+            return [
+                'main_menu',
+                __('chatbot.status_not_found', [], $locale) . "\n\n" . __('chatbot.main_menu_prompt', [], $locale),
+                [],
+            ];
+        }
+        $order = $this->orderLookupService->findByReference($reference);
+        if ($order === null) {
+            return [
+                'main_menu',
+                __('chatbot.status_not_found', [], $locale) . "\n\n" . __('chatbot.main_menu_prompt', [], $locale),
+                [],
+            ];
+        }
+        $reply = $this->buildStatusReply($order, $locale);
+
+        return [
+            'main_menu',
+            $reply . "\n\n" . __('chatbot.main_menu_prompt', [], $locale),
+            [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $statePayload
+     * @param array<int, array{id: int, name: string, price: float}> $menuItems
+     * @return array{string, string, array<string, mixed>}
+     */
+    private function fromTrackRef(string $body, array $statePayload, array $menuItems, string $locale): array
+    {
+        $keyword = $this->keywordMatcher->match($body);
+        if ($keyword === 'back') {
+            return [
+                'track_choice',
+                __('chatbot.track_choice_prompt', [], $locale),
+                [],
+            ];
+        }
+
+        $reference = trim($body);
+        if ($reference === '') {
+            return [
+                'track_ref',
+                __('chatbot.track_enter_ref', [], $locale),
+                [],
+            ];
+        }
+        $order = $this->orderLookupService->findByReference($reference);
+        if ($order === null) {
+            return [
+                'main_menu',
+                __('chatbot.status_not_found', [], $locale) . "\n\n" . __('chatbot.main_menu_prompt', [], $locale),
+                [],
+            ];
+        }
+        $reply = $this->buildStatusReply($order, $locale);
+
+        return [
+            'main_menu',
+            $reply . "\n\n" . __('chatbot.main_menu_prompt', [], $locale),
             [],
         ];
     }

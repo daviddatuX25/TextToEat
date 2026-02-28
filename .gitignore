@@ -2,3 +2,6 @@
 .cursor/mcp.json
 .cursor/stitch-api-key
 .cursor/node_modules
+
+# Production notes (DB credentials, env reference) — never commit
+env.production.notes

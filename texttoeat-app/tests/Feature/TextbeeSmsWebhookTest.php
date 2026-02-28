@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\SmsSenderInterface;
 use App\Models\ChatbotSession;
-use App\Services\OutboundSmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -14,13 +14,13 @@ class TextbeeSmsWebhookTest extends TestCase
 
     public function test_incoming_sms_creates_session_and_sends_reply(): void
     {
-        $outboundMock = Mockery::mock(OutboundSmsService::class);
-        $outboundMock->shouldReceive('enqueueAndSendFcm')
+        $outboundMock = Mockery::mock(SmsSenderInterface::class);
+        $outboundMock->shouldReceive('send')
             ->atLeast()
             ->once()
             ->with('09123456789', Mockery::on(fn ($t): bool => \is_string($t) && $t !== ''), 'sms', Mockery::any())
             ->andReturn(['success' => true, 'ids' => [1]]);
-        $this->app->instance(OutboundSmsService::class, $outboundMock);
+        $this->app->instance(SmsSenderInterface::class, $outboundMock);
 
         $response = $this->postJson('/api/sms/incoming', [
             'from' => '09123456789',
@@ -46,8 +46,8 @@ class TextbeeSmsWebhookTest extends TestCase
 
     public function test_incoming_sms_normalizes_phone_with_country_code(): void
     {
-        $outboundMock = Mockery::mock(OutboundSmsService::class);
-        $outboundMock->shouldReceive('enqueueAndSendFcm')
+        $outboundMock = Mockery::mock(SmsSenderInterface::class);
+        $outboundMock->shouldReceive('send')
             ->atLeast()
             ->once()
             ->with(
@@ -57,7 +57,7 @@ class TextbeeSmsWebhookTest extends TestCase
                 Mockery::any()
             )
             ->andReturn(['success' => true, 'ids' => [1]]);
-        $this->app->instance(OutboundSmsService::class, $outboundMock);
+        $this->app->instance(SmsSenderInterface::class, $outboundMock);
 
         $response = $this->postJson('/api/sms/incoming', [
             'from' => '+639123456789',
@@ -99,13 +99,13 @@ class TextbeeSmsWebhookTest extends TestCase
         $rawBody = json_encode($payload, JSON_THROW_ON_ERROR);
         $signature = 'sha256=' . hash_hmac('sha256', $rawBody, 'my-secret');
 
-        $outboundMock = Mockery::mock(OutboundSmsService::class);
-        $outboundMock->shouldReceive('enqueueAndSendFcm')
+        $outboundMock = Mockery::mock(SmsSenderInterface::class);
+        $outboundMock->shouldReceive('send')
             ->atLeast()
             ->once()
             ->with('09123456789', Mockery::on(fn ($t): bool => \is_string($t) && $t !== ''), 'sms', Mockery::any())
             ->andReturn(['success' => true, 'ids' => [1]]);
-        $this->app->instance(OutboundSmsService::class, $outboundMock);
+        $this->app->instance(SmsSenderInterface::class, $outboundMock);
 
         $response = $this->withHeaders(['X-Signature' => $signature])
             ->postJson('/api/sms/incoming', $payload);

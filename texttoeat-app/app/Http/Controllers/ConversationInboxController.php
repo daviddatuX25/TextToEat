@@ -2,27 +2,24 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActionLog;
 use App\Models\ChatbotSession;
+use App\Contracts\MessengerSenderInterface;
+use App\Contracts\SmsSenderInterface;
 use App\Models\OutboundSms;
-use App\Services\OutboundSmsService;
-use App\Services\FacebookMessengerClient;
-use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ConversationInboxController extends Controller
 {
-    private OutboundSmsService $outboundSmsService;
-
-    private FacebookMessengerClient $facebookMessengerClient;
-
-    public function __construct(OutboundSmsService $outboundSmsService, FacebookMessengerClient $facebookMessengerClient)
-    {
-        $this->outboundSmsService = $outboundSmsService;
-        $this->facebookMessengerClient = $facebookMessengerClient;
-    }
+    public function __construct(
+        private SmsSenderInterface $smsSender,
+        private MessengerSenderInterface $messengerSender
+    ) {}
 
     public function index(Request $request): Response
     {
@@ -220,12 +217,12 @@ class ConversationInboxController extends Controller
 
         try {
             if ($session->channel === 'sms') {
-                $result = $this->outboundSmsService->enqueueAndSendFcm($session->external_id, $message, 'sms', $session->id);
+                $result = $this->smsSender->send($session->external_id, $message, 'sms', $session->id);
                 if (! ($result['success'] ?? false)) {
                     return redirect()->back()->with('error', $result['message'] ?? 'Failed to send SMS.');
                 }
             } else {
-                $this->facebookMessengerClient->sendTextMessage($session->external_id, $message);
+                $this->messengerSender->send($session->external_id, $message);
             }
 
             $session->update(['last_activity_at' => now()]);
@@ -248,26 +245,59 @@ class ConversationInboxController extends Controller
 
         $enabled = (bool) $validated['enabled'];
         $state = $session->state ?? [];
+        $previousAutomationDisabled = (bool) ($state['automation_disabled'] ?? false);
         $state['automation_disabled'] = ! $enabled;
         $session->state = $state;
         $session->last_activity_at = now();
         $session->save();
 
+        $action = $enabled ? 'takeover_automation_enabled' : 'takeover_automation_disabled';
+        ActionLog::create([
+            'user_id' => $request->user()?->id,
+            'action' => $action,
+            'model' => 'ChatbotSession',
+            'model_id' => $session->id,
+            'payload' => [
+                'session_id' => $session->id,
+                'channel' => $session->channel,
+                'external_id' => $session->external_id,
+                'enabled' => $enabled,
+                'previous_automation_disabled' => $previousAutomationDisabled,
+            ],
+        ]);
+        Log::info("Takeover: {$action}", ['session_id' => $session->id, 'channel' => $session->channel, 'user_id' => $request->user()?->id]);
+
         return redirect()->back()->with('success', $enabled ? 'Automated responses enabled.' : 'Automated responses disabled.');
     }
 
-    public function resolve(ChatbotSession $session): RedirectResponse
+    public function resolve(Request $request, ChatbotSession $session): RedirectResponse
     {
         if (! \in_array((string) $session->channel, ['sms', 'messenger'], true)) {
             abort(404);
         }
 
         $state = $session->state ?? [];
+        $previousState = $state['current_state'] ?? null;
         $state['current_state'] = 'main_menu';
         $state['automation_disabled'] = false;
         $session->state = $state;
         $session->last_activity_at = now();
         $session->save();
+
+        ActionLog::create([
+            'user_id' => $request->user()?->id,
+            'action' => 'takeover_resolved',
+            'model' => 'ChatbotSession',
+            'model_id' => $session->id,
+            'payload' => [
+                'session_id' => $session->id,
+                'channel' => $session->channel,
+                'external_id' => $session->external_id,
+                'previous_state' => $previousState,
+                'new_state' => 'main_menu',
+            ],
+        ]);
+        Log::info('Takeover: takeover_resolved', ['session_id' => $session->id, 'channel' => $session->channel, 'user_id' => $request->user()?->id]);
 
         return redirect()->route('portal.inbox')->with('success', 'Marked solved. Bot mode restored.');
     }

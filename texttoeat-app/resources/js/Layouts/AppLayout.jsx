@@ -93,7 +93,6 @@ export default function AppLayout({ children, showDashboard = true }) {
                         <NavLink href="/" pathname={pathname}>Home</NavLink>
                         <NavLink href="/menu" pathname={pathname}>Menu</NavLink>
                         <NavLink href="/track" pathname={pathname}>Track</NavLink>
-                        <NavLink href="/chat" pathname={pathname}>Chat</NavLink>
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -166,7 +165,6 @@ export default function AppLayout({ children, showDashboard = true }) {
                     <NavLink href="/" pathname={pathname} onClick={() => setMobileOpen(false)}>Home</NavLink>
                     <NavLink href="/menu" pathname={pathname} onClick={() => setMobileOpen(false)}>Menu</NavLink>
                     <NavLink href="/track" pathname={pathname} onClick={() => setMobileOpen(false)}>Track</NavLink>
-                    <NavLink href="/chat" pathname={pathname} onClick={() => setMobileOpen(false)}>Chat</NavLink>
                     <div className="h-px bg-surface-200 dark:bg-surface-800" />
                     <div className="flex items-center gap-3">
                         <ThemeToggle />

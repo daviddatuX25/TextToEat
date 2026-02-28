@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\ChatbotWebhookController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerMenuController;
 use App\Http\Controllers\DashboardController;
@@ -40,11 +41,8 @@ Route::get('/order-confirmation/{reference}', [CheckoutController::class, 'confi
 Route::get('/track', function () {
     return Inertia::render('Track');
 });
-Route::get('/chat', function () {
-    return Inertia::render('Chat', [
-        'webChatExternalId' => request()->session()->getId(),
-    ]);
-});
+
+Route::middleware(['auth', 'admin'])->get('/api/chatbot/outbound-messages', [ChatbotWebhookController::class, 'outboundMessages']);
 
 // Redirect old staff URLs to /portal/* (301)
 Route::get('/dashboard', fn () => redirect('/portal', 301));
@@ -94,4 +92,5 @@ Route::prefix('portal')->middleware('auth')->group(function () {
     Route::get('/users', [UsersController::class, 'index'])->name('portal.users')->middleware('admin');
     Route::post('/users', [UsersController::class, 'store'])->middleware('admin');
     Route::post('/users/{user}/send-password-reset', [UsersController::class, 'sendPasswordReset'])->name('portal.users.send-password-reset')->middleware('admin');
+    Route::get('/simulate', fn () => Inertia::render('Chat', ['webChatExternalId' => request()->session()->getId()]))->name('portal.simulate')->middleware('admin');
 });

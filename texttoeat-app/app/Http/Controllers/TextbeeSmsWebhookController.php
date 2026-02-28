@@ -2,22 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\SmsSenderInterface;
 use App\Models\ChatbotSession;
-use App\Services\OutboundSmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class TextbeeSmsWebhookController extends Controller
 {
-    private OutboundSmsService $outboundSmsService;
-
-    private ChatbotWebhookController $chatbot;
-
-    public function __construct(OutboundSmsService $outboundSmsService, ChatbotWebhookController $chatbot)
-    {
-        $this->outboundSmsService = $outboundSmsService;
-        $this->chatbot = $chatbot;
-    }
+    public function __construct(
+        private SmsSenderInterface $smsSender,
+        private ChatbotWebhookController $chatbot
+    ) {}
 
     public function handle(Request $request): JsonResponse
     {
@@ -71,13 +66,13 @@ class TextbeeSmsWebhookController extends Controller
         if (\is_array($replies) && $replies !== []) {
             foreach ($replies as $replyText) {
                 if (\is_string($replyText) && $replyText !== '') {
-                    $this->outboundSmsService->enqueueAndSendFcm($normalizedPhone, $replyText, 'sms', $sessionId);
+                    $this->smsSender->send($normalizedPhone, $replyText, 'sms', $sessionId);
                 }
             }
         } else {
             $reply = $data['reply'] ?? null;
             if (\is_string($reply) && $reply !== '') {
-                $this->outboundSmsService->enqueueAndSendFcm($normalizedPhone, $reply, 'sms', $sessionId);
+                $this->smsSender->send($normalizedPhone, $reply, 'sms', $sessionId);
             }
         }
 

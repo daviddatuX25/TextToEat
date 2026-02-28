@@ -21,7 +21,7 @@ class PortalSeedDataSeeder extends Seeder
 
     private function seedPickupSlots(): void
     {
-        $slots = ['a1', 'a2', 'a3', 'b1', 'b2', 'b3'];
+        $slots = ['a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'depends'];
         foreach ($slots as $i => $value) {
             PickupSlot::firstOrCreate(
                 ['value' => $value],

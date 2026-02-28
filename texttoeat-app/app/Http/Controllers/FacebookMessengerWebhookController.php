@@ -2,23 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\MessengerSenderInterface;
 use App\Models\ChatbotSession;
-use App\Services\FacebookMessengerClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 class FacebookMessengerWebhookController extends Controller
 {
-    private FacebookMessengerClient $client;
-
-    private ChatbotWebhookController $chatbot;
-
-    public function __construct(FacebookMessengerClient $client, ChatbotWebhookController $chatbot)
-    {
-        $this->client = $client;
-        $this->chatbot = $chatbot;
-    }
+    public function __construct(
+        private MessengerSenderInterface $messengerSender,
+        private ChatbotWebhookController $chatbot
+    ) {}
 
     /**
      * @return Response|JsonResponse
@@ -123,7 +118,7 @@ class FacebookMessengerWebhookController extends Controller
         if (\is_array($replies) && $replies !== []) {
             foreach ($replies as $replyText) {
                 if (\is_string($replyText) && $replyText !== '') {
-                    $this->client->sendTextMessage($psid, $replyText);
+                    $this->messengerSender->send($psid, $replyText);
                 }
             }
 
@@ -132,7 +127,7 @@ class FacebookMessengerWebhookController extends Controller
 
         $reply = $data['reply'] ?? null;
         if (\is_string($reply) && $reply !== '') {
-            $this->client->sendTextMessage($psid, $reply);
+            $this->messengerSender->send($psid, $reply);
         }
     }
 

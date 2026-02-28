@@ -2,11 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Contracts\MessengerSenderInterface;
+use App\Contracts\SmsSenderInterface;
 use App\Http\Controllers\ChatbotWebhookController;
 use App\Models\ChatbotSession;
-use App\Models\User;
-use App\Services\FacebookMessengerClient;
-use App\Services\OutboundSmsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -25,9 +24,9 @@ class AutomationDisabledWebhookTest extends TestCase
             'last_activity_at' => now()->subMinute(),
         ]);
 
-        $smsMock = Mockery::mock(OutboundSmsService::class);
-        $smsMock->shouldNotReceive('enqueueAndSendFcm');
-        $this->app->instance(OutboundSmsService::class, $smsMock);
+        $smsMock = Mockery::mock(SmsSenderInterface::class);
+        $smsMock->shouldNotReceive('send');
+        $this->app->instance(SmsSenderInterface::class, $smsMock);
 
         $chatbotMock = Mockery::mock(ChatbotWebhookController::class);
         $chatbotMock->shouldNotReceive('webhook');
@@ -54,9 +53,9 @@ class AutomationDisabledWebhookTest extends TestCase
             'last_activity_at' => now()->subMinute(),
         ]);
 
-        $fbMock = Mockery::mock(FacebookMessengerClient::class);
-        $fbMock->shouldNotReceive('sendTextMessage');
-        $this->app->instance(FacebookMessengerClient::class, $fbMock);
+        $fbMock = Mockery::mock(MessengerSenderInterface::class);
+        $fbMock->shouldNotReceive('send');
+        $this->app->instance(MessengerSenderInterface::class, $fbMock);
 
         $chatbotMock = Mockery::mock(ChatbotWebhookController::class);
         $chatbotMock->shouldNotReceive('webhook');
