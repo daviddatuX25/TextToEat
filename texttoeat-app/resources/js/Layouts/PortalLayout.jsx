@@ -13,6 +13,7 @@ const PORTAL_NAV_ITEMS = [
     { href: '/portal/walkin', label: 'Walk-in', icon: 'ph-utensils' },
     { href: '/portal/menu-items', label: "Today's menu", icon: 'ph-book-open' },
     { href: '/portal/logs/orders', label: 'Order logs', icon: 'ph-list-checks' },
+    { href: '/portal/inbox', label: 'Conversation inbox', icon: 'ph-inbox' },
     { href: '/portal/logs/chatbot', label: 'Chatbot logs', icon: 'ph-chat-circle-dots' },
 ];
 

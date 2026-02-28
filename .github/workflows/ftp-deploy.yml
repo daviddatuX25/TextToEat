@@ -1,0 +1,84 @@
+name: Deploy to Agila via FTP
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  FTP_SERVER: ftp.avelinalacasandile-eat.top
+  FTP_USERNAME: avelinht
+  # FTP_PASSWORD: set in GitHub repo Secrets as FTP_PASSWORD
+  # Remote directory on the server (e.g. public_html/ or the folder for this site)
+  FTP_SERVER_DIR: ./
+
+jobs:
+  deploy:
+    name: Build and FTP deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: texttoeat-app/package-lock.json
+
+      - name: Get composer cache dir
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+        working-directory: texttoeat-app
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('texttoeat-app/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install PHP dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+        working-directory: texttoeat-app
+
+      - name: Install npm dependencies and build
+        run: npm ci && npm run build
+        working-directory: texttoeat-app
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.6
+        with:
+          server: ${{ env.FTP_SERVER }}
+          username: ${{ env.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
+          local-dir: ./texttoeat-app/
+          server-dir: ${{ env.FTP_SERVER_DIR }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env
+            **/.env.*
+            **/tests/**
+            **/.phpunit*
+            **/phpunit.xml
+            **/.phpunit.result.cache
+            **/storage/logs/*
+            **/storage/framework/cache/data/*
+            **/.idea
+            **/.vscode
+            **/README.md
+            **/docker*
+            **/.docker*
+            **/sail
+        log-level: standard

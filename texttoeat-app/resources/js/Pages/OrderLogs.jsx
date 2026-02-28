@@ -7,7 +7,7 @@ export default function OrderLogs({ logs, filters = {}, meta = {} }) {
     const links = !Array.isArray(logs) && logs?.links ? logs.links : [];
 
     const handleSubmit = (nextFilters) => {
-        router.get(route('portal.logs.orders'), nextFilters, {
+        router.get('/portal/logs/orders', nextFilters, {
             preserveState: true,
             replace: true,
         });

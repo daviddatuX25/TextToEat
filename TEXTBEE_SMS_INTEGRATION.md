@@ -1,53 +1,45 @@
-TEXTBEE SMS GATEWAY INTEGRATION WITH LARAVEL CHATBOT - Developer Context Guide
-===============================================================================
+SMS INTEGRATION (INBOUND + FCM OUTBOUND) – Developer Context Guide
+====================================================================
+
+Outbound SMS uses **FCM push**: Laravel enqueues messages and sends a Firebase Cloud Messaging data message to the phone; the Android app sends the SMS via the device SIM and reports back. No polling, no Pi, no tunnel. For the full FCM push design (payloads, APIs, edge cases), see **`docs/SMS_FCM_PUSH_DESIGN.md`**.
 
 ## OVERVIEW
 
-You are integrating Textbee (an open-source Android SMS gateway) with your Laravel chatbot application. This allows your chatbot to:
+You are integrating an Android SMS gateway with your Laravel chatbot application:
 
-- Receive SMS messages from customers  
-- Process those messages through your chatbot logic  
-- Send back SMS responses
+- **Receive**: Gateway app (e.g. Textbee) on the phone receives SMS and POSTs to your Laravel webhook.
+- **Send**: Laravel enqueues outbound SMS and sends an FCM data message to the phone; your Android app sends the SMS via the device SIM and POSTs mark-sent/mark-failed to Laravel.
 
-The flow: Customer SMS → Textbee App on Android Phone → Your Laravel Server → Chatbot Logic → Response back to Customer
+The flow: Customer SMS → Gateway App on Android Phone → Laravel Webhook → Chatbot Logic → Laravel enqueues reply → FCM → App sends SMS → App reports to Laravel.
 
 ## ARCHITECTURE
 
-┌─────────────────────────────────────────────────────────────┐  
-│                    TEXTBEE ARCHITECTURE                     │  
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐  
+│                    SMS ARCHITECTURE (INBOUND + FCM OUTBOUND)                  │  
+└─────────────────────────────────────────────────────────────────────────────┘
 
-Customer                    Textbee App                 Your Laravel Server  
-   │                          │                              │  
-   │──── SMS ───────────>      │                              │  
-   │                           │── Webhook ────────────>      │  
-   │                           │   (incoming SMS)             │  
-   │                           │                    (Process   │  
-   │                           │                     Chatbot)  │  
-   │                           │                              │  
-   │                    [Phone API]                           │  
-   │                           │<──── REST API Response ───────│  
-   │                           │    (send SMS back)            │  
-   │<──── SMS ───────────       │                              │  
-   │                           │                              │
+Customer              Gateway/App on Phone           Laravel Server              FCM
+   │                          │                           │                      │
+   │──── SMS ───────────>      │                           │                      │
+   │                           │── Webhook (incoming) ─────>│                      │
+   │                           │   POST /api/sms/incoming   │  (Process Chatbot)   │
+   │                           │                           │                      │
+   │                           │   Outbound: Laravel enqueues outbound_sms        │
+   │                           │   and sends FCM data ──────────────────────────>│
+   │                           │<────────────────────────── FCM delivers ─────────│
+   │                           │   App: SmsManager.send()   │                      │
+   │                           │   App: POST mark-sent ────>│                      │
+   │<──── SMS ───────────       │                           │                      │
 
-## TEXTBEE SETUP (ALREADY DONE BY TEAM)
+## GATEWAY / PHONE SETUP
 
 Assumptions:
 
-- Textbee app already installed on Android phone  
-- Phone has SIM card and active internet  
-- Phone stays on 24/7 (plugged in)  
-- Textbee dashboard account created  
-- Phone registered in Textbee dashboard
+- Gateway app (e.g. Textbee) installed on Android phone for **receiving** SMS and POSTing to Laravel.
+- Same phone (or a dedicated one) runs the app that **sends** SMS: it registers an FCM token with Laravel and handles FCM data messages (send SMS via SIM → mark-sent).
+- Phone has SIM card and internet; for production the send-capable phone is typically on and reachable by FCM.
 
-What you (developer) need:
-
-- Textbee API URL (IP and port of phone on local network)
-
-Example: `http://192.168.1.100:8080`
-
-This is the base URL for all API calls to Textbee.
+For **inbound only**: configure the gateway app’s webhook URL to your Laravel `/api/sms/incoming`. No Textbee API URL is required for **outbound** (outbound uses FCM). If you keep a legacy Textbee send API (e.g. for health checks), you can set `TEXTBEE_API_URL` in `.env`; see env section below.
 
 ## INTEGRATION POINTS
 
@@ -67,20 +59,24 @@ Setup Required:
 - Webhook must be public HTTPS URL  
 - Example: `https://yourdomain.com/api/sms/incoming`
 
-### 2. SENDING SMS (API)
+### 2. SENDING SMS (FCM push)
 
 Flow:
 
-1. Your chatbot generates response  
-2. Laravel calls Textbee API  
-3. Textbee sends SMS via phone's SIM card  
-4. SMS arrives at customer
+1. Your chatbot (or any code) generates a response and requests “send SMS” to a phone number.
+2. Laravel inserts a row into `outbound_sms` (status `pending`) and gets the row id.
+3. Laravel loads the FCM device token from storage and calls the Firebase Admin API to send a **data-only** message to that token (payload: `id`, `to`, `body`).
+4. FCM delivers the message to the phone; the Android app’s FCM handler runs (even in background).
+5. The app sends the SMS via `SmsManager` (device SIM), then POSTs to Laravel `POST /api/sms/outbound/mark-sent` with `id` and `status` (sent or failed).
+6. Laravel updates the `outbound_sms` row (`sent_at` or `failure_reason`).
+
+No polling; the phone only acts when FCM delivers a message. See **`docs/SMS_FCM_PUSH_DESIGN.md`** for payload shapes, APIs, and edge cases.
 
 Setup Required:
 
-- Create SMS service/class in Laravel  
-- Call Textbee API endpoint  
-- Handle success/failure responses
+- Firebase project, Android app with FCM, service account JSON for Laravel.
+- Laravel: `outbound_sms` and FCM token storage; Firebase client (e.g. kreait/firebase-php); `POST /api/sms/device/register` and `POST /api/sms/outbound/mark-sent`.
+- Android app: FCM token registration, handle data message → send SMS → mark-sent.
 
 ## CODE STRUCTURE
 
@@ -90,53 +86,53 @@ Directory Structure:
 app/
 ├── Http/
 │   ├── Controllers/
-│   │   └── ChatbotController.php
+│   │   ├── ChatbotController.php (or TextbeeSmsWebhookController)
+│   │   └── SmsDeviceController.php   (register FCM token, optional)
 │   ├── Middleware/
 │   │   └── VerifyTextbeeWebhook.php
 │   └── Requests/
 │       └── ReceiveSmsRequest.php
 ├── Services/
-│   ├── SmsService.php
 │   ├── ChatbotService.php
-│   └── TextbeeGatewayService.php
+│   ├── OutboundSmsService.php       (enqueue + send FCM; replaces direct send)
+│   └── TextbeeGatewayService.php    (legacy/inbound only; not used for outbound)
 ├── Models/
 │   ├── ChatMessage.php
 │   ├── ChatSession.php
+│   ├── OutboundSms.php
+│   ├── SmsDevice.php                (FCM token storage)
 │   └── SmsLog.php
 └── Jobs/
     ├── ProcessSmsMessage.php
-    └── MonitorTextbeeHealth.php
+    └── MonitorTextbeeHealth.php (optional)
 
 routes/
-├── api.php (webhook endpoint)
+├── api.php
+│   ├── POST /api/sms/incoming        (receive webhook)
+│   ├── POST /api/sms/device/register (FCM token registration)
+│   └── POST /api/sms/outbound/mark-sent
 └── console.php (scheduled tasks)
 
 database/
 └── migrations/
     ├── create_chat_messages_table.php
     ├── create_chat_sessions_table.php
+    ├── create_outbound_sms_table.php
+    ├── create_sms_devices_table.php
     └── create_sms_logs_table.php
 ```
 
+Outbound send is implemented as: **enqueue** (insert `outbound_sms`) + **send FCM** (Firebase Admin API with data `id`, `to`, `body`). The existing `TextbeeGatewayService::sendSms` is replaced or wrapped by this flow; see `docs/SMS_FCM_PUSH_DESIGN.md` for implementation detail.
+
 ## CORE COMPONENTS
 
-### 1. SMS SERVICE (`TextbeeGatewayService`)
+### 1. OUTBOUND SMS (FCM) AND LEGACY GATEWAY
 
-Purpose: Handle all communication with Textbee API.  
-Responsibilities:
+**Outbound**: Handled by an outbound queue + FCM + Android app. Laravel does **not** call the phone’s API to send SMS. Instead:
 
-- Send SMS via Textbee  
-- Check gateway health/status  
-- Handle API errors gracefully  
-- Log all SMS transactions
+- **OutboundSmsService** (or equivalent): Insert into `outbound_sms`, load FCM token, call Firebase Admin API to send a data message (id, to, body). Expose or use `POST /api/sms/device/register` and `POST /api/sms/outbound/mark-sent` for the app.
 
-Key Methods:
-
-```php
-sendSms(string $phoneNumber, string $message): array
-getGatewayStatus(): bool
-getMessageStatus(string $messageId): array
-```
+**TextbeeGatewayService**: No longer used for **outbound** send. It may remain for legacy or for health checks that hit the phone (if `TEXTBEE_API_URL` is set). All “send SMS” from the chatbot should go through enqueue + FCM send.
 
 ### 2. WEBHOOK CONTROLLER
 
@@ -270,16 +266,18 @@ HTTP Status: `200`
          │  
          ▼  
 ┌─────────────────────────────────┐  
-│  TextbeeGatewayService@send     │  
-│  - Format response              │  
-│  - Call Textbee API             │  
-│  - Log transaction              │  
+│  OutboundSmsService (enqueue)    │  
+│  - Insert outbound_sms (pending)│  
+│  - Load FCM token               │  
+│  - Send FCM data message        │  
 └────────┬────────────────────────┘  
          │  
          ▼  
 ┌─────────────────────────────────┐  
-│  Textbee API                    │  
-│  - Send SMS via Android phone   │  
+│  FCM delivers to device         │  
+│  Android app: onMessageReceived │  
+│  → SmsManager.send()             │  
+│  → POST mark-sent                │  
 └────────┬────────────────────────┘  
          │  
          ▼  
@@ -289,53 +287,47 @@ HTTP Status: `200`
 
 ## IMPLEMENTATION CHECKLIST
 
-### Phase 1: Setup
+### Phase 1: Firebase and env
 
-- Get Textbee API URL from team (IP:port)  
-- Add to `.env`: `TEXTBEE_API_URL=http://192.168.1.100:8080`  
-- Get Textbee webhook URL from team  
-- Configure webhook URL in Textbee app settings
+- Create Firebase project; add Android app; get `google-services.json` and service account JSON for Laravel.  
+- Add to `.env`: `FIREBASE_CREDENTIALS=/path/to/serviceAccountKey.json`, optional `FCM_DEVICE_TOKEN` for testing.  
+- For **inbound**: set webhook URL in gateway app to `https://yourdomain.com/api/sms/incoming`; optionally `TEXTBEE_WEBHOOK_SECRET`.  
+- Optional: `TEXTBEE_API_URL` only if you still use it (e.g. health checks or legacy); outbound does not use it.
 
 ### Phase 2: Database
 
-- Create migrations for `ChatMessage`, `ChatSession`, `SmsLog`  
-- Run migrations  
-- Create models
+- Create migrations for `outbound_sms`, `sms_devices` (FCM token storage), and existing tables (`ChatMessage`, `ChatSession`, `SmsLog` as needed).  
+- Run migrations; create models (`OutboundSms`, `SmsDevice`).
 
-### Phase 3: SMS Service
+### Phase 3: Laravel outbound and FCM
 
-- Create `TextbeeGatewayService` class  
-- Implement `sendSms()` method  
-- Implement `getStatus()` method  
-- Add error handling and logging
+- Install `kreait/firebase-php`; configure Firebase credentials.  
+- Implement service that sends FCM data messages (id, to, body).  
+- Implement `POST /api/sms/device/register` and `POST /api/sms/outbound/mark-sent` (auth: e.g. API key or Bearer).  
+- Where the app currently calls `TextbeeGatewayService::sendSms`, replace with: insert `outbound_sms` → send FCM.
 
-### Phase 4: Webhook
+### Phase 4: Webhook (inbound)
 
-- Create `ChatbotController`  
-- Create `receiveIncomingSms()` endpoint  
-- Add webhook verification middleware  
-- Test webhook locally (use ngrok for HTTPS)
+- Create webhook endpoint (e.g. `TextbeeSmsWebhookController`); receive at `POST /api/sms/incoming`.  
+- Add webhook verification if using secret.  
+- Test webhook locally (use ngrok for HTTPS).
 
-### Phase 5: Job Processing
+### Phase 5: Job processing and chatbot
 
-- Create `ProcessSmsMessage` job  
-- Connect to existing chatbot core  
-- Implement message processing logic  
-- Add fallback/error handling
+- Create/use `ProcessSmsMessage` job; connect to chatbot core.  
+- Ensure “send reply” path uses enqueue + FCM send (not direct Textbee API).
 
-### Phase 6: Testing
+### Phase 6: Android app
 
-- Unit tests for SMS service  
-- Integration tests for webhook  
-- End-to-end SMS flow test  
-- Load testing (simulate multiple SMS)
+- FCM: get token, POST to `/api/sms/device/register`.  
+- Handle FCM data message: read id, to, body; send via SmsManager; POST mark-sent/mark-failed.  
+- Optionally: same app receives SMS and POSTs to `/api/sms/incoming`.
 
-### Phase 7: Monitoring
+### Phase 7: Testing and monitoring
 
-- Create health check job  
-- Set up logging for all SMS  
-- Create alerts for gateway offline  
-- Dashboard for SMS metrics
+- Unit/integration tests for webhook, register, mark-sent; mock FCM send.  
+- End-to-end: trigger outbound SMS → verify FCM sent, app sends SMS, mark-sent called.  
+- Logging and optional cron for old pending rows (mark failed or retry FCM).
 
 ## KEY CONSIDERATIONS
 
@@ -374,10 +366,10 @@ Recommended: Split long messages into multiple SMS (max 160 chars each).
 
 ### 5. Error Handling
 
-- Textbee offline → queue for retry  
-- Invalid phone number → handle gracefully  
-- Network timeout → implement retry logic  
-- API errors → log and alert admin
+- FCM invalid/unregistered token → clear token in DB; app re-registers on next launch.  
+- App never calls mark-sent → row stays pending; cron to mark old pending as failed or retry FCM.  
+- Invalid phone number → handle gracefully.  
+- Firebase/network errors → log; optionally retry or alert admin.
 
 ### 6. Logging & Monitoring
 
@@ -419,9 +411,9 @@ public function handle(ChatMessage $message)
         ['session_id' => $session->id]
     );
     
-    // Send response via SMS
-    $smsService = app(TextbeeGatewayService::class);
-    $smsService->sendSms($message->phone, $response);
+    // Send response via SMS (enqueue + FCM; app sends via SIM and reports mark-sent)
+    $outboundSms = app(OutboundSmsService::class);
+    $outboundSms->enqueueAndSendFcm($message->phone, $response);
 }
 ```
 
@@ -429,11 +421,11 @@ Your chatbot core stays unchanged – you just feed it messages and get response
 
 ## DEPLOYMENT CONSIDERATIONS
 
-### 1. Environment
+### 1. Environment and config
 
-- Development: Test with Textbee on local network  
-- Staging: Test with staging Textbee instance  
-- Production: Use production Textbee phone
+- **Firebase**: Set `FIREBASE_CREDENTIALS` (path to service account JSON) on server; do not commit the JSON. Optional `FCM_DEVICE_TOKEN` for testing.  
+- **Inbound**: Webhook URL and optional `TEXTBEE_WEBHOOK_SECRET`. `TEXTBEE_API_URL` only if you still use it (e.g. health checks); outbound does not use it.  
+- Development: Test with gateway app and FCM-capable Android app; staging/production: same flow with production Firebase and domain.
 
 ### 2. HTTPS Requirement
 
@@ -444,9 +436,8 @@ Your chatbot core stays unchanged – you just feed it messages and get response
 
 ### 3. Firewall/Network
 
-- Ensure Laravel server can reach Textbee API URL  
-- Ensure Textbee phone can reach Laravel webhook URL  
-- Both on same network OR public HTTPS endpoint
+- Laravel must reach Firebase (FCM) and be reachable by the Android app (for register and mark-sent).  
+- Gateway app (inbound) must reach Laravel webhook URL (public HTTPS).
 
 ### 4. Backup/Failover
 
@@ -459,11 +450,12 @@ Your chatbot core stays unchanged – you just feed it messages and get response
 ### Unit Tests
 
 ```php
-// Test SMS service in isolation
-test('can send SMS via Textbee', function () {
-    $service = new TextbeeGatewayService();
-    $result = $service->sendSms('09123456789', 'Test message');
-    $this->assertTrue($result['success']);
+// Test outbound: enqueue + FCM send (mock Firebase)
+test('enqueues outbound SMS and sends FCM', function () {
+    $service = app(OutboundSmsService::class);
+    $result = $service->enqueueAndSendFcm('09123456789', 'Test message');
+    $this->assertDatabaseHas('outbound_sms', ['to' => '09123456789', 'status' => 'pending']);
+    // Assert FCM was called with correct data payload
 });
 ```
 
@@ -526,12 +518,14 @@ test('incoming SMS triggers chatbot response', function () {
 
 ## DEPENDENCIES & PACKAGES
 
-Required packages:
+Required for FCM outbound:
 
 ```bash
-composer require guzzlehttp/guzzle
-composer require laravel/horizon  # For queue monitoring (optional)
+composer require kreait/firebase-php   # Firebase Admin API (send FCM data messages)
+composer require guzzlehttp/guzzle     # HTTP client (often already present)
 ```
+
+Optional: `laravel/horizon` for queue monitoring.
 
 Optional but recommended:
 
@@ -544,45 +538,39 @@ composer require laravel/telescope      # Debug/monitoring
 
 Must create:
 
-1. `app/Services/TextbeeGatewayService.php` – SMS API client  
-2. `app/Http/Controllers/ChatbotController.php` – Webhook endpoint  
-3. `app/Http/Middleware/VerifyTextbeeWebhook.php` – Webhook verification  
-4. `app/Jobs/ProcessSmsMessage.php` – Background job  
-5. `app/Models/ChatMessage.php` – Database model  
-6. `database/migrations/*` – Database tables  
-7. `routes/api.php` – Add webhook route
+1. `app/Services/OutboundSmsService.php` – Enqueue outbound_sms + send FCM data message  
+2. `app/Models/OutboundSms.php`, `app/Models/SmsDevice.php`  
+3. Migrations: `outbound_sms`, `sms_devices`  
+4. `POST /api/sms/device/register` and `POST /api/sms/outbound/mark-sent` (controller + routes)  
+5. Webhook endpoint for inbound (e.g. `TextbeeSmsWebhookController`) and `POST /api/sms/incoming`  
+6. Firebase config (credentials path in `.env`); integrate kreait/firebase-php  
+7. Replace direct `TextbeeGatewayService::sendSms` calls with enqueue + FCM send  
 
 Nice to have:
 
-8. `app/Jobs/MonitorTextbeeHealth.php` – Health check job  
-9. `app/Http/Controllers/DashboardController.php` – Metrics dashboard  
-10. Tests for all components
+8. `app/Jobs/MonitorTextbeeHealth.php` – Health check (if using Textbee API for status)  
+9. Tests for webhook, register, mark-sent, and FCM send flow  
+10. Cron or job to mark very old pending outbound_sms as failed
 
 ## QUICK START (TL;DR)
 
-- Get Textbee API URL from team  
-- Add to `.env`  
-- Create `TextbeeGatewayService`  
-- Create webhook endpoint  
-- Create job to process messages  
-- Connect to your chatbot core  
-- Test SMS flow  
-- Deploy and monitor
+- **Inbound**: Configure gateway app webhook URL to `https://yourdomain.com/api/sms/incoming`.  
+- **Outbound**: Set up Firebase (project, Android app, service account JSON); add `FIREBASE_CREDENTIALS` to `.env`. Create `outbound_sms` and `sms_devices` tables; implement enqueue + FCM send and register/mark-sent API. Android app: FCM token → register; handle FCM data → send SMS → mark-sent.  
+- Connect chatbot “send reply” to enqueue + FCM (not direct Textbee API).  
+- Test inbound and outbound flows; deploy and monitor.
 
 ## SUPPORT & REFERENCE
 
-- Textbee Documentation: `textbee.dev/docs`  
+- **FCM push design (outbound)**: `docs/SMS_FCM_PUSH_DESIGN.md` – payloads, APIs, Laravel/Android detail, edge cases.  
+- **Setup and env**: `docs/sms-fb-integration-follow-up.md`  
 - Laravel Queue Docs: `laravel.com/docs/queues`  
-- Your Chatbot Core Docs: [Reference your existing chatbot documentation]
+- Gateway (inbound) docs: e.g. Textbee at `textbee.dev/docs` if using Textbee for receive.
 
 ## NOTES FOR DEVELOPER
 
-- This is a standard Laravel queue pattern (webhook → queue job → processing)  
-- Nothing exotic, standard industry practice  
-- Textbee is just another API like any other  
-- Your chatbot core doesn't change, just feeds it messages  
-- Focus on error handling and monitoring  
-- Keep logs clean for debugging
-
-You've got this! 💪
+- Inbound: standard webhook → process → (optional) enqueue reply.  
+- Outbound: enqueue in DB + push via FCM; the phone sends the SMS and reports back. No polling.  
+- Your chatbot core doesn’t change; only the “send SMS” mechanism changes from “call gateway API” to “enqueue + FCM”.  
+- Focus on error handling (invalid token, app never reports back), retries, and monitoring.  
+- Full FCM contract: `docs/SMS_FCM_PUSH_DESIGN.md`.
 

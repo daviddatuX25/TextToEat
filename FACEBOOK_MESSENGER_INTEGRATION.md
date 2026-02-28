@@ -242,3 +242,66 @@ From the screenshots you showed:
 
 This is your complete context to brief your builder agent!
 
+---
+
+## When you're ready: webhook URL and setup checklist
+
+Use this when you add your webhook URL and tokens. The app already implements the endpoints; you only configure Meta and `.env`.
+
+| Step | What to do |
+|------|-------------|
+| **1. Callback URL** | In Meta → Messenger → Webhooks, set **Callback URL** to `https://yourdomain.com/api/messenger/webhook` (or `https://xxxx.ngrok.io/api/messenger/webhook` for local dev). Must be HTTPS and publicly reachable. |
+| **2. Verify token** | In the same form, set **Verify Token** to a secret you choose (e.g. `TEXTTOEAT_TOKEN`). Put the **exact same** value in `.env` as `FACEBOOK_VERIFY_TOKEN`. The app returns this token in plain text for Meta’s GET verification. |
+| **3. Verify and save** | Click **Verify and Save**. Meta sends a GET with `hub.mode`, `hub.verify_token`, `hub.challenge`; the app responds with the raw challenge string (plain text). |
+| **4. Subscribe webhook events** | Subscribe: `messages`, `messaging_postbacks`, `message_deliveries`, `message_reads`. The app handles messages and postbacks; deliveries/reads are acknowledged with 200. |
+| **5. Connect Page** | Under Messenger, connect your **Facebook Page**. Generate the **Page Access Token** and store it in `.env` as `FACEBOOK_PAGE_ACCESS_TOKEN`. |
+| **6. Subscribe Page to webhook** | In Webhooks, select your Page and click **Subscribe** so events are sent to your callback. |
+| **7. .env** | Set `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `FACEBOOK_VERIFY_TOKEN`, `FACEBOOK_PAGE_ACCESS_TOKEN`. |
+| **8. Test** | Send a message to your Page; confirm the webhook receives the POST and the bot replies. For production: add test users in Roles; request `pages_messaging` and submit App Review; after approval, the bot is public. |
+
+---
+
+## Tech spec: implemented modules
+
+Brief reference for the code added for the single-page Messenger integration.
+
+### Config
+
+| Item | Location | Purpose |
+|------|----------|---------|
+| Facebook config | `texttoeat-app/config/facebook.php` | Reads `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `FACEBOOK_VERIFY_TOKEN`, `FACEBOOK_PAGE_ACCESS_TOKEN` from env; exposes `graph_base_url` and `graph_version` (v18.0). |
+
+### Routes
+
+| Method | Path | Controller method |
+|--------|------|-------------------|
+| GET | `/api/messenger/webhook` | `FacebookMessengerWebhookController@verify` — Facebook webhook subscription verification. |
+| POST | `/api/messenger/webhook` | `FacebookMessengerWebhookController@handle` — Receives Messenger events, delegates to chatbot, sends replies. |
+
+Defined in `texttoeat-app/routes/api.php`.
+
+### Controller
+
+| File | Responsibility |
+|------|----------------|
+| `texttoeat-app/app/Http/Controllers/FacebookMessengerWebhookController.php` | **verify**: Validates `hub_mode`, `hub_verify_token`, `hub_challenge`; returns the challenge as **plain text** (Meta requires raw body, not JSON). **handle**: Validates `X-Hub-Signature-256` (HMAC-SHA256 of raw body with app secret); parses `entry[*].messaging[*]`; for each message (text, quick_reply payload, or **postback** payload) builds a synthetic request and calls `ChatbotWebhookController@webhook` with `channel = 'messenger'`, `external_id = PSID`, `body = text`; sends reply/replies via `FacebookMessengerClient`. Delivery/read events are ignored (no `message`/`postback`); response remains 200. |
+
+### Service
+
+| File | Responsibility |
+|------|----------------|
+| `texttoeat-app/app/Services/FacebookMessengerClient.php` | **sendTextMessage(recipientId, text)**: POSTs to `{graph_base_url}/{graph_version}/me/messages` with `recipient.id` and `message.text`, using `config('facebook.page_access_token')` as Bearer token. No-op if token is empty. |
+
+### Integration with existing chatbot
+
+- Incoming Messenger messages are normalized to the same shape as other channels: `channel = 'messenger'`, `external_id = sender.id` (PSID), `body = message text or quick_reply payload`.
+- `ChatbotWebhookController@webhook` and `ChatbotFsm` are reused unchanged; sessions and orders are stored with `channel = 'messenger'` and appear in Chatbot Logs and order flows.
+
+### Tests
+
+| File | Coverage |
+|------|----------|
+| `texttoeat-app/tests/Feature/FacebookMessengerWebhookTest.php` | GET verification: success with valid token (asserts plain-text challenge in body), 403 with invalid token. POST handle: message and postback payloads; valid `X-Hub-Signature-256`; asserts `ChatbotSession` and `sendTextMessage` called. |
+
+Run: `./vendor/bin/sail test --filter FacebookMessengerWebhookTest`
+

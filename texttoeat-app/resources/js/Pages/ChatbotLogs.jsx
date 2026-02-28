@@ -7,7 +7,7 @@ export default function ChatbotLogs({ sessions, filters = {}, meta = {} }) {
     const links = !Array.isArray(sessions) && sessions?.links ? sessions.links : [];
 
     const handleSubmit = (nextFilters) => {
-        router.get(route('portal.logs.chatbot'), nextFilters, {
+        router.get('/portal/logs/chatbot', nextFilters, {
             preserveState: true,
             replace: true,
         });
