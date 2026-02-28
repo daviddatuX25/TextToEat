@@ -18,6 +18,7 @@ if (! is_file($webRoutes)) {
 
 return Application::configure(basePath: $basePath)
     ->withRouting(
+        channels: __DIR__.'/../routes/channels.php',
         web: $webRoutes,
         api: $basePath.'/routes/api.php',
         commands: $basePath.'/routes/console.php',

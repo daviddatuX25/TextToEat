@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\OrderStatus;
+use App\Events\OrderUpdated;
 use App\Models\DiningMarker;
 use App\Models\Order;
 use Illuminate\Http\Request;
@@ -59,6 +60,8 @@ class WalkinController extends Controller
 
         $marker = $validated['order_marker'] ?? null;
         $order->update(['order_marker' => $marker === '' ? null : $marker]);
+
+        event(new OrderUpdated($order));
 
         return redirect()->back()->with('success', $marker ? 'Dining marker assigned.' : 'Dining marker cleared.');
     }

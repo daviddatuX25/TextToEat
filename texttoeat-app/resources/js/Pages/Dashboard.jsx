@@ -3,9 +3,11 @@ import { ShoppingBag, Truck, Package, Footprints, PlusCircle, Utensils } from 'l
 import PortalLayout from '../Layouts/PortalLayout';
 import { Card, CardContent, CardHeader, SectionHeading, StatCard } from '../components/ui';
 import ChannelPerformanceChart from '../components/dashboard/ChannelPerformanceChart';
+import { usePortalRefresh } from '../hooks/usePortalRefresh';
 import TopItemsChart from '../components/dashboard/TopItemsChart';
 
 export default function Dashboard({ metrics = {} }) {
+    usePortalRefresh(true, 15000);
     const {
         overview = {},
         realtime = {},

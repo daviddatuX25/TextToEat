@@ -4,6 +4,7 @@ namespace App\Chatbot;
 
 use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
+use App\Events\OrderUpdated;
 use App\Enums\PaymentStatus;
 use App\Models\MenuItem;
 use App\Models\Order;
@@ -101,6 +102,8 @@ class ChatbotOrderService
                 ]);
             }
         });
+
+        event(new OrderUpdated($order));
 
         return ['order' => $order, 'reference' => $reference];
     }

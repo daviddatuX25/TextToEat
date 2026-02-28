@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
+use App\Events\OrderUpdated;
 use App\Enums\PaymentStatus;
 use App\Models\DeliveryArea;
 use App\Models\DiningMarker;
@@ -117,6 +118,8 @@ class QuickOrdersController extends Controller
                 'price' => (float) $line['price'],
             ]);
         }
+
+        event(new OrderUpdated($order));
 
         return redirect()->route('portal.orders')->with('success', 'Order created.');
     }

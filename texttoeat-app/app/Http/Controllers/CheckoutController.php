@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
+use App\Events\OrderUpdated;
 use App\Enums\PaymentStatus;
 use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
@@ -87,6 +88,11 @@ class CheckoutController extends Controller
         });
 
         session()->forget('customer_cart');
+
+        $order = Order::where('reference', $reference)->first();
+        if ($order) {
+            event(new OrderUpdated($order));
+        }
 
         return redirect()->route('order.confirmation', ['reference' => $reference]);
     }

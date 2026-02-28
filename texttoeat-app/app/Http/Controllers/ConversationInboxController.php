@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ConversationUpdated;
 use App\Models\ActionLog;
 use App\Models\ChatbotSession;
 use App\Contracts\MessengerSenderInterface;
@@ -226,6 +227,7 @@ class ConversationInboxController extends Controller
             }
 
             $session->update(['last_activity_at' => now()]);
+            event(new ConversationUpdated($session, 'reply'));
 
             return redirect()->back()->with('success', 'Message sent.');
         } catch (\Throwable $e) {
@@ -250,6 +252,7 @@ class ConversationInboxController extends Controller
         $session->state = $state;
         $session->last_activity_at = now();
         $session->save();
+        event(new ConversationUpdated($session, 'automation'));
 
         $action = $enabled ? 'takeover_automation_enabled' : 'takeover_automation_disabled';
         ActionLog::create([
@@ -283,6 +286,7 @@ class ConversationInboxController extends Controller
         $session->state = $state;
         $session->last_activity_at = now();
         $session->save();
+        event(new ConversationUpdated($session, 'resolve'));
 
         ActionLog::create([
             'user_id' => $request->user()?->id,

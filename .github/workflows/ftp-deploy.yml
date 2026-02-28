@@ -53,6 +53,10 @@ jobs:
       - name: Install npm dependencies and build
         run: npm ci && npm run build
         working-directory: texttoeat-app
+        env:
+          VITE_BROADCAST_BROADCASTER: ${{ secrets.VITE_BROADCAST_BROADCASTER || 'reverb' }}
+          VITE_PUSHER_APP_KEY: ${{ secrets.VITE_PUSHER_APP_KEY }}
+          VITE_PUSHER_APP_CLUSTER: ${{ secrets.VITE_PUSHER_APP_CLUSTER || 'mt1' }}
 
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.6

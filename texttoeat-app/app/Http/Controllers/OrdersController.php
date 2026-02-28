@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
+use App\Events\OrderUpdated;
 use App\Models\ActionLog;
 use App\Services\OrderStatusNotificationService;
 use App\Models\DeliveryArea;
@@ -107,6 +108,8 @@ class OrdersController extends Controller
             $order->payment_status = $validated['payment_status'];
         }
         $order->save();
+
+        event(new OrderUpdated($order));
 
         if (
             ($originalStatus !== $order->status)

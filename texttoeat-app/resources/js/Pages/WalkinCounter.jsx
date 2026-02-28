@@ -3,6 +3,7 @@ import { Link, router, usePage, useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 import PortalLayout from '../Layouts/PortalLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
+import { usePortalOrdersEcho } from '../hooks/usePortalOrdersEcho';
 import { UtensilsCrossed, Trash2 } from 'lucide-react';
 
 const routerOpts = () => ({
@@ -253,6 +254,7 @@ function ManageMarkersDialog({ diningMarkersList = [], open, onOpenChange }) {
 
 export default function WalkinCounter({ orders = [], orderMarkers = [], diningMarkersList = [], highlight }) {
     const { errors } = usePage().props;
+    usePortalOrdersEcho();
     const highlightRef = useRef(null);
     const [manageOpen, setManageOpen] = useState(false);
     const [activeHighlight, setActiveHighlight] = useState(() => (highlight ? String(highlight) : null));

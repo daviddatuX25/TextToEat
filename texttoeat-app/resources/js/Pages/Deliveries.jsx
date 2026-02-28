@@ -3,6 +3,7 @@ import { Link, router, usePage, useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 import PortalLayout from '../Layouts/PortalLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
+import { usePortalOrdersEcho } from '../hooks/usePortalOrdersEcho';
 import { MapPin, Trash2 } from 'lucide-react';
 
 const routerOpts = () => ({
@@ -364,6 +365,7 @@ function ManageDeliveryAreasDialog({ deliveryAreas = [], open, onOpenChange }) {
 
 export default function Deliveries({ orders = [], deliveryAreas = [], highlight }) {
     const highlightRef = useRef(null);
+    usePortalOrdersEcho();
     const [manageOpen, setManageOpen] = useState(false);
     const [activeHighlight, setActiveHighlight] = useState(() => (highlight ? String(highlight) : null));
     const highlightTimeoutRef = useRef(null);

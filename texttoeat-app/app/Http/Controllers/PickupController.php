@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\OrderStatus;
+use App\Events\OrderUpdated;
 use App\Models\Order;
 use App\Models\PickupSlot;
 use Illuminate\Http\Request;
@@ -70,6 +71,8 @@ class PickupController extends Controller
 
         $slot = $validated['pickup_slot'] ?? null;
         $order->update(['pickup_slot' => $slot === '' ? null : $slot]);
+
+        event(new OrderUpdated($order));
 
         return redirect()->back()->with('success', $slot ? 'Pickup slot assigned.' : 'Pickup slot cleared.');
     }

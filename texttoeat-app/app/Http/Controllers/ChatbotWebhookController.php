@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Chatbot\ChatbotFsm;
 use App\Chatbot\ChatbotInventoryException;
 use App\Chatbot\ChatbotOrderService;
+use App\Events\ConversationUpdated;
 use App\Models\ChatbotSession;
 use App\Models\DeliveryArea;
 use App\Models\MenuItem;
@@ -154,6 +155,7 @@ class ChatbotWebhookController extends Controller
         }
 
         $session->update($update);
+        event(new ConversationUpdated($session));
 
         $replies = array_filter(explode("\n\n", $reply));
         if ($replies === []) {

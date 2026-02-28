@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Contracts\MessengerSenderInterface;
+use App\Events\ConversationUpdated;
 use App\Models\ChatbotSession;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -96,6 +97,7 @@ class FacebookMessengerWebhookController extends Controller
             $state = $existingSession->state ?? [];
             if ((bool) ($state['automation_disabled'] ?? false) === true) {
                 $existingSession->update(['last_activity_at' => now()]);
+                event(new ConversationUpdated($existingSession, 'message'));
 
                 return;
             }
