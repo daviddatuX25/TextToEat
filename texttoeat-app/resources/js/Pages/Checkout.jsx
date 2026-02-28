@@ -1,4 +1,4 @@
-import { useForm } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import AppLayout from '../Layouts/AppLayout';
 import { Button, Card, Input, SectionHeading } from '../components/ui';
 
@@ -25,7 +25,7 @@ export default function Checkout({ cart = [], total = 0 }) {
             delivery_place: isDelivery ? form.data.delivery_place : null,
             delivery_fee: isDelivery && form.data.delivery_place === 'Other (paid on delivery)' ? null : 0,
         };
-        form.transform(() => payload).post('/checkout');
+        router.post('/checkout', payload);
     }
 
     return (

@@ -7,10 +7,10 @@ window.axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 
 window.Pusher = Pusher;
 
-const broadcaster = import.meta.env.VITE_BROADCAST_BROADCASTER ?? 'reverb';
+const broadcaster = import.meta.env.VITE_BROADCAST_BROADCASTER ?? 'pusher';
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
 
-if (broadcaster === 'pusher') {
+if (broadcaster === 'pusher' && import.meta.env.VITE_PUSHER_APP_KEY) {
     window.Echo = new Echo({
         broadcaster: 'pusher',
         key: import.meta.env.VITE_PUSHER_APP_KEY,
@@ -21,6 +21,8 @@ if (broadcaster === 'pusher') {
             headers: { 'X-CSRF-TOKEN': csrfToken },
         },
     });
+} else if (broadcaster === 'pusher') {
+    window.Echo = null;
 } else if (broadcaster === 'reverb') {
     const reverbKey = import.meta.env.VITE_REVERB_APP_KEY ?? 'texttoeat-key';
     const reverbHost = import.meta.env.VITE_REVERB_HOST ?? window.location.hostname;

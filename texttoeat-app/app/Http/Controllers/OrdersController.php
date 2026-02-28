@@ -6,6 +6,7 @@ use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
 use App\Events\OrderUpdated;
 use App\Models\ActionLog;
+use App\Models\OrderItem;
 use App\Services\OrderStatusNotificationService;
 use App\Models\DeliveryArea;
 use App\Models\DiningMarker;
@@ -98,16 +99,29 @@ class OrdersController extends Controller
         $originalStatus = $order->status;
         $originalPaymentStatus = $order->payment_status;
 
+        if (isset($validated['payment_status'])) {
+            $order->payment_status = $validated['payment_status'];
+        }
         if (isset($validated['status'])) {
-            if ($validated['status'] === 'completed' && $order->payment_status !== 'paid') {
+            $effectivePayment = $order->payment_status;
+            if ($validated['status'] === 'completed' && $effectivePayment !== 'paid') {
                 return redirect()->back()->with('error', 'Mark the order as paid before completing.');
             }
             $order->status = $validated['status'];
         }
-        if (isset($validated['payment_status'])) {
-            $order->payment_status = $validated['payment_status'];
-        }
         $order->save();
+
+        if ($originalStatus !== $order->status && (string) $order->status === OrderStatus::Completed->value) {
+            $today = Carbon::today();
+            foreach ($order->orderItems as $orderItem) {
+                if ($orderItem->menu_item_id) {
+                    MenuItem::query()
+                        ->where('id', $orderItem->menu_item_id)
+                        ->whereDate('menu_date', $today)
+                        ->decrement('units_today', $orderItem->quantity);
+                }
+            }
+        }
 
         event(new OrderUpdated($order));
 

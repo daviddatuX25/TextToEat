@@ -85,6 +85,7 @@ class TextbeeGatewayService
 
     /**
      * Split message into segments of max 160 characters (GSM 7-bit segment size).
+     * Splits on newlines first so that line breaks are preserved when possible.
      *
      * @return list<string>
      */
@@ -95,15 +96,18 @@ class TextbeeGatewayService
         }
 
         $segments = [];
-        $remaining = $message;
+        $lines = explode("\n", $message);
 
-        while ($remaining !== '') {
-            if (mb_strlen($remaining) <= self::SMS_CHAR_LIMIT) {
-                $segments[] = $remaining;
-                break;
+        foreach ($lines as $line) {
+            $remaining = $line;
+            while ($remaining !== '') {
+                if (mb_strlen($remaining) <= self::SMS_CHAR_LIMIT) {
+                    $segments[] = $remaining;
+                    break;
+                }
+                $segments[] = mb_substr($remaining, 0, self::SMS_CHAR_LIMIT);
+                $remaining = mb_substr($remaining, self::SMS_CHAR_LIMIT);
             }
-            $segments[] = mb_substr($remaining, 0, self::SMS_CHAR_LIMIT);
-            $remaining = mb_substr($remaining, self::SMS_CHAR_LIMIT);
         }
 
         return $segments;

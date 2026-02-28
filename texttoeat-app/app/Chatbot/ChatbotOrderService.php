@@ -9,11 +9,16 @@ use App\Enums\PaymentStatus;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\MenuItemStockService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class ChatbotOrderService
 {
+    public function __construct(
+        private MenuItemStockService $stockService
+    ) {}
+
     /**
      * Create order from session state selected_items with inventory check and idempotency.
      * Channel must be 'sms' or 'web' (maps to OrderChannel).
@@ -44,6 +49,7 @@ class ChatbotOrderService
         $orderChannel = $channel === 'web' ? OrderChannel::Web : OrderChannel::Sms;
         $menuItemIds = array_unique(array_column($selectedItems, 'menu_item_id'));
         $menuItems = MenuItem::whereIn('id', $menuItemIds)->get()->keyBy('id');
+        $virtualAvailable = $this->stockService->getVirtualAvailableForToday($menuItemIds);
 
         foreach ($selectedItems as $line) {
             $id = $line['menu_item_id'];
@@ -52,7 +58,7 @@ class ChatbotOrderService
             if ($item === null || $item->is_sold_out) {
                 throw new ChatbotInventoryException("Item {$id} is not available or sold out.");
             }
-            $available = (int) $item->units_today;
+            $available = (int) ($virtualAvailable[$id] ?? 0);
             if ($qty > $available) {
                 throw new ChatbotInventoryException("Item {$item->name} has only {$available} left.");
             }

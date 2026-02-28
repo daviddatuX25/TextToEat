@@ -3,7 +3,7 @@ import { Link, router, usePage, useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 import PortalLayout from '../Layouts/PortalLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
-import { usePortalOrdersEcho } from '../hooks/usePortalOrdersEcho';
+import { usePortalOrdersLive } from '../hooks/usePortalOrdersLive';
 import { MapPin, Trash2 } from 'lucide-react';
 
 const routerOpts = () => ({
@@ -112,6 +112,35 @@ function DeliveryOrderCard({ order, isHighlighted = false }) {
             )}
 
             <div className="flex flex-col gap-2 mt-4">
+                {isReady && (
+                    <button
+                        type="button"
+                        onClick={() => updateStatus('on_the_way')}
+                        className="w-full font-semibold py-2 rounded-xl border-2 border-blue-400 dark:border-blue-500/60 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 active:scale-[0.99]"
+                    >
+                        Mark on the way
+                    </button>
+                )}
+                {isOnTheWay && (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (!isPaid) {
+                                toast.error('Mark the order as paid before completing.');
+                                return;
+                            }
+                            updateStatus('completed');
+                        }}
+                        title={!isPaid ? 'Mark as paid first' : undefined}
+                        className={`w-full font-semibold py-2 rounded-xl active:scale-[0.99] ${
+                            isPaid
+                                ? 'bg-primary-600 text-white hover:bg-primary-700'
+                                : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400 hover:opacity-90'
+                        }`}
+                    >
+                        Mark delivered
+                    </button>
+                )}
                 <Link
                     href={`/portal/orders?highlight=${order.id}`}
                     className="w-full font-semibold py-2 rounded-xl border-2 border-primary-400 dark:border-primary-500/60 bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-500/20 active:scale-[0.99] text-center"
@@ -365,7 +394,7 @@ function ManageDeliveryAreasDialog({ deliveryAreas = [], open, onOpenChange }) {
 
 export default function Deliveries({ orders = [], deliveryAreas = [], highlight }) {
     const highlightRef = useRef(null);
-    usePortalOrdersEcho();
+    usePortalOrdersLive();
     const [manageOpen, setManageOpen] = useState(false);
     const [activeHighlight, setActiveHighlight] = useState(() => (highlight ? String(highlight) : null));
     const highlightTimeoutRef = useRef(null);

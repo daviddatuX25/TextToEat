@@ -1,10 +1,10 @@
 import { Link, router } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
-import { usePortalConversationsEcho } from '../hooks/usePortalConversationsEcho';
+import { usePortalConversationsLive } from '../hooks/usePortalConversationsLive';
 import { LogFilterPanel } from '../components/logs/LogFilterPanel';
 
 export default function ConversationInbox({ sessions, filters = {}, meta = {} }) {
-    usePortalConversationsEcho();
+    usePortalConversationsLive();
     const items = Array.isArray(sessions) ? sessions : sessions?.data ?? [];
     const links = !Array.isArray(sessions) && sessions?.links ? sessions.links : [];
 

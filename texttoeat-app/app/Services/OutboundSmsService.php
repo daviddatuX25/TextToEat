@@ -77,6 +77,8 @@ class OutboundSmsService
     }
 
     /**
+     * Split message into segments of max 160 chars. Prefer splitting on newlines so lines stay intact.
+     *
      * @return list<string>
      */
     private function splitMessage(string $message): array
@@ -85,14 +87,18 @@ class OutboundSmsService
             return [];
         }
         $segments = [];
-        $remaining = $message;
-        while ($remaining !== '') {
-            if (mb_strlen($remaining) <= self::SMS_CHAR_LIMIT) {
-                $segments[] = $remaining;
-                break;
+        $lines = explode("\n", $message);
+
+        foreach ($lines as $line) {
+            $remaining = $line;
+            while ($remaining !== '') {
+                if (mb_strlen($remaining) <= self::SMS_CHAR_LIMIT) {
+                    $segments[] = $remaining;
+                    break;
+                }
+                $segments[] = mb_substr($remaining, 0, self::SMS_CHAR_LIMIT);
+                $remaining = mb_substr($remaining, self::SMS_CHAR_LIMIT);
             }
-            $segments[] = mb_substr($remaining, 0, self::SMS_CHAR_LIMIT);
-            $remaining = mb_substr($remaining, self::SMS_CHAR_LIMIT);
         }
 
         return $segments;

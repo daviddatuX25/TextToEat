@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\MenuItemStockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,6 +18,9 @@ use Inertia\Response;
 
 class CheckoutController extends Controller
 {
+    public function __construct(
+        private MenuItemStockService $stockService
+    ) {}
     public function index(): Response|RedirectResponse
     {
         $cart = session('customer_cart', []);
@@ -42,6 +46,17 @@ class CheckoutController extends Controller
 
         if (empty($cart)) {
             return redirect()->route('menu')->with('error', 'Your cart is empty.');
+        }
+
+        $menuItemIds = array_unique(array_column($cart, 'menu_item_id'));
+        $virtualAvailable = $this->stockService->getVirtualAvailableForToday($menuItemIds);
+        foreach ($cart as $line) {
+            $id = (int) $line['menu_item_id'];
+            $qty = (int) $line['quantity'];
+            $available = (int) ($virtualAvailable[$id] ?? 0);
+            if ($qty > $available) {
+                return redirect()->route('checkout')->with('error', 'Some items have limited availability. Please check the menu and try again.');
+            }
         }
 
         $validated = $request->validated();

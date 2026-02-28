@@ -1,6 +1,6 @@
 import { Link, router } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
-import { usePortalConversationsEcho } from '../hooks/usePortalConversationsEcho';
+import { usePortalConversationsLive } from '../hooks/usePortalConversationsLive';
 import PortalLayout from '../Layouts/PortalLayout';
 
 function ModeBadge({ mode }) {
@@ -26,7 +26,7 @@ function ModeBadge({ mode }) {
 }
 
 export default function ConversationInboxShow({ session, outbound_sms: outboundSms = [], meta = {} }) {
-    usePortalConversationsEcho();
+    usePortalConversationsLive();
     const [message, setMessage] = useState('');
     const [sending, setSending] = useState(false);
     const [toggling, setToggling] = useState(false);

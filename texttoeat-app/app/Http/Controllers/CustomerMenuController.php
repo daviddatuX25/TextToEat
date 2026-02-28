@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MenuItem;
+use App\Services\MenuItemStockService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -11,6 +12,10 @@ use Inertia\Response;
 
 class CustomerMenuController extends Controller
 {
+    public function __construct(
+        private MenuItemStockService $stockService
+    ) {}
+
     public function index(): Response
     {
         $today = Carbon::today();
@@ -20,10 +25,17 @@ class CustomerMenuController extends Controller
             ->orderBy('name')
             ->get();
 
+        $virtualAvailable = $this->stockService->getVirtualAvailableForTodayAll();
+        $menuItemsArray = $menuItems->map(function ($item) use ($virtualAvailable) {
+            $arr = $item->toArray();
+            $arr['available'] = $virtualAvailable[$item->id] ?? (int) $item->units_today;
+            return $arr;
+        })->values()->all();
+
         $cart = session('customer_cart', []);
 
         return Inertia::render('Menu', [
-            'menuItems' => $menuItems,
+            'menuItems' => $menuItemsArray,
             'cart' => $cart,
         ]);
     }
@@ -39,26 +51,18 @@ class CustomerMenuController extends Controller
         $today = Carbon::today();
 
         if (! $menuItem->menu_date->isSameDay($today)) {
-            abort(422, 'Item is not on today\'s menu.');
+            return redirect()->route('menu')->with('error', 'Item is not on today\'s menu.');
         }
 
-        if ($menuItem->is_sold_out || $menuItem->units_today <= 0) {
-            abort(422, 'Item is sold out.');
-        }
-
-        if ($validated['quantity'] > $menuItem->units_today) {
-            abort(422, 'Quantity exceeds available units.');
+        if ($menuItem->is_sold_out || (int) $menuItem->units_today <= 0) {
+            return redirect()->route('menu')->with('error', 'Item is sold out.');
         }
 
         $cart = session('customer_cart', []);
         $found = false;
         foreach ($cart as $i => $line) {
             if ((int) $line['menu_item_id'] === (int) $menuItem->id) {
-                $newQty = $line['quantity'] + $validated['quantity'];
-                if ($newQty > $menuItem->units_today) {
-                    abort(422, 'Quantity would exceed available units.');
-                }
-                $cart[$i]['quantity'] = $newQty;
+                $cart[$i]['quantity'] = $line['quantity'] + $validated['quantity'];
                 $found = true;
                 break;
             }
@@ -84,10 +88,11 @@ class CustomerMenuController extends Controller
             'quantity' => ['required', 'integer', 'min:0'],
         ]);
 
+        $menuItemId = (int) $validated['menu_item_id'];
         $cart = session('customer_cart', []);
         $newCart = [];
         foreach ($cart as $line) {
-            if ((int) $line['menu_item_id'] === (int) $validated['menu_item_id']) {
+            if ((int) $line['menu_item_id'] === $menuItemId) {
                 if ($validated['quantity'] > 0) {
                     $newCart[] = array_merge($line, ['quantity' => $validated['quantity']]);
                 }

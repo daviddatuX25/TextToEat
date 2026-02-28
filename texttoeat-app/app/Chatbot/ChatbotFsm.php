@@ -42,7 +42,7 @@ class ChatbotFsm
         $body = trim($body);
         $bodyLower = strtolower($body);
 
-        return match ($currentState) {
+        $result = match ($currentState) {
             'welcome' => $this->fromWelcome($locale),
             'language_selection' => $this->fromLanguageSelection($body, $statePayload, $menuItems, $locale),
             'main_menu' => $this->fromMainMenu($body, $statePayload, $menuItems, $locale, $externalId, $channel),
@@ -58,6 +58,20 @@ class ChatbotFsm
             'track_ref' => $this->fromTrackRef($body, $statePayload, $menuItems, $locale),
             default => $this->fromWelcome($locale),
         };
+
+        $nextState = $result[0];
+        $reply = $this->appendNavigationHint($result[1], $nextState, $locale);
+
+        return [$nextState, $reply, $result[2]];
+    }
+
+    private function appendNavigationHint(string $reply, string $nextState, string $locale): string
+    {
+        if ($nextState !== 'main_menu') {
+            return $reply;
+        }
+        $hint = __('chatbot.back_main_menu_options', [], $locale);
+        return $reply . "\n\nRemember: " . $hint;
     }
 
     /**
@@ -401,7 +415,7 @@ class ChatbotFsm
                     [],
                 ];
             }
-            $summary = $this->buildCartSummary($selectedItems, $locale);
+            $summary = $this->buildCartSummary($selectedItems, $locale, false);
             return [
                 'item_selection',
                 __('chatbot.cart_edit_select_prompt', ['summary' => $summary], $locale),
@@ -412,10 +426,10 @@ class ChatbotFsm
         if ($mode === 'edit_select') {
             $index = (int) $body;
             if ($index < 1 || $index > count($selectedItems)) {
-                $summary = $this->buildCartSummary($selectedItems, $locale);
+                $summary = $this->buildCartSummary($selectedItems, $locale, false);
                 return [
                     'item_selection',
-                    __('chatbot.cart_edit_invalid_index', ['summary' => $summary], $locale),
+                    __('chatbot.cart_edit_invalid_index', [], $locale) . "\n\n" . $summary,
                     ['item_selection_mode' => 'edit_select'],
                 ];
             }
@@ -681,7 +695,7 @@ class ChatbotFsm
             $payload['delivery_fee'] = 0;
             return [
                 'confirm',
-                __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                $this->buildConfirmPrompt($summary, $statePayload, $locale),
                 $payload,
             ];
         }
@@ -702,7 +716,7 @@ class ChatbotFsm
             $payload['delivery_fee'] = 0;
             return [
                 'confirm',
-                __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                $this->buildConfirmPrompt($summary, $statePayload, $locale),
                 $payload,
             ];
         }
@@ -713,7 +727,7 @@ class ChatbotFsm
                 $payload['delivery_fee'] = 0;
                 return [
                     'confirm',
-                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $this->buildConfirmPrompt($summary, $statePayload, $locale),
                     $payload,
                 ];
             }
@@ -723,7 +737,7 @@ class ChatbotFsm
                 $payload['delivery_fee'] = 0;
                 return [
                     'confirm',
-                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $this->buildConfirmPrompt($summary, $statePayload, $locale),
                     $payload,
                 ];
             }
@@ -733,7 +747,7 @@ class ChatbotFsm
                 $payload['delivery_fee'] = null;
                 return [
                     'confirm',
-                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $this->buildConfirmPrompt($summary, $statePayload, $locale),
                     $payload,
                 ];
             }
@@ -750,7 +764,7 @@ class ChatbotFsm
                 $payload['delivery_fee'] = $isFree ? 0 : ($fee === null ? null : (float) $fee);
                 return [
                     'confirm',
-                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $this->buildConfirmPrompt($summary, $statePayload, $locale),
                     $payload,
                 ];
             }
@@ -760,7 +774,7 @@ class ChatbotFsm
                 $payload['delivery_fee'] = null;
                 return [
                     'confirm',
-                    __('chatbot.confirm_prompt', ['summary' => $summary], $locale),
+                    $this->buildConfirmPrompt($summary, $statePayload, $locale),
                     $payload,
                 ];
             }
@@ -1221,7 +1235,7 @@ class ChatbotFsm
     }
 
     /**
-     * @param array<int, array{id: int, name: string, price: float}> $menuItems
+     * @param array<int, array{id: int, name: string, price: float, category?: string}> $menuItems
      */
     private function buildMenuText(array $menuItems, string $locale): string
     {
@@ -1229,7 +1243,13 @@ class ChatbotFsm
             return __('chatbot.no_menu_today', [], $locale);
         }
         $lines = [];
+        $lastCategory = '';
         foreach ($menuItems as $n => $item) {
+            $category = $item['category'] ?? '';
+            if ($category !== '' && $category !== $lastCategory) {
+                $lines[] = '— ' . $category . ' —';
+                $lastCategory = $category;
+            }
             $num = $n + 1;
             $price = number_format((float) $item['price'], 2);
             $lines[] = "{$num}. {$item['name']} - {$price}";
@@ -1240,9 +1260,29 @@ class ChatbotFsm
     }
 
     /**
-     * @param list<array{menu_item_id: int, name: string, price: float, quantity: int}> $selectedItems
+     * @param array<string, mixed> $statePayload
      */
-    private function buildCartSummary(array $selectedItems, string $locale): string
+    private function buildConfirmPrompt(string $summary, array $statePayload, string $locale): string
+    {
+        $base = __('chatbot.confirm_prompt', ['summary' => $summary], $locale);
+        $virtualAvailable = $statePayload['virtual_available'] ?? [];
+        $selectedItems = $this->normalizeSelectedItems($statePayload['selected_items'] ?? []);
+        foreach ($selectedItems as $line) {
+            $id = (int) $line['menu_item_id'];
+            $qty = (int) $line['quantity'];
+            $available = (int) ($virtualAvailable[$id] ?? 0);
+            if ($qty > $available) {
+                return $base . "\n\n" . __('chatbot.confirm_slots_full_warning', [], $locale);
+            }
+        }
+        return $base;
+    }
+
+    /**
+     * @param list<array{menu_item_id: int, name: string, price: float, quantity: int}> $selectedItems
+     * @param bool $includeFooter whether to append cart_footer (1=Add, 2=View cart, etc.)
+     */
+    private function buildCartSummary(array $selectedItems, string $locale, bool $includeFooter = true): string
     {
         if (empty($selectedItems)) {
             return __('chatbot.cart_empty', [], $locale);
@@ -1262,7 +1302,9 @@ class ChatbotFsm
             $lines[] = "{$num}. {$line}";
         }
         $lines[] = __('chatbot.cart_total', ['total' => number_format($total, 2)], $locale);
-        $lines[] = __('chatbot.cart_footer', [], $locale);
+        if ($includeFooter) {
+            $lines[] = __('chatbot.cart_footer', [], $locale);
+        }
         return implode("\n", $lines);
     }
 

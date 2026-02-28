@@ -27,6 +27,7 @@ Confirm with Agila support which structure they support (e.g. “Laravel in subf
 
 - Create **one** `.env` file on the server (e.g. under the Laravel app root, same level as `artisan`).
 - The GitHub Action does **not** upload `.env` (it’s excluded). So you must create and maintain `.env` manually on the server (or via FTP/SFTP) with production values.
+- Use **`texttoeat-app/env.production.example`** as a template (MySQL, Pusher, Facebook, SMS, `CHANNEL_MODE=prod`); copy to the server as `.env` and fill in real values.
 - At minimum set:
 
 ```env
@@ -88,6 +89,34 @@ It:
    - `php artisan storage:link` (if you use storage for uploads)
 
 If Agila doesn’t give SSH, do these via their file manager / “Run PHP” or support.
+
+### 2.5 Realtime – Pusher
+
+Both local dev and production use **Pusher** (hosted). Reverb is no longer used. Use the same Pusher app or a separate one for dev.
+
+When Pusher is not configured (`BROADCAST_CONNECTION=null` or no Pusher credentials), staff pages (Orders, Deliveries, Pickup, Walkin, Inbox) automatically use a 30s polling fallback so staff still see updates.
+
+**Server `.env`** — add when you want realtime staff updates (Orders, Deliveries, Inbox):
+
+```env
+BROADCAST_CONNECTION=pusher
+PUSHER_APP_ID=your_app_id
+PUSHER_APP_KEY=your_app_key
+PUSHER_APP_SECRET=your_app_secret
+PUSHER_APP_CLUSTER=ap1
+```
+
+**Build-time vars** — the frontend needs Pusher config at `npm run build` time. The workflow already reads these. Add to GitHub **Settings → Secrets and variables → Actions → Secrets** (the workflow reads these):
+
+| Name | Value |
+|------|-------|
+| `VITE_BROADCAST_BROADCASTER` | `pusher` (when set, build uses Pusher) |
+| `VITE_PUSHER_APP_KEY` | Your Pusher app key |
+| `VITE_PUSHER_APP_CLUSTER` | Your Pusher cluster (e.g. `ap1`) |
+
+If these secrets are not set, the production build will have no Echo (staff pages use the 30s polling fallback). Set them when you want realtime via Pusher.
+
+**To skip Pusher in prod:** Set `BROADCAST_CONNECTION=null` on the server. Staff pages will use the built-in 30s polling fallback.
 
 ---
 

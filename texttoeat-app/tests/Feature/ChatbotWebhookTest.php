@@ -1077,7 +1077,7 @@ class ChatbotWebhookTest extends TestCase
         $this->assertNotEmpty($ref1);
         $session = ChatbotSession::where('channel', 'sms')->where('external_id', $externalId)->first();
         $cart = [['menu_item_id' => $item->id, 'name' => $item->name, 'price' => (float) $item->price, 'quantity' => 1]];
-        $service = new \App\Chatbot\ChatbotOrderService();
+        $service = app(\App\Chatbot\ChatbotOrderService::class);
         $fingerprint = $service->cartFingerprint($cart);
         $session->state = array_merge($session->state ?? [], [
             'current_state' => 'confirm',

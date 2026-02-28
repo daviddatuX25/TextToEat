@@ -11,6 +11,7 @@ use App\Models\DeliveryArea;
 use App\Models\MenuItem;
 use App\Models\OutboundMessenger;
 use App\Models\OutboundSms;
+use App\Services\MenuItemStockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -74,11 +75,29 @@ class ChatbotWebhookController extends Controller
             ]);
         }
 
-        $menuItems = MenuItem::forToday()->get()->map(fn ($m) => [
-            'id' => $m->id,
-            'name' => $m->name,
-            'price' => (float) $m->price,
-        ])->values()->all();
+        $todayMenuItems = MenuItem::forToday()->get();
+        $virtualAvailable = app(MenuItemStockService::class)->getVirtualAvailableForToday($todayMenuItems->pluck('id')->all());
+        $categoryOrder = array_flip(config('menu.categories', []));
+        $menuItems = $todayMenuItems
+            ->sort(function ($a, $b) use ($categoryOrder) {
+                $ca = $categoryOrder[$a->category] ?? 999;
+                $cb = $categoryOrder[$b->category] ?? 999;
+                if ($ca !== $cb) {
+                    return $ca <=> $cb;
+                }
+                return strcmp($a->name, $b->name);
+            })
+            ->values()
+            ->map(fn ($m) => [
+                'id' => $m->id,
+                'name' => $m->name,
+                'price' => (float) $m->price,
+                'category' => $m->category ?? '',
+                'available' => (int) ($virtualAvailable[$m->id] ?? 0),
+            ])
+            ->all();
+
+        $state['virtual_available'] = $virtualAvailable;
 
         $deliveryAreas = DeliveryArea::query()
             ->orderBy('sort_order')
@@ -110,28 +129,35 @@ class ChatbotWebhookController extends Controller
         if ($nextState === 'order_placed') {
             $selectedItems = $this->normalizeSelectedItems($newState['selected_items'] ?? []);
             $customerName = $newState['customer_name'] ?? 'Anonymous';
-            try {
-                $orderService = new ChatbotOrderService();
-                $result = $orderService->createOrder(
-                    $selectedItems,
-                    $channel,
-                    $newState,
-                    $customerName,
-                    $externalId
-                );
-                $order = $result['order'];
-                $reference = $result['reference'];
-                $newState['last_order_id'] = $order->id;
-                $newState['last_order_reference'] = $reference;
-                $newState['last_order_cart_fingerprint'] = $orderService->cartFingerprint($selectedItems);
-                $newState['selected_items'] = [];
-                $newState['current_state'] = 'main_menu';
-                $reply = __('chatbot.order_placed_reference', ['reference' => $reference], $locale)
-                    . "\n\n"
-                    . __('chatbot.main_menu_prompt', [], $locale);
-            } catch (ChatbotInventoryException $e) {
+            // Block order creation when using simulator/system IDs; only real SMS phone or Messenger PSID may place orders
+            $isSimulatorId = str_starts_with($externalId, 'sim_') || str_starts_with($externalId, 'web_');
+            if ($isSimulatorId) {
                 $newState['current_state'] = 'confirm';
-                $reply = __('chatbot.inventory_failure', [], $locale);
+                $reply = __('chatbot.use_real_phone_or_messenger', [], $locale);
+            } else {
+                try {
+                    $orderService = app(ChatbotOrderService::class);
+                    $result = $orderService->createOrder(
+                        $selectedItems,
+                        $channel,
+                        $newState,
+                        $customerName,
+                        $externalId
+                    );
+                    $order = $result['order'];
+                    $reference = $result['reference'];
+                    $newState['last_order_id'] = $order->id;
+                    $newState['last_order_reference'] = $reference;
+                    $newState['last_order_cart_fingerprint'] = $orderService->cartFingerprint($selectedItems);
+                    $newState['selected_items'] = [];
+                    $newState['current_state'] = 'main_menu';
+                    $reply = __('chatbot.order_placed_reference', ['reference' => $reference], $locale)
+                        . "\n\n"
+                        . __('chatbot.main_menu_prompt', [], $locale);
+                } catch (ChatbotInventoryException $e) {
+                    $newState['current_state'] = 'confirm';
+                    $reply = __('chatbot.inventory_failure', [], $locale);
+                }
             }
         }
 

@@ -44,15 +44,20 @@ export function CreateOrderForm({
     const isDelivery = form.data.fulfillment === 'delivery';
     const isWalkin = form.data.fulfillment === 'walkin';
     const isPickup = form.data.fulfillment === 'pickup';
+    const isDineIn = isWalkin && form.data.walkin_type === 'dine_in';
+    const isTakeout = isWalkin && form.data.walkin_type === 'takeout';
 
     const setFulfillment = (opt) => {
+        const isDineInOpt = opt.walkin_type === 'dine_in';
+        const isTakeoutOpt = opt.walkin_type === 'takeout';
         form.setData({
             fulfillment: opt.value,
             walkin_type: opt.walkin_type,
             delivery_place: opt.delivery_type === 'delivery' ? (deliveryOptions[0]?.name ?? null) : null,
             delivery_fee: opt.delivery_type === 'delivery' ? (deliveryOptions[0]?.is_free ? 0 : (deliveryOptions[0]?.fee ?? null)) : null,
-            pickup_slot: opt.delivery_type === 'pickup' && !opt.walkin_type ? (pickupValues[0] ?? null) : null,
-            order_marker: opt.walkin_type ? '' : null,
+            pickup_slot: isDineInOpt ? null : (opt.delivery_type === 'pickup' ? (pickupValues[0] ?? null) : null),
+            order_marker: isTakeoutOpt ? null : (isDineInOpt ? '' : null),
+            customer_phone: isDineInOpt ? '' : form.data.customer_phone,
         });
     };
 
@@ -83,14 +88,14 @@ export function CreateOrderForm({
         e.preventDefault();
         if (cartLines.length === 0) return;
         const payload = {
-            customer_name: form.data.customer_name,
-            customer_phone: form.data.customer_phone || null,
+            customer_name: (form.data.customer_name || '').trim() || null,
+            customer_phone: isDineIn ? null : (form.data.customer_phone || null),
             fulfillment: form.data.fulfillment,
             walkin_type: form.data.walkin_type || null,
             delivery_place: isDelivery ? form.data.delivery_place : null,
             delivery_fee: isDelivery ? form.data.delivery_fee : null,
-            pickup_slot: isPickup || isWalkin ? (form.data.pickup_slot || null) : null,
-            order_marker: isWalkin ? (form.data.order_marker || null) : null,
+            pickup_slot: (isPickup || isTakeout) ? (form.data.pickup_slot || null) : null,
+            order_marker: isDineIn ? (form.data.order_marker || null) : null,
             items: cartLines,
         };
         form.transform(() => payload).post('/portal/quick-orders', {
@@ -206,7 +211,7 @@ export function CreateOrderForm({
                         </div>
                     )}
 
-                    {(isPickup || isWalkin) && pickupValues.length > 0 && (
+                    {(isPickup || (isWalkin && form.data.walkin_type === 'takeout')) && pickupValues.length > 0 && (
                         <div>
                             <label className="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Pickup slot</label>
                             <select
@@ -222,9 +227,9 @@ export function CreateOrderForm({
                         </div>
                     )}
 
-                    {isWalkin && diningMarkers.length > 0 && (
+                    {isWalkin && form.data.walkin_type === 'dine_in' && diningMarkers.length > 0 && (
                         <div>
-                            <label className="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Table / marker</label>
+                            <label className="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Table / marker (optional)</label>
                             <select
                                 value={form.data.order_marker ?? ''}
                                 onChange={(e) => form.setData('order_marker', e.target.value || null)}
@@ -247,21 +252,22 @@ export function CreateOrderForm({
                     <div className="space-y-2">
                         <Input
                             id="create_customer_name"
-                            label="Customer name"
+                            label={isWalkin ? 'Customer name (optional)' : 'Customer name'}
                             type="text"
-                            required
                             value={form.data.customer_name}
                             onChange={(e) => form.setData('customer_name', e.target.value)}
                             error={form.errors.customer_name}
                         />
-                        <Input
-                            id="create_customer_phone"
-                            label="Phone (optional)"
-                            type="text"
-                            value={form.data.customer_phone}
-                            onChange={(e) => form.setData('customer_phone', e.target.value)}
-                            error={form.errors.customer_phone}
-                        />
+                        {!(isWalkin && form.data.walkin_type === 'dine_in') && (
+                            <Input
+                                id="create_customer_phone"
+                                label="Phone (optional)"
+                                type="text"
+                                value={form.data.customer_phone}
+                                onChange={(e) => form.setData('customer_phone', e.target.value)}
+                                error={form.errors.customer_phone}
+                            />
+                        )}
                     </div>
                 </div>
 

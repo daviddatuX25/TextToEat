@@ -92,22 +92,49 @@ class OrderStatusNotificationService
         $reference = $order->reference ?? '';
         $deliveryType = $order->delivery_type ?? 'pickup';
         $pickupSlot = trim((string) ($order->pickup_slot ?? ''));
+        $paymentStatus = $order->payment_status;
+        $isPaid = $paymentStatus === 'paid' || (is_object($paymentStatus) && $paymentStatus->value === 'paid');
+        $totalFormatted = number_format((float) ($order->total ?? 0), 2);
 
         if ($toStatus === 'on_the_way' && $deliveryType === 'delivery') {
-            return __('chatbot.status_push_on_the_way', ['reference' => $reference], $locale);
+            $message = __('chatbot.status_push_on_the_way', ['reference' => $reference], $locale);
+            if (! $isPaid) {
+                $message .= "\n\n" . $this->unpaidDeliveryReminder($order, $locale, $totalFormatted);
+            }
+
+            return $message;
         }
 
         if ($toStatus === 'ready' && $deliveryType === 'pickup') {
             if ($pickupSlot !== '') {
-                return __('chatbot.status_push_ready_pickup_slot', [
+                $message = __('chatbot.status_push_ready_pickup_slot', [
                     'reference' => $reference,
                     'slot' => $pickupSlot,
                 ], $locale);
+            } else {
+                $message = __('chatbot.status_push_ready_pickup', ['reference' => $reference], $locale);
+            }
+            if (! $isPaid) {
+                $message .= "\n\n" . __('chatbot.status_push_unpaid_pickup', ['total' => $totalFormatted], $locale);
             }
 
-            return __('chatbot.status_push_ready_pickup', ['reference' => $reference], $locale);
+            return $message;
         }
 
         return '';
+    }
+
+    /**
+     * Message for unpaid delivery: known total (₱X) or "cash for payment on delivery" when fee is paid at door.
+     */
+    private function unpaidDeliveryReminder(Order $order, string $locale, string $totalFormatted): string
+    {
+        $place = $order->delivery_place ?? '';
+
+        if ($place === 'Other (paid on delivery)') {
+            return __('chatbot.status_push_unpaid_delivery_cash', [], $locale);
+        }
+
+        return __('chatbot.status_push_unpaid_delivery_total', ['total' => $totalFormatted], $locale);
     }
 }

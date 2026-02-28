@@ -72,7 +72,7 @@ class QuickOrdersController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'customer_name' => ['required', 'string', 'max:255'],
+            'customer_name' => ['nullable', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:64'],
             'fulfillment' => ['required', 'string', 'in:walkin,pickup,delivery'],
             'walkin_type' => ['nullable', 'string', 'in:dine_in,takeout'],
@@ -94,19 +94,24 @@ class QuickOrdersController extends Controller
         }
         $total = round($total, 2);
 
+        $customerName = trim((string) ($validated['customer_name'] ?? ''));
+        $walkinType = $validated['walkin_type'] ?? null;
+        $pickupSlot = $walkinType === 'dine_in' ? null : ($validated['pickup_slot'] ?? null);
+        $orderMarker = $walkinType === 'takeout' ? null : ($validated['order_marker'] ?? null);
+
         $order = Order::create([
             'reference' => 'Q' . strtoupper(substr(uniqid(), -6)),
             'channel' => OrderChannel::WalkIn,
-            'status' => OrderStatus::Received,
+            'status' => OrderStatus::Confirmed,
             'payment_status' => PaymentStatus::Unpaid,
-            'customer_name' => $validated['customer_name'],
+            'customer_name' => $customerName,
             'customer_phone' => $validated['customer_phone'] ?? null,
             'total' => $total,
             'delivery_type' => $deliveryType,
             'delivery_place' => $validated['delivery_place'] ?? null,
             'delivery_fee' => isset($validated['delivery_fee']) ? (float) $validated['delivery_fee'] : null,
-            'pickup_slot' => $validated['pickup_slot'] ?? null,
-            'order_marker' => $validated['order_marker'] ?? null,
+            'pickup_slot' => $pickupSlot,
+            'order_marker' => $orderMarker,
         ]);
 
         foreach ($validated['items'] as $line) {

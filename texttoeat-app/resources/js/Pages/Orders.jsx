@@ -4,7 +4,7 @@ import PortalLayout from '../Layouts/PortalLayout';
 import { OrderListRow } from '../components/staff/OrderListRow';
 import { CreateOrderForm } from '../components/staff/CreateOrderForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
-import { usePortalOrdersEcho } from '../hooks/usePortalOrdersEcho';
+import { usePortalOrdersLive } from '../hooks/usePortalOrdersLive';
 import { LayoutGrid, PanelLeft, StickyNote, ChefHat, UtensilsCrossed, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const ORDERS_VIEW_MODE_KEY = 'ordersViewMode';
@@ -60,7 +60,7 @@ export default function Orders({
     const highlightTimeoutRef = useRef(null);
 
     const groups = useMemo(() => groupOrders(orders), [orders]);
-    usePortalOrdersEcho();
+    usePortalOrdersLive();
 
     useEffect(() => {
         if (!highlight) {
