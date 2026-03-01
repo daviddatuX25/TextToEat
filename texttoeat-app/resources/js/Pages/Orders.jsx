@@ -3,7 +3,7 @@ import { Link } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
 import { OrderListRow } from '../components/staff/OrderListRow';
 import { usePortalOrdersLive } from '../hooks/usePortalOrdersLive';
-import { LayoutGrid, List, StickyNote, ChefHat, UtensilsCrossed, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { Columns3, Smartphone, StickyNote, ChefHat, UtensilsCrossed, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 const ORDERS_VIEW_MODE_KEY = 'ordersViewMode';
 const SECTIONS = [
@@ -228,7 +228,7 @@ export default function Orders({
                                         : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
                                 }`}
                             >
-                                <LayoutGrid className="h-4 w-4" />
+                                <Columns3 className="h-4 w-4" />
                             </button>
                             <button
                                 type="button"
@@ -241,7 +241,7 @@ export default function Orders({
                                         : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
                                 }`}
                             >
-                                <List className="h-4 w-4" />
+                                <Smartphone className="h-4 w-4" />
                             </button>
                         </div>
                         <Link
