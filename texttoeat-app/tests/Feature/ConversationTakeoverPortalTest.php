@@ -131,6 +131,10 @@ class ConversationTakeoverPortalTest extends TestCase
         $this->assertSame('main_menu', $session->state['current_state'] ?? null);
         $this->assertFalse((bool) ($session->state['automation_disabled'] ?? true));
 
+        $outbound = OutboundSms::where('chatbot_session_id', $session->id)->orderByDesc('id')->first();
+        $this->assertNotNull($outbound);
+        $this->assertStringContainsString('support session has ended', strtolower($outbound->body));
+
         $this->assertDatabaseHas('action_log', [
             'model' => 'ChatbotSession',
             'model_id' => $session->id,

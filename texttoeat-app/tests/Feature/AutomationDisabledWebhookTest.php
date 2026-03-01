@@ -38,6 +38,13 @@ class AutomationDisabledWebhookTest extends TestCase
         ])
             ->assertStatus(200)
             ->assertJsonPath('skipped', 'automation_disabled');
+
+        $session = ChatbotSession::where('channel', 'sms')->where('external_id', '09123456789')->first();
+        $this->assertNotNull($session);
+        $this->assertDatabaseHas('inbound_messages', [
+            'chatbot_session_id' => $session->id,
+            'body' => 'Hello?',
+        ]);
     }
 
     public function test_messenger_webhook_skips_bot_when_automation_disabled(): void
@@ -92,6 +99,13 @@ class AutomationDisabledWebhookTest extends TestCase
         )
             ->assertStatus(200)
             ->assertJsonPath('status', 'ok');
+
+        $session = ChatbotSession::where('channel', 'messenger')->where('external_id', 'psid-999')->first();
+        $this->assertNotNull($session);
+        $this->assertDatabaseHas('inbound_messages', [
+            'chatbot_session_id' => $session->id,
+            'body' => 'Hi',
+        ]);
     }
 
     protected function tearDown(): void

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Contracts\MessengerSenderInterface;
 use App\Events\ConversationUpdated;
 use App\Models\ChatbotSession;
+use App\Models\InboundMessage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -97,6 +98,11 @@ class FacebookMessengerWebhookController extends Controller
             $state = $existingSession->state ?? [];
             if ((bool) ($state['automation_disabled'] ?? false) === true) {
                 $existingSession->update(['last_activity_at' => now()]);
+                InboundMessage::create([
+                    'chatbot_session_id' => $existingSession->id,
+                    'body' => $text,
+                    'channel' => 'messenger',
+                ]);
                 event(new ConversationUpdated($existingSession, 'message'));
 
                 return;

@@ -21,7 +21,10 @@ class PortalSeedDataSeeder extends Seeder
 
     private function seedPickupSlots(): void
     {
-        $slots = ['a1', 'a2', 'a3', 'b1', 'b2', 'b3', 'depends'];
+        $slots = [];
+        for ($i = 1; $i <= 30; $i++) {
+            $slots[] = 'P' . $i;
+        }
         foreach ($slots as $i => $value) {
             PickupSlot::firstOrCreate(
                 ['value' => $value],
@@ -32,7 +35,10 @@ class PortalSeedDataSeeder extends Seeder
 
     private function seedDiningMarkers(): void
     {
-        $markers = ['1', '2', '3', '4', '5', 'Table A', 'Table B', 'Table C'];
+        $markers = [];
+        for ($i = 1; $i <= 30; $i++) {
+            $markers[] = (string) $i;
+        }
         foreach ($markers as $i => $value) {
             DiningMarker::firstOrCreate(
                 ['value' => $value],

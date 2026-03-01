@@ -7,7 +7,9 @@ use App\Chatbot\ChatbotInventoryException;
 use App\Chatbot\ChatbotOrderService;
 use App\Events\ConversationUpdated;
 use App\Models\ChatbotSession;
+use App\Models\Conversation;
 use App\Models\DeliveryArea;
+use App\Models\InboundMessage;
 use App\Models\MenuItem;
 use App\Models\OutboundMessenger;
 use App\Models\OutboundSms;
@@ -112,6 +114,14 @@ class ChatbotWebhookController extends Controller
             ->values()
             ->all();
 
+        if ($currentState === 'human_takeover') {
+            InboundMessage::create([
+                'chatbot_session_id' => $session->id,
+                'body' => $body,
+                'channel' => $channel,
+            ]);
+        }
+
         $fsm = new ChatbotFsm();
         [$nextState, $reply, $statePayload] = $fsm->transition(
             $currentState,
@@ -125,6 +135,19 @@ class ChatbotWebhookController extends Controller
         );
 
         $newState = array_merge($state, ['current_state' => $nextState], $statePayload);
+
+        if ($currentState === 'human_takeover' && $nextState === 'main_menu') {
+            $newState['automation_disabled'] = false;
+        }
+
+        if ($nextState === 'human_takeover' && $currentState !== 'human_takeover') {
+            Conversation::create([
+                'chatbot_session_id' => $session->id,
+                'channel' => $channel,
+                'external_id' => $externalId,
+                'status' => 'human_takeover',
+            ]);
+        }
 
         if ($nextState === 'order_placed') {
             $selectedItems = $this->normalizeSelectedItems($newState['selected_items'] ?? []);

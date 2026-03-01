@@ -1,20 +1,37 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
-import { Menu, ArrowLeft } from 'lucide-react';
+import {
+    Menu,
+    LayoutDashboard,
+    ListOrdered,
+    CheckCircle,
+    Zap,
+    Truck,
+    Store,
+    UtensilsCrossed,
+    BookOpen,
+    ClipboardList,
+    Inbox,
+    MessageCircle,
+    Users,
+    Sun,
+    Moon,
+    Utensils,
+} from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
 const PORTAL_NAV_ITEMS = [
-    { href: '/portal', label: 'Dashboard', icon: 'ph-house-simple' },
-    { href: '/portal/orders', label: 'Orders', icon: 'ph-list-bullets' },
-    { href: '/portal/orders/completed', label: 'Completed orders', icon: 'ph-check-circle' },
-    { href: '/portal/quick-orders', label: 'Create order', icon: 'ph-lightning' },
-    { href: '/portal/deliveries', label: 'Deliveries', icon: 'ph-truck' },
-    { href: '/portal/pickup', label: 'Pickup counter', icon: 'ph-storefront' },
-    { href: '/portal/walkin', label: 'Walk-in', icon: 'ph-utensils' },
-    { href: '/portal/menu-items', label: "Today's menu", icon: 'ph-book-open' },
-    { href: '/portal/logs/orders', label: 'Order logs', icon: 'ph-list-checks' },
-    { href: '/portal/inbox', label: 'Conversation inbox', icon: 'ph-inbox' },
-    { href: '/portal/logs/chatbot', label: 'Chatbot logs', icon: 'ph-chat-circle-dots' },
+    { href: '/portal', label: 'Dashboard', Icon: LayoutDashboard },
+    { href: '/portal/orders', label: 'Orders', Icon: ListOrdered },
+    { href: '/portal/orders/completed', label: 'Completed orders', Icon: CheckCircle },
+    { href: '/portal/quick-orders', label: 'Create order', Icon: Zap },
+    { href: '/portal/deliveries', label: 'Deliveries', Icon: Truck },
+    { href: '/portal/pickup', label: 'Pickup counter', Icon: Store },
+    { href: '/portal/walkin', label: 'Walk-in', Icon: UtensilsCrossed },
+    { href: '/portal/menu-items', label: "Today's menu", Icon: BookOpen },
+    { href: '/portal/logs/orders', label: 'Order logs', Icon: ClipboardList },
+    { href: '/portal/inbox', label: 'Conversation inbox', Icon: Inbox },
+    { href: '/portal/logs/chatbot', label: 'Chatbot logs', Icon: MessageCircle },
 ];
 
 function getPathname(url) {
@@ -31,16 +48,23 @@ function isPortalNavActive(href, pathname) {
     return pathname === href || pathname.startsWith(href + '/');
 }
 
-function NavLink({ href, label, icon, pathname, onClick }) {
+function NavLink({ href, label, Icon, pathname, onClick }) {
     const isActive = isPortalNavActive(href, pathname);
-    const activeClass = isActive ? 'text-primary-600 font-bold dark:text-primary-400 bg-primary-50 dark:bg-primary-500/10' : 'text-surface-600 hover:text-primary-600 dark:text-surface-400 dark:hover:text-primary-400 hover:bg-surface-100 dark:hover:bg-surface-800';
+    const activeClass = isActive
+        ? 'text-primary-700 font-semibold dark:text-primary-300 bg-primary-100 dark:bg-primary-500/20'
+        : 'text-surface-600 hover:text-primary-600 dark:text-surface-400 dark:hover:text-primary-400 hover:bg-surface-100 dark:hover:bg-surface-800';
     return (
         <Link
             href={href}
             onClick={onClick}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors whitespace-nowrap ${activeClass}`}
+            aria-current={isActive ? 'page' : undefined}
         >
-            {icon && <i className={`ph-bold ${icon} text-lg shrink-0`} />}
+            {Icon && (
+                <span className="flex shrink-0 items-center justify-center text-[1.125rem]" aria-hidden>
+                    <Icon className="h-5 w-5" strokeWidth={2} />
+                </span>
+            )}
             {label}
         </Link>
     );
@@ -78,7 +102,7 @@ function ThemeToggle() {
             className="flex h-10 w-10 items-center justify-center rounded-full text-surface-500 smooth-hover hover:bg-surface-200 hover:text-surface-900 dark:hover:bg-surface-800 dark:hover:text-surface-50"
             aria-label="Toggle theme"
         >
-            {isDark ? <i className="ph ph-sun text-xl"></i> : <i className="ph ph-moon text-xl"></i>}
+            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
         </button>
     );
 }
@@ -89,9 +113,12 @@ function SidebarContent({ navItems, pathname, onNavClick }) {
             <div className="flex items-center gap-3 px-4 py-5 border-b border-surface-200 dark:border-surface-800">
                 <Link href="/portal" onClick={onNavClick} className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 text-white shrink-0">
-                        <i className="ph-bold ph-bowl-food relative z-10 text-2xl"></i>
+                        <Utensils className="h-6 w-6 relative z-10" aria-hidden />
                     </div>
-                    <span className="text-lg font-bold leading-tight tracking-tight">Portal</span>
+                    <div className="min-w-0">
+                        <span className="block text-lg font-bold leading-tight tracking-tight">Lacasandile Eatery</span>
+                        <span className="block text-xs font-medium text-surface-500 dark:text-surface-400">powered by TextToEat</span>
+                    </div>
                 </Link>
             </div>
             <nav className="flex flex-col gap-1 p-4 overflow-y-auto flex-1">
@@ -100,7 +127,7 @@ function SidebarContent({ navItems, pathname, onNavClick }) {
                         key={item.href}
                         href={item.href}
                         label={item.label}
-                        icon={item.icon}
+                        Icon={item.Icon}
                         pathname={pathname}
                         onClick={onNavClick}
                     />
@@ -122,12 +149,27 @@ function SidebarContent({ navItems, pathname, onNavClick }) {
     );
 }
 
+const DEBUG_LOG = (location, message, data, hypothesisId) => {
+    fetch('http://127.0.0.1:7376/ingest/6bfbe7d4-b4cf-4142-be65-9dec6fac862c', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '91eb81' }, body: JSON.stringify({ sessionId: '91eb81', location, message, data: data || {}, timestamp: Date.now(), hypothesisId }) }).catch(() => {});
+};
+
 export default function PortalLayout({ children }) {
     const { auth, flash } = usePage().props;
     const pageUrl = usePage().url;
     const pathname = getPathname(pageUrl);
     const isAdmin = auth?.user?.role === 'admin';
     const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    // #region agent log
+    useEffect(() => {
+        DEBUG_LOG('PortalLayout.jsx:mount', 'PortalLayout mounted', { pathname }, 'H4');
+        const onStart = (e) => { DEBUG_LOG('PortalLayout.jsx:inertia', 'Inertia start', { phase: 'start', url: e?.detail?.visit?.url ?? window.location.href }, 'H3'); };
+        const onFinish = () => { DEBUG_LOG('PortalLayout.jsx:inertia', 'Inertia finish', { phase: 'finish' }, 'H3'); };
+        const offStart = router.on('start', onStart);
+        const offFinish = router.on('finish', onFinish);
+        return () => { offStart(); offFinish(); };
+    }, []);
+    // #endregion
 
     useEffect(() => {
         setSidebarOpen(false);
@@ -140,8 +182,8 @@ export default function PortalLayout({ children }) {
 
     const navItems = [...PORTAL_NAV_ITEMS];
     if (isAdmin) {
-        navItems.push({ href: '/portal/simulate', label: 'Channel simulator', icon: 'ph-chat-circle' });
-        navItems.push({ href: '/portal/users', label: 'Manage users', icon: 'ph-users-three' });
+        navItems.push({ href: '/portal/simulate', label: 'Channel simulator', Icon: MessageCircle });
+        navItems.push({ href: '/portal/users', label: 'Manage users', Icon: Users });
     }
 
     const closeSidebar = () => setSidebarOpen(false);
@@ -173,25 +215,18 @@ export default function PortalLayout({ children }) {
             <div className="flex flex-col flex-1 min-w-0">
                 {/* Mobile top bar */}
                 <header className="lg:hidden sticky top-0 z-30 flex h-16 items-center justify-between gap-4 px-4 border-b border-surface-200 bg-white/95 dark:bg-surface-900/95 dark:border-surface-800 glass-panel backdrop-blur">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                         <button
                             type="button"
                             onClick={openSidebar}
-                            className="flex h-10 w-10 items-center justify-center rounded-full text-surface-600 hover:bg-surface-200 dark:text-surface-400 dark:hover:bg-surface-800"
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-surface-600 hover:bg-surface-200 dark:text-surface-400 dark:hover:bg-surface-800"
                             aria-label="Open menu"
                         >
                             <Menu className="h-6 w-6" />
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => (window.history.length > 1 ? router.visit(window.history.back()) : router.visit('/portal'))}
-                            className="flex h-10 w-10 items-center justify-center rounded-full text-surface-600 hover:bg-surface-200 dark:text-surface-400 dark:hover:bg-surface-800"
-                            aria-label="Back"
-                        >
-                            <ArrowLeft className="h-5 w-5" />
-                        </button>
-                        <Link href="/portal" className="flex items-center gap-2">
-                            <span className="text-base font-bold tracking-tight">Portal</span>
+                        <Link href="/portal" className="min-w-0 flex-1">
+                            <span className="block text-base font-bold tracking-tight truncate">Lacasandile Eatery</span>
+                            <span className="block text-xs font-medium text-surface-500 dark:text-surface-400 truncate">powered by TextToEat</span>
                         </Link>
                     </div>
                 </header>

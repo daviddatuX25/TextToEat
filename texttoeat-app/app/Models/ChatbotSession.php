@@ -43,6 +43,87 @@ class ChatbotSession extends Model
     }
 
     /**
+     * Restrict to sessions relevant to human takeover (inbox only).
+     */
+    public function scopeForInbox(Builder $query): Builder
+    {
+        return $query
+            ->whereIn('channel', ['sms', 'messenger'])
+            ->where(function (Builder $q): void {
+                $q->where('state->current_state', 'human_takeover')
+                    ->orWhere('state->automation_disabled', true)
+                    ->orWhereHas('conversations', function (Builder $q): void {
+                        $q->where('status', 'human_takeover');
+                    });
+            });
+    }
+
+    /**
+     * Filter by session state for inbox: active, pending, ended.
+     * Uses Laravel JSON where (driver-agnostic for MySQL/PostgreSQL).
+     * - pending: human_takeover, automation on, no messages in thread yet.
+     * - active: (human_takeover or automation_disabled) and at least one message in thread.
+     * - ended: back to bot.
+     *
+     * @param  array<int, string>  $statuses  One or more of: active, pending, ended
+     */
+    public function scopeSessionState(Builder $query, array $statuses): Builder
+    {
+        $statuses = array_values(array_intersect($statuses, ['active', 'pending', 'ended']));
+        if ($statuses === []) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($statuses): void {
+            foreach ($statuses as $state) {
+                if ($state === 'pending') {
+                    $q->orWhere(function (Builder $q): void {
+                        $q->where('state->current_state', 'human_takeover')
+                            ->where(function (Builder $q): void {
+                                $q->whereNull('state->automation_disabled')
+                                    ->orWhere('state->automation_disabled', false);
+                            })
+                            ->whereDoesntHave('inboundMessages')
+                            ->whereDoesntHave('outboundSms')
+                            ->whereNotExists(function ($sub): void {
+                                $sub->selectRaw('1')
+                                    ->from('outbound_messenger')
+                                    ->whereColumn('outbound_messenger.to', 'chatbot_sessions.external_id');
+                            });
+                    });
+                } elseif ($state === 'active') {
+                    $q->orWhere(function (Builder $q): void {
+                        $q->where(function (Builder $q): void {
+                            $q->where('state->current_state', 'human_takeover')
+                                ->orWhere('state->automation_disabled', true);
+                        })
+                            ->where(function (Builder $q): void {
+                                $q->whereHas('inboundMessages')
+                                    ->orWhereHas('outboundSms')
+                                    ->orWhereExists(function ($sub): void {
+                                        $sub->selectRaw('1')
+                                            ->from('outbound_messenger')
+                                            ->whereColumn('outbound_messenger.to', 'chatbot_sessions.external_id');
+                                    });
+                            });
+                    });
+                } else {
+                    $q->orWhere(function (Builder $q): void {
+                        $q->where(function (Builder $q): void {
+                            $q->where('state->current_state', '!=', 'human_takeover')
+                                ->orWhereNull('state->current_state');
+                        })
+                            ->where(function (Builder $q): void {
+                                $q->whereNull('state->automation_disabled')
+                                    ->orWhere('state->automation_disabled', false);
+                            });
+                    });
+                }
+            }
+        });
+    }
+
+    /**
      * @param  array<string, mixed>  $filters
      */
     public function scopeFilterForLogs(Builder $query, array $filters): Builder
@@ -102,5 +183,15 @@ class ChatbotSession extends Model
     public function conversations(): HasMany
     {
         return $this->hasMany(Conversation::class);
+    }
+
+    public function inboundMessages(): HasMany
+    {
+        return $this->hasMany(InboundMessage::class);
+    }
+
+    public function outboundSms(): HasMany
+    {
+        return $this->hasMany(OutboundSms::class);
     }
 }

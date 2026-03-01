@@ -5,9 +5,12 @@ namespace App\Http\Controllers;
 use App\Events\ConversationUpdated;
 use App\Models\ActionLog;
 use App\Models\ChatbotSession;
+use App\Models\InboundMessage;
 use App\Contracts\MessengerSenderInterface;
 use App\Contracts\SmsSenderInterface;
+use App\Models\OutboundMessenger;
 use App\Models\OutboundSms;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -29,10 +32,9 @@ class ConversationInboxController extends Controller
             'date_to' => ['nullable', 'date'],
             'customer' => ['nullable', 'string'],
             'status' => ['nullable', 'array'],
-            'status.*' => ['string'],
+            'status.*' => ['string', 'in:active,pending,ended'],
             'channel' => ['nullable', 'array'],
             'channel.*' => ['string'],
-            'has_human_takeover' => ['nullable', 'boolean'],
         ]);
 
         $filters = [
@@ -41,22 +43,53 @@ class ConversationInboxController extends Controller
             'customer' => $validated['customer'] ?? null,
             'status' => $validated['status'] ?? [],
             'channel' => $validated['channel'] ?? [],
-            'has_human_takeover' => array_key_exists('has_human_takeover', $validated)
-                ? $validated['has_human_takeover']
-                : true,
         ];
 
-        $sessions = ChatbotSession::query()
+        $query = ChatbotSession::query()
+            ->forInbox()
             ->withCount('conversations')
             ->withCount([
                 'conversations as human_takeover_count' => function ($query): void {
                     $query->where('status', 'human_takeover');
                 },
-            ])
-            ->filterForLogs($filters)
-            ->recent()
-            ->paginate(50)
-            ->withQueryString();
+            ]);
+
+        $query->when($filters['date_from'], function ($q) use ($filters): void {
+            $dateFrom = $filters['date_from'];
+            $q->where(function (Builder $q) use ($dateFrom): void {
+                $q->whereNotNull('last_activity_at')
+                    ->whereDate('last_activity_at', '>=', $dateFrom)
+                    ->orWhere(function (Builder $q) use ($dateFrom): void {
+                        $q->whereNull('last_activity_at')
+                            ->whereDate('created_at', '>=', $dateFrom);
+                    });
+            });
+        });
+        $query->when($filters['date_to'], function ($q) use ($filters): void {
+            $dateTo = $filters['date_to'];
+            $q->where(function (Builder $q) use ($dateTo): void {
+                $q->whereNotNull('last_activity_at')
+                    ->whereDate('last_activity_at', '<=', $dateTo)
+                    ->orWhere(function (Builder $q) use ($dateTo): void {
+                        $q->whereNull('last_activity_at')
+                            ->whereDate('created_at', '<=', $dateTo);
+                    });
+            });
+        });
+        $query->when(
+            $filters['channel'] && \is_array($filters['channel']) && $filters['channel'] !== [],
+            fn ($q) => $q->whereIn('channel', $filters['channel'])
+        );
+        $query->when($filters['customer'], function ($q) use ($filters): void {
+            $like = '%' . $filters['customer'] . '%';
+            $q->where(function (Builder $q) use ($like): void {
+                $q->where('saved_customer_name', 'like', $like)
+                    ->orWhere('state->customer_name', 'like', $like);
+            });
+        });
+        $query->sessionState($filters['status']);
+
+        $sessions = $query->recent()->paginate(50)->withQueryString();
 
         $smsSessionIds = $sessions->getCollection()
             ->filter(fn ($s) => ($s->channel ?? '') === 'sms')
@@ -112,20 +145,14 @@ class ConversationInboxController extends Controller
             ];
         });
 
-        $statusValues = ChatbotSession::query()
-            ->selectRaw("distinct state->>'current_state' as value")
-            ->pluck('value')
-            ->filter()
-            ->values();
-
-        $statusOptions = $statusValues->map(function (string $value): array {
-            return [
-                'value' => $value,
-                'label' => Str::headline(str_replace('_', ' ', $value)),
-            ];
-        })->values();
+        $statusOptions = [
+            ['value' => 'active', 'label' => 'Active'],
+            ['value' => 'pending', 'label' => 'Pending'],
+            ['value' => 'ended', 'label' => 'Ended'],
+        ];
 
         $channelValues = ChatbotSession::query()
+            ->forInbox()
             ->whereNotNull('channel')
             ->distinct()
             ->pluck('channel')
@@ -161,25 +188,69 @@ class ConversationInboxController extends Controller
         $currentState = $state['current_state'] ?? null;
         $mode = $automationDisabled ? 'staff_only' : ($currentState === 'human_takeover' ? 'takeover' : 'bot');
 
-        $outbound = [];
         if ($session->channel === 'sms') {
-            $outbound = OutboundSms::query()
+            $outboundRows = OutboundSms::query()
                 ->where('chatbot_session_id', $session->id)
                 ->orderByDesc('created_at')
-                ->limit(25)
+                ->limit(50)
+                ->get();
+            $outboundForThread = $outboundRows->map(fn (OutboundSms $o): array => [
+                'id' => 'out-' . $o->id,
+                'direction' => 'out',
+                'body' => $o->body,
+                'status' => $o->status,
+                'failure_reason' => $o->failure_reason,
+                'created_at' => $o->created_at?->toIso8601String(),
+                'to' => $o->to,
+            ])->values()->all();
+        } else {
+            $outboundRows = collect();
+            $outboundForThread = OutboundMessenger::query()
+                ->where('to', $session->external_id)
+                ->orderBy('created_at')
+                ->limit(50)
                 ->get()
-                ->map(fn (OutboundSms $o): array => [
-                    'id' => $o->id,
-                    'to' => $o->to,
+                ->map(fn (OutboundMessenger $o): array => [
+                    'id' => 'out-' . $o->id,
+                    'direction' => 'out',
                     'body' => $o->body,
-                    'status' => $o->status,
-                    'sent_at' => $o->sent_at?->toIso8601String(),
-                    'failure_reason' => $o->failure_reason,
+                    'status' => null,
+                    'failure_reason' => null,
                     'created_at' => $o->created_at?->toIso8601String(),
+                    'to' => $o->to,
                 ])
                 ->values()
                 ->all();
         }
+
+        $inbound = InboundMessage::query()
+            ->where('chatbot_session_id', $session->id)
+            ->orderBy('created_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (InboundMessage $m): array => [
+                'id' => 'in-' . $m->id,
+                'direction' => 'in',
+                'body' => $m->body,
+                'created_at' => $m->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+
+        $thread = array_merge($outboundForThread, $inbound);
+        usort($thread, fn (array $a, array $b): int => strcmp($a['created_at'] ?? '', $b['created_at'] ?? ''));
+
+        $outboundSms = $session->channel === 'sms'
+            ? $outboundRows->take(25)->map(fn (OutboundSms $o): array => [
+            'id' => $o->id,
+            'to' => $o->to,
+            'body' => $o->body,
+            'status' => $o->status,
+            'sent_at' => $o->sent_at?->toIso8601String(),
+            'failure_reason' => $o->failure_reason,
+            'created_at' => $o->created_at?->toIso8601String(),
+        ])->values()->all()
+            : [];
 
         return Inertia::render('ConversationInboxShow', [
             'session' => [
@@ -194,7 +265,8 @@ class ConversationInboxController extends Controller
                 'automation_disabled' => $automationDisabled,
                 'mode' => $mode,
             ],
-            'outbound_sms' => $outbound,
+            'outbound_sms' => $outboundSms,
+            'thread' => $thread,
             'meta' => [
                 'takeoverTimeoutMinutes' => (int) config('chatbot.takeover_timeout_minutes', 60),
             ],
@@ -286,6 +358,29 @@ class ConversationInboxController extends Controller
         $session->state = $state;
         $session->last_activity_at = now();
         $session->save();
+
+        $locale = $session->language ?? 'en';
+        $message = __('chatbot.takeover_ended_by_staff', [], $locale);
+        try {
+            if ($session->channel === 'sms') {
+                $result = $this->smsSender->send($session->external_id, $message, 'sms', $session->id);
+                if (! ($result['success'] ?? false)) {
+                    Log::warning('Takeover: failed to send session-ended SMS to customer', [
+                        'session_id' => $session->id,
+                        'message' => $result['message'] ?? 'Unknown',
+                    ]);
+                }
+            } else {
+                $this->messengerSender->send($session->external_id, $message);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Takeover: failed to send session-ended message to customer', [
+                'session_id' => $session->id,
+                'channel' => $session->channel,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         event(new ConversationUpdated($session, 'resolve'));
 
         ActionLog::create([

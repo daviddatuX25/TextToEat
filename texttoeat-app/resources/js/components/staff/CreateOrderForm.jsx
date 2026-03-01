@@ -1,313 +1,539 @@
-import { useForm } from '@inertiajs/react';
-import { Minus, Plus } from 'lucide-react';
-import { Input } from '../ui/Input';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { router, usePage } from '@inertiajs/react';
+import { Input, Button, Card } from '../ui';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/Dialog';
+import { Plus, Minus, Utensils, ChevronUp } from 'lucide-react';
 
-const FULFILLMENT_OPTIONS = [
-    { value: 'walkin', walkin_type: 'dine_in', label: 'Dine in', delivery_type: 'pickup', delivery_place: null, delivery_fee: null },
-    { value: 'walkin', walkin_type: 'takeout', label: 'Take out', delivery_type: 'pickup', delivery_place: null, delivery_fee: null },
-    { value: 'pickup', walkin_type: null, label: 'Pickup', delivery_type: 'pickup', delivery_place: null, delivery_fee: null },
-    { value: 'delivery', walkin_type: null, label: 'Delivery', delivery_type: 'delivery', delivery_place: null, delivery_fee: null },
+const filterLabelClass = 'block text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1.5';
+const filterSelectClass =
+    'w-full rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-sm text-surface-800 dark:text-surface-200 px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent';
+
+const DELIVERY_PLACES = [
+    { value: 'Municipal Hall', label: 'Municipal Hall (free)' },
+    { value: 'Within Barangay Tagudin', label: 'Within Barangay Tagudin (free)' },
+    { value: 'Other (paid on delivery)', label: 'Other (fee on delivery)' },
 ];
 
-function initialCart(menuItems) {
-    return (Array.isArray(menuItems) ? menuItems : [])
-        .filter((m) => m && m.id != null)
-        .reduce((acc, m) => ({ ...acc, [m.id]: 0 }), {});
-}
-
-export function CreateOrderForm({
+function CreateOrderForm({
     menuItems = [],
-    diningMarkers = [],
-    diningMarkersUnavailable = [],
     deliveryAreas = [],
     pickupSlots = [],
+    diningMarkers = [],
+    diningMarkersUnavailable = [],
+    standalonePage = false,
 }) {
-    const pickupValues = Array.isArray(pickupSlots) && pickupSlots.length > 0
-        ? pickupSlots.map((s) => (typeof s === 'string' ? s : s?.value ?? s))
-        : [];
-    const deliveryOptions = Array.isArray(deliveryAreas) && deliveryAreas.length > 0
-        ? deliveryAreas
-        : [{ id: 0, name: 'Other (paid on delivery)', is_free: false, fee: null }];
+    const { props } = usePage();
+    const rawErrors = props.errors || {};
+    const serverErrors = useMemo(() => {
+        const o = {};
+        for (const [k, v] of Object.entries(rawErrors)) {
+            o[k] = Array.isArray(v) ? v[0] : v;
+        }
+        return o;
+    }, [rawErrors]);
+    const [customerName, setCustomerName] = useState('');
+    const [customerPhone, setCustomerPhone] = useState('');
+    const [fulfillment, setFulfillment] = useState('walkin'); // 'walkin' | 'pickup' | 'delivery'
+    const [orderMarker, setOrderMarker] = useState('');
+    const [pickupSlot, setPickupSlot] = useState('');
+    const [deliveryPlace, setDeliveryPlace] = useState(DELIVERY_PLACES[0]?.value ?? '');
+    const [cart, setCart] = useState([]);
+    const [mobileFormOpen, setMobileFormOpen] = useState(false);
+    const [touched, setTouched] = useState({});
+    const [mounted, setMounted] = useState(false);
+    const formSectionRef = useRef(null);
+    const itemsGridRef = useRef(null);
 
-    const form = useForm({
-        customer_name: '',
-        customer_phone: '',
-        fulfillment: 'walkin',
-        walkin_type: 'dine_in',
-        delivery_place: deliveryOptions[0]?.name ?? null,
-        delivery_fee: deliveryOptions[0]?.is_free ? 0 : (deliveryOptions[0]?.fee ?? null),
-        pickup_slot: pickupValues[0] ?? null,
-        order_marker: '',
-        items: initialCart(menuItems),
-    });
+    useEffect(() => {
+        if (standalonePage) setMounted(true);
+    }, [standalonePage]);
 
-    const isDelivery = form.data.fulfillment === 'delivery';
-    const isWalkin = form.data.fulfillment === 'walkin';
-    const isPickup = form.data.fulfillment === 'pickup';
-    const isDineIn = isWalkin && form.data.walkin_type === 'dine_in';
-    const isTakeout = isWalkin && form.data.walkin_type === 'takeout';
+    // #region agent log
+    useEffect(() => {
+        if (!standalonePage || !itemsGridRef.current) return;
+        const el = itemsGridRef.current;
+        const rect = el.getBoundingClientRect();
+        fetch('http://127.0.0.1:7376/ingest/6bfbe7d4-b4cf-4142-be65-9dec6fac862c', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '267e08' },
+            body: JSON.stringify({
+                sessionId: '267e08',
+                location: 'CreateOrderForm.jsx:itemsGridRef',
+                message: 'items grid rect on desktop',
+                data: { height: rect.height, width: rect.width, top: rect.top, left: rect.left },
+                hypothesisId: 'H1,H3',
+                timestamp: Date.now(),
+            }),
+        }).catch(() => {});
+    }, [standalonePage, menuItems.length]);
+    // #endregion
 
-    const setFulfillment = (opt) => {
-        const isDineInOpt = opt.walkin_type === 'dine_in';
-        const isTakeoutOpt = opt.walkin_type === 'takeout';
-        form.setData({
-            fulfillment: opt.value,
-            walkin_type: opt.walkin_type,
-            delivery_place: opt.delivery_type === 'delivery' ? (deliveryOptions[0]?.name ?? null) : null,
-            delivery_fee: opt.delivery_type === 'delivery' ? (deliveryOptions[0]?.is_free ? 0 : (deliveryOptions[0]?.fee ?? null)) : null,
-            pickup_slot: isDineInOpt ? null : (opt.delivery_type === 'pickup' ? (pickupValues[0] ?? null) : null),
-            order_marker: isTakeoutOpt ? null : (isDineInOpt ? '' : null),
-            customer_phone: isDineInOpt ? '' : form.data.customer_phone,
+    const adjustQty = useCallback((menuItemId, delta) => {
+        setCart((prev) => {
+            const idx = prev.findIndex((l) => l.menu_item_id === menuItemId);
+            if (idx >= 0) {
+                const line = prev[idx];
+                const newQty = Math.max(0, line.quantity + delta);
+                if (newQty === 0) return prev.filter((_, i) => i !== idx);
+                return prev.map((l, i) => (i === idx ? { ...l, quantity: newQty } : l));
+            }
+            if (delta > 0) {
+                const item = menuItems.find((m) => m.id === menuItemId);
+                if (item) {
+                    return [...prev, { menu_item_id: item.id, name: item.name, price: Number(item.price) ?? 0, quantity: 1 }];
+                }
+            }
+            return prev;
         });
-    };
+    }, [menuItems]);
 
-    const setDeliveryPlace = (area) => {
-        form.setData({
-            delivery_place: area.name,
-            delivery_fee: area.is_free ? 0 : (area.fee ?? null),
-        });
-    };
+    const addOne = useCallback((item) => {
+        adjustQty(item.id, 1);
+    }, [adjustQty]);
 
-    const setQuantity = (id, qty) => {
-        const next = { ...form.data.items };
-        next[id] = Math.max(0, qty);
-        form.setData('items', next);
-    };
+    const categories = useMemo(() => {
+        const cats = [...new Set((menuItems || []).map((m) => m.category).filter(Boolean))].sort();
+        return ['All', ...cats];
+    }, [menuItems]);
 
-    const cartLines = Object.entries(form.data.items || {})
-        .filter(([, qty]) => qty > 0)
-        .map(([id, qty]) => {
-            const item = menuItems.find((m) => String(m.id) === String(id));
-            return item ? { menu_item_id: parseInt(id, 10), quantity: qty, name: item.name, price: Number(item.price) } : null;
-        })
-        .filter(Boolean);
+    const [categoryFilter, setCategoryFilter] = useState('All');
+    const filteredItems = useMemo(() => {
+        if (categoryFilter === 'All' || !categoryFilter) return menuItems || [];
+        return (menuItems || []).filter((m) => m.category === categoryFilter);
+    }, [menuItems, categoryFilter]);
 
-    const total = cartLines.reduce((sum, line) => sum + line.price * line.quantity, 0);
+    // #region agent log
+    if (standalonePage && typeof window !== 'undefined') {
+        const gridClass = standalonePage ? 'lg:grid-cols-2 lg:max-h-0 lg:min-h-0 lg:flex-1' : 'lg:grid-cols-4 max-h-[400px]';
+        fetch('http://127.0.0.1:7376/ingest/6bfbe7d4-b4cf-4142-be65-9dec6fac862c', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '267e08' },
+            body: JSON.stringify({
+                sessionId: '267e08',
+                location: 'CreateOrderForm.jsx:render',
+                message: 'create-order desktop data and grid class',
+                data: {
+                    standalonePage,
+                    menuItemsLength: (menuItems || []).length,
+                    filteredItemsLength: filteredItems.length,
+                    gridClassIncludesMaxH0: gridClass.includes('max-h-0'),
+                    innerWidth: window.innerWidth,
+                },
+                hypothesisId: 'H1,H2,H5',
+                timestamp: Date.now(),
+            }),
+        }).catch(() => {});
+    }
+    // #endregion
+
+    const total = cart.reduce((sum, line) => sum + Number(line.price) * Number(line.quantity), 0);
+    const nameRequired = fulfillment !== 'walkin';
+    const canSubmit = (nameRequired ? customerName.trim() !== '' : true) && cart.length > 0 && total > 0;
+
+    const nameError = serverErrors.customer_name ?? (touched.customer_name && nameRequired && !customerName.trim() ? 'Customer name is required for pickup/delivery' : null);
+    const phoneError = serverErrors.customer_phone ?? null;
+    const itemsError = serverErrors.items ?? (touched.items && cart.length === 0 ? 'Add at least one item' : null);
+
+    const hasServerErrors = Object.keys(serverErrors).length > 0;
+    useEffect(() => {
+        if (hasServerErrors && formSectionRef.current) {
+            formSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (standalonePage) setMobileFormOpen(true);
+        }
+    }, [hasServerErrors, standalonePage]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        if (cartLines.length === 0) return;
+        if (!canSubmit) {
+            setTouched({
+                customer_name: true,
+                items: true,
+            });
+            if (standalonePage) setMobileFormOpen(true);
+            formSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            return;
+        }
+        setTouched({});
+        const delivery_type = fulfillment === 'delivery' ? 'delivery' : 'pickup';
+        const delivery_place = fulfillment === 'delivery' ? deliveryPlace : null;
+        const delivery_fee = fulfillment === 'delivery' && deliveryPlace === 'Other (paid on delivery)' ? null : 0;
+        const pickup_slot = fulfillment === 'pickup' ? (pickupSlot || null) : null;
+        const order_marker = fulfillment === 'walkin' ? (orderMarker || null) : null;
+        const is_walkin = fulfillment === 'walkin';
+        const customer_name = is_walkin && !customerName.trim() ? 'Walk-in' : customerName.trim();
+
         const payload = {
-            customer_name: (form.data.customer_name || '').trim() || null,
-            customer_phone: isDineIn ? null : (form.data.customer_phone || null),
-            fulfillment: form.data.fulfillment,
-            walkin_type: form.data.walkin_type || null,
-            delivery_place: isDelivery ? form.data.delivery_place : null,
-            delivery_fee: isDelivery ? form.data.delivery_fee : null,
-            pickup_slot: (isPickup || isTakeout) ? (form.data.pickup_slot || null) : null,
-            order_marker: isDineIn ? (form.data.order_marker || null) : null,
-            items: cartLines,
+            customer_name,
+            is_walkin,
+            customer_phone: customerPhone.trim() || '',
+            delivery_type,
+            delivery_place,
+            delivery_fee,
+            pickup_slot,
+            order_marker,
+            items: cart.map((line) => ({
+                menu_item_id: line.menu_item_id,
+                name: line.name,
+                price: line.price,
+                quantity: line.quantity,
+            })),
         };
-        form.transform(() => payload).post('/portal/quick-orders', {
-            onSuccess: () => form.reset('items', initialCart(menuItems)),
+
+        router.post('/portal/quick-orders', payload, {
+            onSuccess: () => {
+                setCustomerName('');
+                setCustomerPhone('');
+                setOrderMarker('');
+                setPickupSlot('');
+                setDeliveryPlace(DELIVERY_PLACES[0]?.value ?? '');
+                setCart([]);
+                setTouched({});
+                if (standalonePage) setMobileFormOpen(false);
+            },
         });
     };
 
-    return (
-        <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-6 lg:gap-8">
-            {/* Left: Menu grid for easy choosing */}
-            <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400 mb-3">Today&apos;s menu</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 gap-3 overflow-y-auto max-h-[50vh] lg:max-h-[calc(90vh-12rem)] pr-1">
-                    {(menuItems || []).map((item) => {
-                        const qty = form.data.items?.[item.id] ?? 0;
-                        const disabled = item.is_sold_out || (item.units_today != null && item.units_today <= 0);
-                        return (
-                            <div
-                                key={item.id}
-                                className={`rounded-xl border-2 overflow-hidden transition-all ${
-                                    qty > 0
-                                        ? 'border-primary-400 dark:border-primary-500/60 bg-primary-50/50 dark:bg-primary-500/10'
-                                        : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 hover:border-surface-300 dark:hover:border-surface-600'
-                                } ${disabled ? 'opacity-60' : ''}`}
-                            >
-                                {item.image_url && (
-                                    <div className="aspect-[4/3] bg-surface-100 dark:bg-surface-800 relative">
-                                        <img
-                                            src={item.image_url}
-                                            alt=""
-                                            className="w-full h-full object-cover"
-                                        />
-                                        {qty > 0 && (
-                                            <span className="absolute top-2 right-2 h-7 min-w-[28px] px-1.5 rounded-full bg-primary-600 text-white text-sm font-bold flex items-center justify-center">
-                                                {qty}
-                                            </span>
-                                        )}
+    const markerTaken = (value) => value && diningMarkersUnavailable && diningMarkersUnavailable.includes(value);
+
+    const toggleOrderMarker = (value) => {
+        if (markerTaken(value)) return;
+        setOrderMarker((prev) => (prev === value ? '' : value));
+    };
+
+    const togglePickupSlot = (value) => {
+        setPickupSlot((prev) => (prev === value ? '' : value));
+    };
+
+    const itemsSection = (
+        <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-2 shrink-0">Items</h3>
+            {itemsError && (
+                <p className="text-xs font-medium text-destructive mb-2" role="alert">
+                    {itemsError}
+                </p>
+            )}
+            {categories.length > 1 && (
+                <div className="mb-3 shrink-0 max-w-[200px]">
+                    <label htmlFor="create-order-category" className={filterLabelClass}>
+                        Category
+                    </label>
+                    <select
+                        id="create-order-category"
+                        value={categoryFilter}
+                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        className={filterSelectClass}
+                        aria-label="Filter menu by category"
+                    >
+                        {categories.map((cat) => (
+                            <option key={cat} value={cat}>
+                                {cat}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
+            <div
+                ref={itemsGridRef}
+                className={`grid grid-cols-2 sm:grid-cols-3 gap-4 overflow-y-auto pb-2 ${standalonePage ? 'lg:grid-cols-3 lg:gap-4 lg:content-start' : 'lg:grid-cols-4 max-h-[400px]'}`}
+            >
+                {filteredItems.map((item) => {
+                    const line = cart.find((l) => l.menu_item_id === item.id);
+                    const qty = line ? line.quantity : 0;
+                    return (
+                        <Card key={item.id} className="overflow-hidden transition-all hover:shadow-md flex flex-col">
+                            <div className="aspect-[4/3] bg-surface-100 dark:bg-surface-800 relative overflow-hidden shrink-0">
+                                {item.image_url ? (
+                                    <img src={item.image_url} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center">
+                                        <Utensils className="h-12 w-12 text-surface-300 dark:text-surface-600" />
                                     </div>
                                 )}
-                                <div className="p-3">
-                                    <p className="font-semibold text-surface-800 dark:text-surface-100 text-sm line-clamp-2">{item.name}</p>
-                                    <p className="text-primary-600 dark:text-primary-400 font-bold text-sm mt-0.5">₱{Number(item.price).toFixed(2)}</p>
-                                    <div className="flex items-center gap-1 mt-2">
-                                        <button
+                                {item.category && (
+                                    <span className="absolute top-2 left-2 inline-flex items-center max-w-[calc(100%-1rem)] rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-primary-500/90 text-white shadow-sm truncate">
+                                        {item.category}
+                                    </span>
+                                )}
+                            </div>
+                            <div className="p-3 flex flex-col flex-1 min-h-0">
+                                <div className="flex justify-between items-baseline gap-2">
+                                    <h3 className="font-semibold text-sm text-surface-900 dark:text-surface-100 line-clamp-2 min-w-0 leading-tight">
+                                        {item.name}
+                                    </h3>
+                                    <span className="font-bold text-sm text-primary-600 dark:text-primary-400 shrink-0 tabular-nums">
+                                        ₱{Number(item.price).toFixed(2)}
+                                    </span>
+                                </div>
+                                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                                    {qty > 0 ? (
+                                        <div className="flex items-center rounded-lg border-2 border-surface-200 dark:border-surface-600 overflow-hidden">
+                                            <button
+                                                type="button"
+                                                onClick={() => adjustQty(item.id, -1)}
+                                                className="p-1.5 text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800"
+                                                aria-label="Decrease quantity"
+                                            >
+                                                <Minus className="h-3.5 w-3.5" />
+                                            </button>
+                                            <span className="min-w-[1.5rem] text-center text-xs font-bold tabular-nums">
+                                                {qty}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => addOne(item)}
+                                                className="p-1.5 text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800"
+                                                aria-label="Increase quantity"
+                                            >
+                                                <Plus className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <Button
                                             type="button"
-                                            onClick={() => setQuantity(item.id, qty - 1)}
-                                            disabled={qty <= 0 || disabled}
-                                            className="h-8 w-8 rounded-lg border border-surface-200 dark:border-surface-600 flex items-center justify-center text-surface-600 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 disabled:opacity-40 disabled:pointer-events-none shrink-0"
-                                            aria-label="Decrease"
+                                            variant="primary"
+                                            onClick={() => addOne(item)}
+                                            className="gap-1 text-xs py-1.5 px-2"
                                         >
-                                            <Minus className="h-4 w-4" />
-                                        </button>
-                                        <span className="flex-1 text-center font-bold text-surface-800 dark:text-surface-100 text-sm">{qty}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setQuantity(item.id, qty + 1)}
-                                            disabled={disabled}
-                                            className="h-8 w-8 rounded-lg border border-primary-300 dark:border-primary-500/50 bg-primary-50 dark:bg-primary-500/20 flex items-center justify-center text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-500/30 disabled:opacity-40 disabled:pointer-events-none shrink-0"
-                                            aria-label="Increase"
-                                        >
-                                            <Plus className="h-4 w-4" />
-                                        </button>
-                                    </div>
+                                            <Plus className="h-3.5 w-3.5" />
+                                            Add
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
+                        </Card>
+                    );
+                })}
+            </div>
+            {cart.length > 0 && (
+                <p className="mt-2 text-sm font-semibold text-primary-600 dark:text-primary-400 shrink-0">
+                    Total: ₱{total.toFixed(2)}
+                </p>
+            )}
+        </div>
+    );
+
+    const formSection = (
+        <div ref={formSectionRef} className="space-y-6">
+            <div className="space-y-3">
+                <Input
+                    id="customer_name"
+                    label={fulfillment === 'walkin' ? 'Customer name (optional)' : 'Customer name'}
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    onBlur={() => setTouched((t) => ({ ...t, customer_name: true }))}
+                    required={nameRequired}
+                    placeholder={fulfillment === 'walkin' ? 'Walk-in' : 'Name'}
+                    error={nameError ?? undefined}
+                />
+                <Input
+                    id="customer_phone"
+                    label="Phone (optional)"
+                    type="text"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    placeholder=""
+                    error={phoneError ?? undefined}
+                />
+            </div>
+
+            <div>
+                <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">Fulfillment</h3>
+
+                {/* Toggle: Walk-in | Pickup | Delivery */}
+                <div
+                    role="group"
+                    aria-label="Fulfillment type"
+                    className="inline-flex p-1 rounded-xl bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700"
+                >
+                    {[
+                        { value: 'walkin', label: 'Walk-in' },
+                        { value: 'pickup', label: 'Pickup' },
+                        { value: 'delivery', label: 'Delivery' },
+                    ].map((opt) => {
+                        const selected = fulfillment === opt.value;
+                        return (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={selected}
+                                onClick={() => setFulfillment(opt.value)}
+                                className={`rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                                    selected
+                                        ? 'bg-white dark:bg-surface-700 text-primary-700 dark:text-primary-300 shadow-sm border border-surface-200 dark:border-surface-600'
+                                        : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-200'
+                                }`}
+                            >
+                                {opt.label}
+                            </button>
                         );
                     })}
                 </div>
-            </div>
 
-            {/* Right: Order options sidebar */}
-            <div className="lg:w-80 xl:w-96 shrink-0 flex flex-col gap-4 lg:sticky lg:top-4 lg:self-start">
-                <div className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/30 p-4 space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400">Order options</h3>
-
-                    <div>
-                        <label className="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-2">Fulfillment</label>
-                        <div className="flex flex-wrap gap-2">
-                            {FULFILLMENT_OPTIONS.map((opt) => (
-                                <button
-                                    key={opt.label}
-                                    type="button"
-                                    onClick={() => setFulfillment(opt)}
-                                    className={`rounded-xl border-2 px-3 py-1.5 text-xs font-semibold transition-colors ${
-                                        form.data.fulfillment === opt.value && form.data.walkin_type === opt.walkin_type
-                                            ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300'
-                                            : 'border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-surface-300 dark:hover:border-surface-500'
-                                    }`}
-                                >
-                                    {opt.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {isDelivery && (
-                        <div>
-                            <label className="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Delivery area</label>
-                            <select
-                                value={form.data.delivery_place ?? ''}
-                                onChange={(e) => {
-                                    const area = deliveryOptions.find((a) => a.name === e.target.value);
-                                    if (area) setDeliveryPlace(area);
-                                }}
-                                className="w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
-                            >
-                                {deliveryOptions.map((a) => (
-                                    <option key={a.id} value={a.name}>
-                                        {a.name} {a.is_free ? '(free)' : a.fee != null ? `₱${Number(a.fee).toFixed(2)}` : 'fee on delivery'}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {(isPickup || (isWalkin && form.data.walkin_type === 'takeout')) && pickupValues.length > 0 && (
-                        <div>
-                            <label className="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Pickup slot</label>
-                            <select
-                                value={form.data.pickup_slot ?? ''}
-                                onChange={(e) => form.setData('pickup_slot', e.target.value || null)}
-                                className="w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
-                            >
-                                <option value="">—</option>
-                                {pickupValues.map((v) => (
-                                    <option key={v} value={v}>{v}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {isWalkin && form.data.walkin_type === 'dine_in' && diningMarkers.length > 0 && (
-                        <div>
-                            <label className="block text-sm font-semibold text-surface-700 dark:text-surface-300 mb-1">Table / marker (optional)</label>
-                            <select
-                                value={form.data.order_marker ?? ''}
-                                onChange={(e) => form.setData('order_marker', e.target.value || null)}
-                                className="w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
-                            >
-                                <option value="">—</option>
-                                {diningMarkers.map((m) => {
-                                    const val = typeof m === 'string' ? m : m?.value ?? m;
-                                    const taken = diningMarkersUnavailable.includes(val);
+                {/* Dining markers: square with small radius */}
+                {fulfillment === 'walkin' && (
+                    <div className="mt-4">
+                        <p className={filterLabelClass}>Dining marker (optional)</p>
+                        <div className="overflow-x-auto pb-2 -mx-1">
+                            <div className="p-1 flex flex-wrap gap-2">
+                                {(diningMarkers || []).map((m) => {
+                                    const taken = markerTaken(m.value);
+                                    const selected = orderMarker === m.value;
                                     return (
-                                        <option key={val} value={val} disabled={taken}>
-                                            {val}{taken ? ' (taken)' : ''}
-                                        </option>
+                                        <button
+                                            key={m.id}
+                                            type="button"
+                                            onClick={() => toggleOrderMarker(m.value)}
+                                            disabled={taken}
+                                            className={`rounded-lg border-2 w-10 h-10 flex items-center justify-center text-xs font-semibold transition-colors shrink-0 ${
+                                                taken
+                                                    ? 'border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 text-surface-400 cursor-not-allowed'
+                                                    : selected
+                                                        ? 'border-primary-500 bg-primary-500 text-white dark:bg-primary-600 dark:border-primary-600'
+                                                        : 'border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-primary-400 dark:hover:border-primary-500'
+                                            }`}
+                                        >
+                                            {m.value}
+                                        </button>
                                     );
                                 })}
-                            </select>
-                        </div>
-                    )}
-
-                    <div className="space-y-2">
-                        <Input
-                            id="create_customer_name"
-                            label={isWalkin ? 'Customer name (optional)' : 'Customer name'}
-                            type="text"
-                            value={form.data.customer_name}
-                            onChange={(e) => form.setData('customer_name', e.target.value)}
-                            error={form.errors.customer_name}
-                        />
-                        {!(isWalkin && form.data.walkin_type === 'dine_in') && (
-                            <Input
-                                id="create_customer_phone"
-                                label="Phone (optional)"
-                                type="text"
-                                value={form.data.customer_phone}
-                                onChange={(e) => form.setData('customer_phone', e.target.value)}
-                                error={form.errors.customer_phone}
-                            />
-                        )}
-                    </div>
-                </div>
-
-                {/* Cart summary */}
-                <div className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 p-4 space-y-2">
-                    <h3 className="text-sm font-bold uppercase tracking-wider text-surface-600 dark:text-surface-400">Order summary</h3>
-                    {cartLines.length === 0 ? (
-                        <p className="text-sm text-surface-500 dark:text-surface-400">Add items from the menu.</p>
-                    ) : (
-                        <>
-                            {cartLines.map((line) => (
-                                <div key={line.menu_item_id} className="flex justify-between text-sm">
-                                    <span><span className="font-bold text-primary-600 dark:text-primary-400">{line.quantity}x</span> {line.name}</span>
-                                    <span className="font-bold">₱{(line.price * line.quantity).toFixed(2)}</span>
-                                </div>
-                            ))}
-                            <div className="pt-2 mt-2 border-t border-surface-200 dark:border-surface-700 flex justify-between font-bold text-lg">
-                                <span>Total</span>
-                                <span className="text-primary-600 dark:text-primary-400">₱{total.toFixed(2)}</span>
                             </div>
-                        </>
-                    )}
-                </div>
-
-                {Object.keys(form.errors).length > 0 && (
-                    <ul className="text-sm text-red-600 dark:text-red-400 space-y-1">
-                        {Object.entries(form.errors).map(([k, v]) => (
-                            <li key={k}>{v}</li>
-                        ))}
-                    </ul>
+                        </div>
+                    </div>
                 )}
 
-                <button
-                    type="submit"
-                    disabled={form.processing || cartLines.length === 0}
-                    className="w-full py-3 rounded-xl bg-primary-600 text-white font-semibold hover:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none"
-                >
-                    {form.processing ? 'Creating…' : 'Create order'}
-                </button>
+                {/* Pickup slots: circles */}
+                {fulfillment === 'pickup' && (
+                    <div className="mt-4">
+                        <p className={filterLabelClass}>Pickup slot (optional)</p>
+                        <div className="overflow-x-auto pb-2 -mx-1">
+                            <div className="flex flex-wrap gap-2 p-1">
+                                {(pickupSlots || []).map((s) => {
+                                    const selected = pickupSlot === s.value;
+                                    return (
+                                        <button
+                                            key={s.id}
+                                            type="button"
+                                            onClick={() => togglePickupSlot(s.value)}
+                                            className={`rounded-full w-10 h-10 flex items-center justify-center text-xs font-semibold transition-colors shrink-0 ${
+                                                selected
+                                                    ? 'bg-primary-500 text-white dark:bg-primary-600 ring-2 ring-primary-300 dark:ring-primary-700 ring-offset-2 dark:ring-offset-surface-900'
+                                                    : 'border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-primary-400 dark:hover:border-primary-500'
+                                            }`}
+                                        >
+                                            {s.value}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Delivery area */}
+                {fulfillment === 'delivery' && (
+                    <div className="mt-4">
+                        <label htmlFor="create-order-delivery-place" className={filterLabelClass}>
+                            Delivery area
+                        </label>
+                        <select
+                            id="create-order-delivery-place"
+                            value={deliveryPlace}
+                            onChange={(e) => setDeliveryPlace(e.target.value)}
+                            className={filterSelectClass}
+                            aria-label="Delivery area"
+                        >
+                            {DELIVERY_PLACES.map((opt) => (
+                                <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
             </div>
+
+            <Button type="submit" disabled={!canSubmit} variant="primary" className="w-full">
+                Create order
+            </Button>
+        </div>
+    );
+
+    if (standalonePage) {
+        return (
+            <>
+                {/* Desktop: 2 columns with independent scroll; mobile: single column */}
+                <form onSubmit={handleSubmit} className="flex flex-col lg:grid lg:grid-cols-[1fr_min(22rem)] lg:gap-6 lg:min-h-[28rem] lg:h-[calc(100vh-11rem)]">
+                    <div className="flex flex-col min-h-0 min-w-0 order-1 lg:overflow-y-auto lg:pr-4 lg:pb-4">
+                        {itemsSection}
+                    </div>
+                    <div className="max-lg:hidden flex flex-col min-h-0 min-w-[320px] order-2 overflow-y-auto lg:pl-4 lg:border-l border-surface-200 dark:border-surface-700">
+                        {formSection}
+                    </div>
+                </form>
+
+                {/* Mobile: fixed bottom bar (portaled to body so it stays fixed to viewport) */}
+                {standalonePage &&
+                    mounted &&
+                    typeof document !== 'undefined' &&
+                    document.body &&
+                    createPortal(
+                        <div
+                            className="fixed left-0 right-0 bottom-0 z-[100] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white dark:bg-slate-900 border-t border-surface-200 dark:border-surface-700 shadow-[0_-4px_20px_rgba(0,0,0,0.12)] lg:hidden"
+                            style={{ position: 'fixed', left: 0, right: 0, bottom: 0 }}
+                            data-create-order-footer
+                        >
+                            <button
+                                type="button"
+                                onClick={() => setMobileFormOpen(true)}
+                                className={`w-full flex items-center justify-between gap-4 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3.5 px-4 transition-colors ${cart.length > 0 ? 'proceed-blink' : ''}`}
+                            >
+                                <span className="text-left">
+                                    {cart.length === 0 ? 'Add items to continue' : (
+                                        <>
+                                            <span className="block text-white/90 text-xs font-medium">Proceed to checkout</span>
+                                            <span className="block text-sm mt-0.5">{cart.length} item{cart.length !== 1 ? 's' : ''} · ₱{total.toFixed(2)}</span>
+                                        </>
+                                    )}
+                                </span>
+                                <ChevronUp className="h-5 w-5 shrink-0" aria-hidden />
+                            </button>
+                        </div>,
+                        document.body
+                    )}
+                <div className="h-24 lg:hidden flex-shrink-0" aria-hidden />
+
+                <Dialog open={mobileFormOpen} onOpenChange={setMobileFormOpen}>
+                    <DialogContent
+                        className="fixed bottom-0 left-0 right-0 top-auto translate-y-0 translate-x-0 max-h-[90vh] rounded-t-2xl rounded-b-none border-b-0 sm:max-w-none w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom"
+                        onPointerDownOutside={(e) => e.target === e.currentTarget && setMobileFormOpen(false)}
+                    >
+                        <div className="flex flex-col gap-2 pb-4">
+                            <div className="w-10 h-1 rounded-full bg-surface-300 dark:bg-surface-600 mx-auto shrink-0" aria-hidden />
+                            <DialogHeader>
+                                <DialogTitle className="text-center">Customer &amp; fulfillment</DialogTitle>
+                            </DialogHeader>
+                        </div>
+                        <div className="overflow-y-auto flex-1 min-h-0 -mx-6 px-6">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                {formSection}
+                            </form>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </>
+        );
+    }
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-6">
+            {itemsSection}
+            {formSection}
         </form>
     );
 }
+
+export { CreateOrderForm };
+export default CreateOrderForm;

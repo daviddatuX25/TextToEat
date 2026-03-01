@@ -6,29 +6,63 @@ use App\Http\Requests\StoreMenuItemRequest;
 use App\Http\Requests\UpdateMenuItemRequest;
 use App\Models\MenuItem;
 use App\Services\MenuItemImageService;
+use App\Services\MenuItemStockService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class MenuItemsController extends Controller
 {
     public function __construct(
-        private MenuItemImageService $imageService
+        private MenuItemImageService $imageService,
+        private MenuItemStockService $stockService
     ) {}
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
+        $validated = $request->validate([
+            'category' => ['nullable', 'string', 'max:255'],
+        ]);
+
         $today = Carbon::today();
         $menuItems = MenuItem::query()
             ->whereDate('menu_date', $today)
+            ->when(
+                ! empty($validated['category']),
+                fn ($q) => $q->where('category', $validated['category'])
+            )
             ->orderBy('category')
             ->orderBy('name')
-            ->get();
+            ->paginate(20)
+            ->withQueryString();
+
+        $virtualAvailable = $this->stockService->getVirtualAvailableForToday(
+            $menuItems->pluck('id')->all()
+        );
+
+        $menuItems = $menuItems->through(function ($item) use ($virtualAvailable) {
+            $arr = $item->toArray();
+            $arr['virtual_available'] = $virtualAvailable[$item->id] ?? (int) $item->units_today;
+
+            return $arr;
+        });
+
+        $menuCategories = MenuItem::query()
+            ->whereDate('menu_date', $today)
+            ->distinct()
+            ->pluck('category')
+            ->filter()
+            ->sort()
+            ->values()
+            ->all();
 
         return Inertia::render('MenuItems', [
             'menuItems' => $menuItems,
             'categories' => config('menu.categories', []),
+            'menuCategories' => $menuCategories,
+            'filterCategory' => $validated['category'] ?? null,
         ]);
     }
 

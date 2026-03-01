@@ -67,8 +67,9 @@ export default function Chat({ webChatExternalId = '' }) {
             })
             .then((data) => {
                 const replies = data.replies ?? (data.reply ? [data.reply] : []);
+                const nonEmpty = replies.filter((t) => typeof t === 'string' && t.trim() !== '');
                 setMessages(
-                    replies.map((text, i) => ({ role: 'bot', text, id: `init-${i}` }))
+                    nonEmpty.map((text, i) => ({ role: 'bot', text, id: `init-${i}` }))
                 );
             })
             .catch((e) => {
@@ -151,10 +152,13 @@ export default function Chat({ webChatExternalId = '' }) {
             .then((data) => {
                 const reply = data.reply ?? '';
                 const replies = data.replies ?? (reply ? [reply] : []);
-                setMessages((prev) => [
-                    ...prev,
-                    ...replies.map((t, i) => ({ role: 'bot', text: t, id: `b-${Date.now()}-${i}` })),
-                ]);
+                const nonEmpty = replies.filter((t) => typeof t === 'string' && t.trim() !== '');
+                if (nonEmpty.length > 0) {
+                    setMessages((prev) => [
+                        ...prev,
+                        ...nonEmpty.map((t, i) => ({ role: 'bot', text: t, id: `b-${Date.now()}-${i}` })),
+                    ]);
+                }
             })
             .catch((e) => {
                 setError(e.message || 'Send failed');

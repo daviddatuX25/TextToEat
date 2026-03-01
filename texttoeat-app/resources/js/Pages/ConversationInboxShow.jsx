@@ -1,5 +1,5 @@
 import { Link, router } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { usePortalConversationsLive } from '../hooks/usePortalConversationsLive';
 import PortalLayout from '../Layouts/PortalLayout';
 
@@ -25,8 +25,9 @@ function ModeBadge({ mode }) {
     );
 }
 
-export default function ConversationInboxShow({ session, outbound_sms: outboundSms = [], meta = {} }) {
+export default function ConversationInboxShow({ session, outbound_sms: outboundSms = [], thread = [], meta = {} }) {
     usePortalConversationsLive();
+    const threadEndRef = useRef(null);
     const [message, setMessage] = useState('');
     const [sending, setSending] = useState(false);
     const [toggling, setToggling] = useState(false);
@@ -37,6 +38,10 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
     const isMessenger = session?.channel === 'messenger';
 
     const automationEnabled = useMemo(() => !Boolean(session?.automation_disabled), [session?.automation_disabled]);
+
+    useEffect(() => {
+        threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [thread]);
 
     const submitReply = (e) => {
         e.preventDefault();
@@ -109,11 +114,28 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
                             <span className="text-surface-400 text-xs">{String(session.language).toUpperCase()}</span>
                         )}
                     </div>
-                    <p className="text-surface-600 dark:text-surface-400 text-sm">
-                        Takeover expires after {takeoverTimeoutMinutes} minutes of no activity and returns to bot mode.
-                    </p>
+                    {session?.mode !== 'bot' && (
+                        <p className="text-surface-600 dark:text-surface-400 text-sm">
+                            Takeover expires after {takeoverTimeoutMinutes} minutes of no activity and returns to bot mode.
+                        </p>
+                    )}
                 </header>
 
+                {session?.mode === 'bot' && (
+                    <div className="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/80 p-4 flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm text-surface-700 dark:text-surface-300">
+                            This session is no longer in human takeover. The customer has returned to the bot.
+                        </p>
+                        <Link
+                            href="/portal/inbox"
+                            className="rounded-lg px-4 py-2 text-sm font-semibold bg-primary-600 text-white hover:bg-primary-700 transition-colors"
+                        >
+                            Back to inbox
+                        </Link>
+                    </div>
+                )}
+
+                {session?.mode !== 'bot' && (
                 <div className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-900/60 p-4 flex flex-col gap-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="text-sm font-bold text-surface-800 dark:text-surface-100">
@@ -164,7 +186,47 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
                         </button>
                     </div>
                 </div>
+                )}
 
+                <div className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-900/60 p-4">
+                    <h2 className="text-lg font-bold mb-3">Conversation</h2>
+                    <div className="flex flex-col max-h-[28rem] overflow-y-auto">
+                        {thread.length === 0 ? (
+                            <p className="text-sm text-surface-500 py-4">No messages yet.</p>
+                        ) : (
+                            <ul className="flex flex-col gap-3 py-1">
+                                {thread.map((m) => (
+                                    <li
+                                        key={m.id}
+                                        className={`flex ${m.direction === 'in' ? 'justify-start' : 'justify-end'}`}
+                                    >
+                                        <div
+                                            className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                                                m.direction === 'in'
+                                                    ? 'rounded-tl-md bg-amber-50 dark:bg-amber-500/10 text-surface-800 dark:text-surface-200'
+                                                    : 'rounded-tr-md bg-primary-100 dark:bg-primary-500/20 text-primary-900 dark:text-primary-100'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between gap-2 mb-1">
+                                                <span className="text-xs font-semibold text-surface-600 dark:text-surface-400">
+                                                    {m.direction === 'in' ? 'Customer' : 'Staff'}
+                                                </span>
+                                                <span className="text-xs text-surface-400 tabular-nums">{m.created_at}</span>
+                                            </div>
+                                            <div className="whitespace-pre-wrap">{m.body}</div>
+                                            {m.direction === 'out' && m.status === 'failed' && (
+                                                <div className="text-xs text-surface-500 mt-1">Status: {m.status}</div>
+                                            )}
+                                        </div>
+                                    </li>
+                                ))}
+                                <li ref={threadEndRef} className="h-0 overflow-hidden" aria-hidden />
+                            </ul>
+                        )}
+                    </div>
+                </div>
+
+                {session?.mode !== 'bot' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-900/60 p-4">
                         <div className="flex items-center justify-between gap-2 mb-3">
@@ -226,6 +288,7 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
                         )}
                     </div>
                 </div>
+                )}
             </section>
         </PortalLayout>
     );

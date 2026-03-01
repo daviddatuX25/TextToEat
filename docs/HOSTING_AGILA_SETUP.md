@@ -1,6 +1,6 @@
 # Hosting & Agila Setup Guide
 
-This guide covers deploying the Text-to-Eat Laravel app to **Agila** hosting via **FTP**, using **GitHub Actions** for automated deploys, and configuring **Facebook Messenger** and **Textbee SMS** integrations to use your live domain.
+This guide covers deploying the Text-to-Eat Laravel app to **Agila** hosting using **FileZilla** (FTP/SFTP) only. No GitHub Actions. You build locally and upload the built app via FileZilla. It also covers configuring **Facebook Messenger** and **Textbee SMS** integrations to use your live domain.
 
 ---
 
@@ -9,94 +9,139 @@ This guide covers deploying the Text-to-Eat Laravel app to **Agila** hosting via
 | Item | Value |
 |------|--------|
 | **Domain** | `www.avelinalacasandile-eat.top` |
-| **FTP host** | `ftp.avelinalacasandile-eat.top` |
-| **FTP port** | `21` |
+| **FTP host** | `ftp.avelinalacasandile-eat.top` (or your Agila FTP host) |
+| **FTP port** | `21` (FTP) or `22` (SFTP if supported) |
 | **FTP username** | `avelinht` |
-| **FTP password** | Store in GitHub Secrets (see below). **Never** commit or document the real password. |
+| **FTP password** | Store in a password manager or in FileZilla’s saved site. **Never** commit or document the real password in the repo. |
 
-### 1.1 Document root on Agila
+Use **FileZilla** (or another FTP/SFTP client) to connect and upload files. No automation; you deploy by building locally and uploading.
 
-- Point the domain’s **document root** to the Laravel `public` folder.
-- Typical options on Agila:
-  - **Option A:** Upload the whole Laravel app (e.g. into `public_html` or a subfolder). Then in the hosting panel set “Document root” / “Web root” to that folder’s **`public`** subfolder (e.g. `public_html/public` or `public_html/texttoeat-app/public`).
-  - **Option B:** If the panel only allows a single folder (e.g. `public_html`), upload the **contents** of Laravel’s `public` directory into `public_html`, and the rest of the app (app, bootstrap, config, etc.) **one level above** `public_html` if your host supports it. Otherwise use Option A.
+---
 
-Confirm with Agila support which structure they support (e.g. “Laravel in subfolder, document root = `public`”).
+## 2. Build, then upload via FileZilla
 
-### 1.2 `.env` on the server
+You do **not** use GitHub Actions. You either **build on your machine** (PHP + Node) or **build with Docker and export** a folder/archive, then upload the result with FileZilla.
 
-- Create **one** `.env` file on the server (e.g. under the Laravel app root, same level as `artisan`).
-- The GitHub Action does **not** upload `.env` (it’s excluded). So you must create and maintain `.env` manually on the server (or via FTP/SFTP) with production values.
-- Use **`texttoeat-app/env.production.example`** as a template (MySQL, Pusher, Facebook, SMS, `CHANNEL_MODE=prod`); copy to the server as `.env` and fill in real values.
-- At minimum set:
+---
+
+### Option A: Build locally (no Docker)
+
+#### 2.1 One-time: prepare build env
+
+On your machine, in the project repo:
+
+- PHP and Composer available (e.g. via Sail, or local PHP).
+- Node.js and npm available for the frontend build.
+
+### 2.2 Build steps (before each deploy)
+
+Run these from the **project root** (or from `texttoeat-app/` if your paths differ):
+
+```bash
+cd texttoeat-app
+
+# Dependencies (production only)
+composer install --no-dev --optimize-autoloader
+
+# Frontend build (uses .env or .env.production for Vite vars)
+npm ci
+npm run build
+```
+
+**Optional – production Vite/Pusher vars:**  
+If you use Pusher in production, set these **before** `npm run build` (e.g. in `.env.production` or export in the shell):
+
+- `VITE_BROADCAST_BROADCASTER=pusher`
+- `VITE_PUSHER_APP_KEY=your_key`
+- `VITE_PUSHER_APP_CLUSTER=ap1` (or your cluster)
+
+If these are not set, the production build will not include Echo; staff pages will use the 30s polling fallback.
+
+---
+
+### Option B: Build with Docker, then export for FTP
+
+You can use **Docker** (e.g. Sail) only to build the app; the server does **not** need Docker. Docker produces a built app; you export that as a folder (or zip) and upload it with FileZilla.
+
+1. **Build inside Docker**  
+   From the project root, use Sail (or a PHP + Node image) to run the same build steps inside a container:
+   - `composer install --no-dev --optimize-autoloader`
+   - `npm ci` and `npm run build`  
+   (e.g. `./vendor/bin/sail shell` then run those in `texttoeat-app/`, or run a one-off container that mounts the repo and runs the commands.)
+
+2. **Export the result**  
+   After the build, the built app is in `texttoeat-app/` (including `vendor/` and `public/build/`). Copy that directory out of the container if needed (e.g. `docker cp <container>:/var/www/html/texttoeat-app ./deploy-build`), or use a bind mount so the built files are already on your host.
+
+3. **Optional: zip for upload**  
+   From the host, zip the built app (excluding `.env`, `.git`, `node_modules`) into e.g. `texttoeat-app-deploy.zip`. Upload the zip with FileZilla and extract on the server, or upload the unzipped folder.
+
+4. **Upload via FileZilla**  
+   Upload the exported folder (or its contents) to the remote app root. Same rules as below: exclude `.env`, `.git`, `node_modules`; include `vendor/`, `public/build/`, and all app files.
+
+**Vite/Pusher:** If you need production Pusher in the frontend build, set `VITE_BROADCAST_BROADCASTER`, `VITE_PUSHER_APP_KEY`, and `VITE_PUSHER_APP_CLUSTER` in the environment where `npm run build` runs inside Docker (e.g. an `.env.production` in the mounted app dir or env vars passed into the container).
+
+---
+
+### 2.3 What to upload with FileZilla
+
+- **Upload the whole `texttoeat-app/` folder** (after the build above) into the remote directory that will be the Laravel app root (e.g. `public_html/` or `htdocs/` — confirm with Agila).
+- **Do NOT upload:**
+  - `.env` (you create and edit this only on the server)
+  - `.git/`
+  - `node_modules/`
+  - `storage/logs/*` (optional; can leave empty or omit)
+  - `vendor/` is **needed** (you built it with `composer install --no-dev`; upload it)
+
+So: upload everything in `texttoeat-app/` **except** `.env`, `.git`, and `node_modules`. Include `vendor/`, `public/build/` (from `npm run build`), and all Laravel app files.
+
+### 2.4 Remote directory layout
+
+- Put the Laravel app (the contents you upload) in the path Agila expects (e.g. `public_html/` or a subfolder like `public_html/texttoeat-app/`).
+- Point the domain’s **document root** to the Laravel **`public`** folder:
+  - Example: if the app is in `public_html/texttoeat-app/`, set document root to `public_html/texttoeat-app/public`.
+
+If the panel only allows one folder (e.g. `public_html`), either:
+- Put the app in a subfolder and set document root to that subfolder’s `public`, or  
+- Upload the contents of `public/` into `public_html/` and the rest of the app one level above, if Agila supports that (confirm with support).
+
+---
+
+## 3. `.env` on the server
+
+- Create **one** `.env` file on the server at the Laravel app root (same level as `artisan`).
+- **Do not** upload `.env` from your machine. Create or edit it on the server (via FileZilla or the hosting file manager).
+- Use **`texttoeat-app/env.production.example`** as a template; copy it to the server as `.env` and fill in production values.
+
+Minimum:
 
 ```env
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://www.avelinalacasandile-eat.top
 
-# DB, etc. — use Agila’s DB host, name, user, password
+# DB — use Agila’s DB host, name, user, password
 ```
+
+### 3.1 First-time setup on the server
+
+After the first upload, run these on the server (via SSH, or “Run script” / “PHP” in the panel if Agila provides it):
+
+```bash
+php artisan key:generate    # if APP_KEY is not set
+php artisan config:cache
+php artisan route:cache
+php artisan storage:link   # if you use storage for uploads
+```
+
+If there is no SSH, use the panel’s file manager or ask Agila how to run these commands.
 
 ---
 
-## 2. GitHub Actions: deploy one branch via FTP
+## 4. Realtime – Pusher
 
-Deploys run when you push to the branch you choose (e.g. `main` or `production`). The workflow builds the Laravel app and uploads it via FTP.
+Both local dev and production can use **Pusher**. When Pusher is not configured (`BROADCAST_CONNECTION=null` or no credentials), staff pages use a 30s polling fallback.
 
-### 2.1 GitHub Secrets
-
-In the repo: **Settings → Secrets and variables → Actions → New repository secret.** Add:
-
-| Secret name | Value | Notes |
-|-------------|--------|--------|
-| `FTP_PASSWORD` | Your FTP password | Same as Agila FTP password; never commit it. |
-| (optional) `FTP_SERVER_DIR` | e.g. `public_html/` or `htdocs/` | Only if you need a custom remote path. |
-
-Do **not** put the FTP password in the workflow file or any doc in the repo.
-
-### 2.2 Workflow file
-
-The workflow file is:
-
-**`.github/workflows/ftp-deploy.yml`**
-
-It:
-
-- Triggers on push to the branch you set (e.g. `main`).
-- Runs `composer install --no-dev` and `npm ci && npm run build` inside `texttoeat-app/`.
-- Uploads the contents of `texttoeat-app/` to the FTP server (excluding `node_modules`, `.git`, `.env`, tests, etc.).
-
-### 2.3 Remote path on the server
-
-- In `.github/workflows/ftp-deploy.yml`, the **`server-dir`** (env `FTP_SERVER_DIR`) is the remote directory where the Laravel app will live. Default is `./` (FTP user’s home). If Agila uses a different root (e.g. `public_html/`), edit the workflow:
-
-  ```yaml
-  env:
-    FTP_SERVER_DIR: public_html/
-  ```
-
-  or add a repository secret `FTP_SERVER_DIR` and in the workflow use `server-dir: ${{ secrets.FTP_SERVER_DIR || './' }}` if you prefer to keep it out of the file.
-- Ensure the domain’s document root points to this directory’s **`public`** subfolder (see 1.1).
-
-### 2.4 First-time and manual steps
-
-1. Push the branch that triggers the workflow (e.g. `main`).
-2. After the first deploy, create/upload `.env` on the server and run (via SSH or a “Run script” in the panel, if available):
-   - `php artisan key:generate` (if no `APP_KEY` yet)
-   - `php artisan config:cache`
-   - `php artisan route:cache`
-   - `php artisan storage:link` (if you use storage for uploads)
-
-If Agila doesn’t give SSH, do these via their file manager / “Run PHP” or support.
-
-### 2.5 Realtime – Pusher
-
-Both local dev and production use **Pusher** (hosted). Reverb is no longer used. Use the same Pusher app or a separate one for dev.
-
-When Pusher is not configured (`BROADCAST_CONNECTION=null` or no Pusher credentials), staff pages (Orders, Deliveries, Pickup, Walkin, Inbox) automatically use a 30s polling fallback so staff still see updates.
-
-**Server `.env`** — add when you want realtime staff updates (Orders, Deliveries, Inbox):
+**Server `.env`** (when you want realtime):
 
 ```env
 BROADCAST_CONNECTION=pusher
@@ -106,38 +151,24 @@ PUSHER_APP_SECRET=your_app_secret
 PUSHER_APP_CLUSTER=ap1
 ```
 
-**Build-time vars** — the frontend needs Pusher config at `npm run build` time. The workflow already reads these. Add to GitHub **Settings → Secrets and variables → Actions → Secrets** (the workflow reads these):
-
-| Name | Value |
-|------|-------|
-| `VITE_BROADCAST_BROADCASTER` | `pusher` (when set, build uses Pusher) |
-| `VITE_PUSHER_APP_KEY` | Your Pusher app key |
-| `VITE_PUSHER_APP_CLUSTER` | Your Pusher cluster (e.g. `ap1`) |
-
-If these secrets are not set, the production build will have no Echo (staff pages use the 30s polling fallback). Set them when you want realtime via Pusher.
-
-**To skip Pusher in prod:** Set `BROADCAST_CONNECTION=null` on the server. Staff pages will use the built-in 30s polling fallback.
+**Build-time:** Set `VITE_*` vars before `npm run build` (see 2.2). To skip Pusher in prod, set `BROADCAST_CONNECTION=null` on the server; staff pages will use polling.
 
 ---
 
-## 3. Facebook Messenger – URLs for your domain
+## 5. Facebook Messenger – URLs for your domain
 
-Use these with **Meta for Developers** and your app’s **Messenger** product.
+In **Meta for Developers** → your app → **Messenger** → **Webhooks**:
 
-### 3.1 Webhook URL (Callback URL)
-
-Set in **Messenger → Settings → Webhooks**:
+**Callback URL:**
 
 ```text
 https://www.avelinalacasandile-eat.top/api/messenger/webhook
 ```
 
-- **GET** is used for subscription verification (verify token).
-- **POST** is used for incoming messages and postbacks.
+- **GET** = subscription verification (verify token).
+- **POST** = incoming messages and postbacks.
 
-### 3.2 `.env` on server (Messenger)
-
-In the server’s `.env`:
+**Server `.env`:**
 
 ```env
 APP_URL=https://www.avelinalacasandile-eat.top
@@ -148,26 +179,15 @@ FACEBOOK_VERIFY_TOKEN=your_verify_token
 FACEBOOK_PAGE_ACCESS_TOKEN=your_page_access_token
 ```
 
-`FACEBOOK_VERIFY_TOKEN` must match exactly the “Verify token” you type in the Meta webhook configuration.
-
-### 3.3 Checklist (from FACEBOOK_MESSENGER_INTEGRATION.md)
-
-- Callback URL = `https://www.avelinalacasandile-eat.top/api/messenger/webhook`
-- Verify and save (Meta will send a GET to confirm).
-- Connect the Page and subscribe events: `messages`, `messaging_postbacks`, etc.
-- Page Access Token in `.env` as `FACEBOOK_PAGE_ACCESS_TOKEN`.
+`FACEBOOK_VERIFY_TOKEN` must match the “Verify token” in the Meta webhook configuration. Connect the Page and subscribe to `messages`, `messaging_postbacks`, etc. See **`FACEBOOK_MESSENGER_INTEGRATION.md`** for full checklist.
 
 ---
 
-## 4. SMS – URL for your domain and high-level plan
+## 6. SMS – URL for your domain and high-level plan
 
-**SMS – High-level plan:** Inbound is unchanged (gateway app on the phone receives SMS and POSTs to Laravel at `/api/sms/incoming`). Outbound uses **FCM push**: Laravel enqueues outbound SMS and sends a Firebase Cloud Messaging data message to the phone; the Android app sends the SMS via the device SIM and POSTs mark-sent to Laravel. No polling. For full detail see **`docs/SMS_FCM_PUSH_DESIGN.md`** and **`TEXTBEE_SMS_INTEGRATION.md`**.
+**Inbound:** The gateway app on the phone receives SMS and POSTs to Laravel. **Outbound:** Laravel enqueues SMS and sends an FCM data message to the phone; the Android app sends the SMS via the device SIM and POSTs mark-sent to Laravel. See **`docs/SMS_FCM_PUSH_DESIGN.md`** and **`TEXTBEE_SMS_INTEGRATION.md`**.
 
----
-
-Textbee (or your gateway app) must call your app at a **public HTTPS** URL for **inbound** SMS.
-
-### 4.1 Webhook URL (incoming SMS)
+### 6.1 Webhook URL (incoming SMS)
 
 In the Textbee app/dashboard, set the **Webhook URL** to:
 
@@ -175,29 +195,18 @@ In the Textbee app/dashboard, set the **Webhook URL** to:
 https://www.avelinalacasandile-eat.top/api/sms/incoming
 ```
 
-Your Laravel route is `POST /api/sms/incoming` (see `routes/api.php`).
-
-### 4.2 `.env` on server (SMS)
-
-For **outbound** (FCM), set Firebase credentials. For **inbound**, optional webhook secret. Outbound does not use a gateway API URL.
+### 6.2 Server `.env` (SMS)
 
 ```env
 FIREBASE_CREDENTIALS=/path/to/serviceAccountKey.json
-# FCM_DEVICE_TOKEN=   # optional, for testing
 TEXTBEE_WEBHOOK_SECRET=optional_if_supported
-# TEXTBEE_API_URL=    # optional, only for legacy/health checks; outbound uses FCM
 ```
 
-The webhook URL in 4.1 is where the gateway app **sends** incoming SMS. The Android app registers its FCM token with Laravel and receives outbound send commands via FCM; it then POSTs to `/api/sms/outbound/mark-sent`. See `docs/SMS_FCM_PUSH_DESIGN.md`.
-
-### 4.3 Testing
-
-- **Inbound:** Send an SMS to the gateway number; confirm the app receives a POST at `/api/sms/incoming` (logs or Telescope).
-- **Outbound:** Confirm the chatbot reply is enqueued, FCM is sent, the Android app sends the SMS and calls mark-sent, and the customer receives the SMS.
+Upload the Firebase service account JSON to the server and set `FIREBASE_CREDENTIALS` to its path. The Android app registers its FCM token and receives outbound send commands via FCM; it POSTs to `/api/sms/outbound/mark-sent`.
 
 ---
 
-## 5. Quick reference – live URLs
+## 7. Quick reference – live URLs
 
 | Purpose | URL |
 |--------|-----|
@@ -209,17 +218,29 @@ The webhook URL in 4.1 is where the gateway app **sends** incoming SMS. The Andr
 
 ---
 
-## 6. Related docs
+## 8. Deployment checklist (FileZilla-only)
+
+1. **Build** (choose one):
+   - **Local:** `cd texttoeat-app && composer install --no-dev --optimize-autoloader && npm ci && npm run build`
+   - **Docker:** Build inside Sail/container (composer + npm run build), then export the built `texttoeat-app/` folder (or zip it) for upload. See **Option B** in §2.
+2. **Connect with FileZilla** using the Agila FTP host, username, and password.
+3. **Upload** the contents of `texttoeat-app/` to the remote app root, **excluding** `.env`, `.git`, `node_modules`. Include `vendor/` and `public/build/`.
+4. **On the server:** Ensure `.env` exists and is correct; run `php artisan config:cache`, `route:cache`, and `storage:link` if needed.
+5. **Confirm** document root points to the `public` folder of the uploaded app.
+
+---
+
+## 9. Related docs
 
 - **Facebook Messenger:** project root `FACEBOOK_MESSENGER_INTEGRATION.md`
 - **SMS FCM push design:** `docs/SMS_FCM_PUSH_DESIGN.md`
-- **SMS integration overview:** project root `TEXTBEE_SMS_INTEGRATION.md`
+- **SMS integration:** project root `TEXTBEE_SMS_INTEGRATION.md`
 - **Follow-up (env + webhooks):** `docs/sms-fb-integration-follow-up.md`
 
 ---
 
-## 7. Security reminder
+## 10. Security reminder
 
-- **FTP password:** Only in GitHub Secrets (e.g. `FTP_PASSWORD`), never in the repo or this doc.
-- **`.env`:** Never committed; create and edit only on the server (or via secure panel).
+- **FTP password:** Only in FileZilla (or a password manager). Never in the repo or this doc.
+- **`.env`:** Never committed; create and edit only on the server (FileZilla or panel).
 - **APP_DEBUG:** Must be `false` in production.

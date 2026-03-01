@@ -16,15 +16,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Seeded accounts for testing (password for both: password)
+        // Seeded accounts (password for both: Password1!)
         User::updateOrCreate(
-            ['email' => 'test@example.com'],
-            ['name' => 'Test User', 'password' => Hash::make('password'), 'role' => 'staff']
+            ['email' => 'staff@avelinalacasandile-eat.top'],
+            ['name' => 'Staff', 'password' => Hash::make('Password1!'), 'role' => 'staff']
         );
 
         User::updateOrCreate(
-            ['email' => 'staff@texttoeat.test'],
-            ['name' => 'Lacasandile Staff', 'password' => Hash::make('password'), 'role' => 'staff']
+            ['email' => 'admin@avelinalacasandile-eat.top'],
+            ['name' => 'Admin', 'password' => Hash::make('Password1!'), 'role' => 'admin']
         );
 
         $this->call(BootstrapAdminSeeder::class);

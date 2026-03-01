@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ChatbotSession;
+use App\Models\Conversation;
 use App\Models\MenuItem;
 use App\Models\Order;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -350,6 +351,50 @@ class ChatbotWebhookTest extends TestCase
         ]);
         $personResponse->assertStatus(200)
             ->assertJsonPath('state.current_state', 'human_takeover');
+    }
+
+    public function test_webhook_creates_conversation_when_entering_human_takeover_once(): void
+    {
+        $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'conv_user',
+            'body' => 'hi',
+        ]);
+        $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'conv_user',
+            'body' => '1',
+        ]);
+        $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'conv_user',
+            'body' => '1',
+        ]);
+
+        $this->assertDatabaseCount('conversations', 0);
+
+        $response = $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'conv_user',
+            'body' => 'tao',
+        ]);
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'human_takeover');
+
+        $this->assertDatabaseCount('conversations', 1);
+        $conversation = Conversation::first();
+        $this->assertSame('human_takeover', $conversation->status);
+        $session = ChatbotSession::where('channel', 'sms')->where('external_id', 'conv_user')->first();
+        $this->assertNotNull($session);
+        $this->assertSame($session->id, $conversation->chatbot_session_id);
+        $this->assertSame('sms', $conversation->channel);
+        $this->assertSame('conv_user', $conversation->external_id);
+
+        $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'conv_user',
+            'body' => 'another message while in takeover',
+        ]);
+        $this->assertDatabaseCount('conversations', 1);
     }
 
     public function test_keyword_person_in_menu_transitions_to_human_takeover(): void
@@ -1515,6 +1560,79 @@ class ChatbotWebhookTest extends TestCase
         $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'mm4_user', 'body' => '4']);
         $response->assertStatus(200)->assertJsonPath('state.current_state', 'human_takeover');
         $this->assertStringContainsString('human', strtolower($response->json('reply')));
+    }
+
+    public function test_human_takeover_already_in_state_returns_empty_reply(): void
+    {
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_empty_user', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_empty_user', 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_empty_user', 'body' => '4']);
+
+        $response = $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'ht_empty_user',
+            'body' => 'hello customer reply',
+        ]);
+
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'human_takeover');
+        $reply = $response->json('reply');
+        $this->assertSame('', $reply);
+    }
+
+    public function test_human_takeover_exit_session_transitions_to_main_menu(): void
+    {
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_exit_user', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_exit_user', 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_exit_user', 'body' => '4']);
+
+        $response = $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'ht_exit_user',
+            'body' => 'exit session',
+        ]);
+
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
+        $this->assertStringContainsString('left', strtolower($response->json('reply')));
+
+        $session = ChatbotSession::where('channel', 'sms')->where('external_id', 'ht_exit_user')->first();
+        $this->assertNotNull($session);
+        $this->assertSame('main_menu', $session->state['current_state'] ?? null);
+        $this->assertFalse((bool) ($session->state['automation_disabled'] ?? true));
+    }
+
+    public function test_human_takeover_exit_session_case_insensitive(): void
+    {
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_exit_ci_user', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_exit_ci_user', 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_exit_ci_user', 'body' => '4']);
+
+        $response = $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'ht_exit_ci_user',
+            'body' => 'EXIT SESSION',
+        ]);
+
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
+    }
+
+    public function test_human_takeover_persists_inbound_message(): void
+    {
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_inbound_user', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_inbound_user', 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'ht_inbound_user', 'body' => '4']);
+
+        $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'ht_inbound_user',
+            'body' => 'mabisinakon',
+        ]);
+
+        $session = ChatbotSession::where('channel', 'sms')->where('external_id', 'ht_inbound_user')->first();
+        $this->assertNotNull($session);
+        $this->assertDatabaseHas('inbound_messages', [
+            'chatbot_session_id' => $session->id,
+            'body' => 'mabisinakon',
+        ]);
     }
 
     public function test_order_with_anonymous_name_stores_anonymous(): void

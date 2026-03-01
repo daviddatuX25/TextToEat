@@ -868,9 +868,17 @@ class ChatbotFsm
      */
     private function fromHumanTakeover(string $body, string $locale): array
     {
+        if (trim(strtolower($body)) === 'exit session') {
+            return [
+                'main_menu',
+                __('chatbot.exit_session_ack', [], $locale),
+                $this->orderFlowResetPayload(),
+            ];
+        }
+
         return [
             'human_takeover',
-            __('chatbot.human_takeover_reply', [], $locale),
+            '',
             [],
         ];
     }

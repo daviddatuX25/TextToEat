@@ -77,15 +77,68 @@ class OrdersController extends Controller
         ]);
     }
 
-    public function completedIndex(): Response
+    public function completedIndex(Request $request): Response
     {
-        $orders = Order::with('orderItems')
-            ->whereIn('status', [OrderStatus::Completed, OrderStatus::Cancelled])
-            ->orderByDesc('updated_at')
-            ->get();
+        $validated = $request->validate([
+            'status' => ['sometimes', 'string', 'in:all,completed,cancelled'],
+            'channel' => ['sometimes', 'array'],
+            'channel.*' => ['string', 'in:sms,messenger,web,walkin'],
+            'date_from' => ['sometimes', 'nullable', 'date'],
+            'date_to' => ['sometimes', 'nullable', 'date', 'after_or_equal:date_from'],
+            'search' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'sort' => ['sometimes', 'string', 'in:created_at,updated_at,total,reference'],
+            'direction' => ['sometimes', 'string', 'in:asc,desc'],
+        ]);
+
+        $query = Order::with('orderItems')
+            ->whereIn('status', [OrderStatus::Completed, OrderStatus::Cancelled]);
+
+        $statusFilter = $validated['status'] ?? 'all';
+        if ($statusFilter === 'completed') {
+            $query->where('status', OrderStatus::Completed);
+        } elseif ($statusFilter === 'cancelled') {
+            $query->where('status', OrderStatus::Cancelled);
+        }
+
+        if (! empty($validated['channel'] ?? [])) {
+            $query->whereIn('channel', $validated['channel']);
+        }
+
+        if (! empty($validated['date_from'] ?? null)) {
+            $query->whereDate('created_at', '>=', $validated['date_from']);
+        }
+        if (! empty($validated['date_to'] ?? null)) {
+            $query->whereDate('created_at', '<=', $validated['date_to']);
+        }
+
+        $search = trim($validated['search'] ?? '');
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('customer_name', 'ilike', '%' . $search . '%')
+                    ->orWhere('customer_phone', 'ilike', '%' . $search . '%')
+                    ->orWhere('reference', 'ilike', '%' . $search . '%');
+            });
+        }
+
+        $sort = $validated['sort'] ?? 'updated_at';
+        $direction = $validated['direction'] ?? 'desc';
+        $query->orderBy($sort, $direction);
+
+        $orders = $query->get();
+
+        $filters = [
+            'status' => $statusFilter,
+            'channel' => $validated['channel'] ?? [],
+            'date_from' => $validated['date_from'] ?? '',
+            'date_to' => $validated['date_to'] ?? '',
+            'search' => $search,
+            'sort' => $sort,
+            'direction' => $direction,
+        ];
 
         return Inertia::render('CompletedOrders', [
             'orders' => $orders,
+            'filters' => $filters,
         ]);
     }
 

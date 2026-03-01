@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import PortalLayout from '../Layouts/PortalLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
 import { usePortalOrdersLive } from '../hooks/usePortalOrdersLive';
-import { LayoutGrid, Trash2 } from 'lucide-react';
+import { LayoutGrid, Trash2, List } from 'lucide-react';
 
 const routerOpts = () => ({
     preserveScroll: true,
@@ -252,13 +252,25 @@ function ManageSlotsDialog({ pickupSlotsList = [], open, onOpenChange }) {
     );
 }
 
+const PICKUP_VIEW_MODE_KEY = 'pickupCounterViewMode';
+
 export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlotsList = [], highlight }) {
     const { errors } = usePage().props;
     usePortalOrdersLive();
     const highlightRef = useRef(null);
     const [manageOpen, setManageOpen] = useState(false);
+    const [viewMode, setViewMode] = useState(() => {
+        if (typeof window === 'undefined') return 'card';
+        return window.localStorage?.getItem(PICKUP_VIEW_MODE_KEY) || 'card';
+    });
     const [activeHighlight, setActiveHighlight] = useState(() => (highlight ? String(highlight) : null));
     const highlightTimeoutRef = useRef(null);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && viewMode) {
+            window.localStorage?.setItem(PICKUP_VIEW_MODE_KEY, viewMode);
+        }
+    }, [viewMode]);
 
     useEffect(() => {
         if (!highlight) {
@@ -302,17 +314,19 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
 
     return (
         <PortalLayout>
-            <section className="flex flex-col gap-8 animate-fade-in">
-                <header className="space-y-4">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm font-semibold tracking-wide text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                        <i className="ph-bold ph-storefront"></i>
-                        Pickup counter
-                    </div>
+            <section className="flex flex-col gap-5 animate-fade-in">
+                <header className="space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-surface-900 dark:text-white">
+                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
                             Pickup <span className="bg-gradient-to-r from-primary-500 to-orange-400 bg-clip-text text-transparent">counter</span>
                         </h1>
                         <div className="flex flex-wrap items-center gap-3">
+                            <Link
+                                href="/portal/orders"
+                                className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
+                            >
+                                ← Back to orders
+                            </Link>
                             <button
                                 type="button"
                                 onClick={() => setManageOpen(true)}
@@ -321,39 +335,152 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
                                 <LayoutGrid className="h-4 w-4" />
                                 Manage slots
                             </button>
-                            <Link href="/portal/orders/completed" className="text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline">
-                                View completed orders →
+                            <Link href="/portal/orders/completed" className="text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline py-2">
+                                Completed orders →
                             </Link>
                         </div>
                     </div>
+                    <p className="text-surface-500 dark:text-surface-400 text-sm">
+                        Assign pickup slots and manage orders for customer pickup.
+                    </p>
                 </header>
 
                 {errors?.pickup_slot && (
                     <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm font-bold text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400">
-                        <i className="ph-fill ph-warning text-lg"></i>
+                        <i className="ph-fill ph-warning text-lg" aria-hidden />
                         {errors.pickup_slot}
                     </div>
                 )}
 
-                <div>
-                    <h2 className="text-xl font-bold text-surface-800 dark:text-surface-100 mb-4">Pickup orders</h2>
-                    {orders.length === 0 ? (
-                        <div className="rounded-2xl border-2 border-dashed border-surface-200 dark:border-surface-700 p-8 text-center text-surface-500">
-                            No pickup orders.
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                            {orders.map((order) => {
-                                const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
-                                return (
-                                    <div key={order.id} ref={isHighlight ? highlightRef : null} className={isHighlight ? 'p-2 -m-2' : ''}>
-                                        <PickupOrderCard order={order} pickupSlots={pickupSlots} slotToOrder={slotToOrder} isHighlighted={isHighlight} />
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                    <div
+                        className="inline-flex rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 p-0.5"
+                        role="group"
+                        aria-label="View mode"
+                    >
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('card')}
+                            aria-label="Card view"
+                            aria-pressed={viewMode === 'card'}
+                            className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
+                                viewMode === 'card'
+                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400'
+                                    : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
+                            }`}
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                            Card
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewMode('table')}
+                            aria-label="Table view"
+                            aria-pressed={viewMode === 'table'}
+                            className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
+                                viewMode === 'table'
+                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400'
+                                    : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
+                            }`}
+                        >
+                            <List className="h-4 w-4" />
+                            Table
+                        </button>
+                    </div>
                 </div>
+
+                {orders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border-2 border-dashed border-surface-200 dark:border-surface-800">
+                        <i className="ph-thin ph-storefront text-6xl text-surface-300 dark:text-surface-700 mb-4" aria-hidden />
+                        <h3 className="text-lg font-bold text-surface-700 dark:text-surface-300">No pickup orders</h3>
+                        <p className="text-surface-500 text-sm max-w-sm mt-2">
+                            Pickup orders will appear here. Switch to card view to assign slots and manage orders.
+                        </p>
+                    </div>
+                ) : viewMode === 'table' ? (
+                    <div className="rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 overflow-hidden">
+                        <div className="overflow-x-auto max-h-[calc(100vh-18rem)] overflow-y-auto">
+                            <table className="w-full text-left text-sm min-w-[700px]">
+                                <thead className="sticky top-0 z-10 bg-surface-100 dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700">
+                                    <tr>
+                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Reference</th>
+                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Customer</th>
+                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Slot</th>
+                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Status</th>
+                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Paid</th>
+                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Total</th>
+                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {orders.map((order) => {
+                                        const status = typeof order.status === 'string' ? order.status : order.status?.value ?? 'received';
+                                        const isPaid = (typeof order.payment_status === 'string' ? order.payment_status : order.payment_status?.value ?? 'unpaid') === 'paid';
+                                        const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
+                                        return (
+                                            <tr
+                                                key={order.id}
+                                                className={`border-b border-surface-200 dark:border-surface-700 hover:bg-surface-50/50 dark:hover:bg-surface-800/30 transition-colors ${isHighlight ? 'ring-2 ring-primary-500 ring-inset' : ''}`}
+                                            >
+                                                <td className="py-2.5 px-3 font-mono text-xs font-medium text-surface-600 dark:text-surface-400 tabular-nums">
+                                                    #{order.reference ?? order.id}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-sm text-surface-800 dark:text-surface-200">
+                                                    {order.customer_name ?? 'Walk-in'}
+                                                </td>
+                                                <td className="py-2.5 px-3 text-xs text-surface-600 dark:text-surface-400">
+                                                    {order.pickup_slot ?? '—'}
+                                                </td>
+                                                <td className="py-2.5 px-3 whitespace-nowrap">
+                                                    <span className="px-2 py-0.5 rounded-full bg-surface-200 dark:bg-surface-600 text-surface-700 dark:text-surface-300 text-xs font-semibold capitalize">
+                                                        {status.replace('_', ' ')}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2.5 px-3 whitespace-nowrap">
+                                                    <span className={`text-xs font-semibold ${isPaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                                                        {isPaid ? 'Paid' : 'Unpaid'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-2.5 px-3 font-bold text-sm tabular-nums text-primary-600 dark:text-primary-400">
+                                                    ₱{Number(order.total).toFixed(2)}
+                                                </td>
+                                                <td className="py-2.5 px-3 whitespace-nowrap">
+                                                    <Link
+                                                        href={`/portal/orders?highlight=${order.id}`}
+                                                        className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline"
+                                                    >
+                                                        Go to Orders
+                                                    </Link>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-xs text-surface-500 dark:text-surface-400">
+                            {orders.length} order{orders.length !== 1 ? 's' : ''}
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-col min-h-0 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/30 dark:bg-surface-800/30 overflow-hidden">
+                        <div className="flex-1 min-h-0 overflow-y-auto max-h-[calc(100vh-18rem)] p-3">
+                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {orders.map((order) => {
+                                    const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
+                                    return (
+                                        <div key={order.id} ref={isHighlight ? highlightRef : null} className={isHighlight ? 'ring-2 ring-primary-500 ring-offset-2 rounded-2xl' : ''}>
+                                            <PickupOrderCard order={order} pickupSlots={pickupSlots} slotToOrder={slotToOrder} isHighlighted={isHighlight} />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        <div className="shrink-0 px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-800/80 text-xs text-surface-500 dark:text-surface-400">
+                            {orders.length} order{orders.length !== 1 ? 's' : ''}
+                        </div>
+                    </div>
+                )}
             </section>
 
             <ManageSlotsDialog pickupSlotsList={pickupSlotsList} open={manageOpen} onOpenChange={setManageOpen} />

@@ -1,7 +1,11 @@
 import './bootstrap';
 
-import { createInertiaApp } from '@inertiajs/react';
+import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
+
+if (typeof window !== 'undefined') {
+    window.__inertia_router = router;
+}
 
 const pages = import.meta.glob('./Pages/**/*.jsx');
 

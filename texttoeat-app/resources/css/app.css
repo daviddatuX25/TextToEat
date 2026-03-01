@@ -75,6 +75,11 @@
         0%, 100% { box-shadow: 0 0 0 3px var(--color-primary-400), 0 0 0 6px var(--color-primary-200); }
         50% { box-shadow: 0 0 0 6px var(--color-primary-500), 0 0 0 12px var(--color-primary-300); }
     }
+
+    @keyframes proceedBlink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.88; }
+    }
 }
 
 /* Base custom utilities */
@@ -106,6 +111,10 @@
 
     .highlight-ring {
         animation: highlightRing 1.5s ease-in-out infinite;
+    }
+
+    .proceed-blink {
+        animation: proceedBlink 2s ease-in-out infinite;
     }
 }
 

@@ -4,8 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
-use App\Events\OrderUpdated;
 use App\Enums\PaymentStatus;
+use App\Events\OrderUpdated;
 use App\Models\DeliveryArea;
 use App\Models\DiningMarker;
 use App\Models\MenuItem;
@@ -15,6 +15,8 @@ use App\Models\PickupSlot;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -72,52 +74,62 @@ class QuickOrdersController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'customer_name' => ['nullable', 'string', 'max:255'],
-            'customer_phone' => ['nullable', 'string', 'max:64'],
-            'fulfillment' => ['required', 'string', 'in:walkin,pickup,delivery'],
-            'walkin_type' => ['nullable', 'string', 'in:dine_in,takeout'],
+            'customer_name' => [Rule::requiredIf(!$request->boolean('is_walkin')), 'nullable', 'string', 'max:255'],
+            'is_walkin' => ['sometimes', 'boolean'],
+            'customer_phone' => ['nullable', 'string', 'max:50'],
+            'delivery_type' => ['required', 'string', 'in:pickup,delivery'],
             'delivery_place' => ['nullable', 'string', 'max:255'],
             'delivery_fee' => ['nullable', 'numeric', 'min:0'],
-            'pickup_slot' => ['nullable', 'string', 'max:64'],
+            'pickup_slot' => ['nullable', 'string', 'max:255'],
             'order_marker' => ['nullable', 'string', 'max:64'],
-            'items' => ['required', 'array'],
+            'items' => ['required', 'array', 'min:1'],
             'items.*.menu_item_id' => ['required', 'integer', 'exists:menu_items,id'],
-            'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'items.*.name' => ['required', 'string'],
+            'items.*.name' => ['required', 'string', 'max:255'],
             'items.*.price' => ['required', 'numeric', 'min:0'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        $deliveryType = $validated['fulfillment'] === 'delivery' ? 'delivery' : 'pickup';
+        $items = $validated['items'];
         $total = 0;
-        foreach ($validated['items'] as $line) {
+        foreach ($items as $line) {
             $total += (float) $line['price'] * (int) $line['quantity'];
         }
         $total = round($total, 2);
 
-        $customerName = trim((string) ($validated['customer_name'] ?? ''));
-        $walkinType = $validated['walkin_type'] ?? null;
-        $pickupSlot = $walkinType === 'dine_in' ? null : ($validated['pickup_slot'] ?? null);
-        $orderMarker = $walkinType === 'takeout' ? null : ($validated['order_marker'] ?? null);
+        $deliveryType = $validated['delivery_type'];
+        $deliveryPlace = $deliveryType === 'delivery' ? ($validated['delivery_place'] ?? null) : null;
+        $deliveryFee = array_key_exists('delivery_fee', $validated) && $validated['delivery_fee'] !== null && $validated['delivery_fee'] !== ''
+            ? (float) $validated['delivery_fee']
+            : ($deliveryPlace === 'Other (paid on delivery)' ? null : 0);
+        $pickupSlot = $deliveryType === 'pickup' ? ($validated['pickup_slot'] ?? null) : null;
+        $orderMarker = $validated['order_marker'] ?? null;
+        $customerPhone = isset($validated['customer_phone']) ? (string) $validated['customer_phone'] : '';
+        $customerName = trim((string) ($validated['customer_name'] ?? '')) ?: 'Walk-in';
+
+        $reference = null;
+        do {
+            $reference = strtoupper(Str::random(7));
+        } while (Order::where('reference', $reference)->exists());
 
         $order = Order::create([
-            'reference' => 'Q' . strtoupper(substr(uniqid(), -6)),
+            'reference' => $reference,
             'channel' => OrderChannel::WalkIn,
-            'status' => OrderStatus::Confirmed,
+            'status' => OrderStatus::Received,
             'payment_status' => PaymentStatus::Unpaid,
             'customer_name' => $customerName,
-            'customer_phone' => $validated['customer_phone'] ?? null,
+            'customer_phone' => $customerPhone,
             'total' => $total,
             'delivery_type' => $deliveryType,
-            'delivery_place' => $validated['delivery_place'] ?? null,
-            'delivery_fee' => isset($validated['delivery_fee']) ? (float) $validated['delivery_fee'] : null,
-            'pickup_slot' => $pickupSlot,
-            'order_marker' => $orderMarker,
+            'delivery_place' => $deliveryPlace,
+            'delivery_fee' => $deliveryFee,
+            'pickup_slot' => $pickupSlot === '' ? null : $pickupSlot,
+            'order_marker' => $orderMarker === '' ? null : $orderMarker,
         ]);
 
-        foreach ($validated['items'] as $line) {
+        foreach ($items as $line) {
             OrderItem::create([
                 'order_id' => $order->id,
-                'menu_item_id' => $line['menu_item_id'],
+                'menu_item_id' => (int) $line['menu_item_id'],
                 'name' => $line['name'],
                 'quantity' => (int) $line['quantity'],
                 'price' => (float) $line['price'],
@@ -126,6 +138,6 @@ class QuickOrdersController extends Controller
 
         event(new OrderUpdated($order));
 
-        return redirect()->route('portal.orders')->with('success', 'Order created.');
+        return redirect()->route('portal.orders')->with('success', 'Order ' . $reference . ' created.');
     }
 }

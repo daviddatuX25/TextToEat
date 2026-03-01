@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { ShoppingBag, Truck, Package, Footprints, PlusCircle, Utensils } from 'lucide-react';
+import { ListOrdered, Truck, Store, UtensilsCrossed, Zap, BookOpen } from 'lucide-react';
 import PortalLayout from '../Layouts/PortalLayout';
 import { Card, CardContent, CardHeader, SectionHeading, StatCard } from '../components/ui';
 import ChannelPerformanceChart from '../components/dashboard/ChannelPerformanceChart';
@@ -108,7 +108,7 @@ export default function Dashboard({ metrics = {} }) {
                             <div className="h-full rounded-2xl border border-primary-500/70 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-primary-50/60 dark:border-primary-500/60 dark:bg-surface-900/40 dark:hover:bg-primary-500/10">
                                 <div className="flex flex-col gap-3 p-4">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-600 dark:text-primary-400">
-                                        <ShoppingBag className="h-5 w-5" aria-hidden="true" />
+                                        <ListOrdered className="h-5 w-5" aria-hidden="true" />
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
@@ -148,7 +148,7 @@ export default function Dashboard({ metrics = {} }) {
                             <div className="h-full rounded-2xl border border-amber-500/70 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-amber-50/60 dark:border-amber-500/60 dark:bg-surface-900/40 dark:hover:bg-amber-500/10">
                                 <div className="flex flex-col gap-3 p-4">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                        <Package className="h-5 w-5" aria-hidden="true" />
+                                        <Store className="h-5 w-5" aria-hidden="true" />
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
@@ -168,7 +168,7 @@ export default function Dashboard({ metrics = {} }) {
                             <div className="h-full rounded-2xl border border-violet-500/70 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-violet-50/60 dark:border-violet-500/60 dark:bg-surface-900/40 dark:hover:bg-violet-500/10">
                                 <div className="flex flex-col gap-3 p-4">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                                        <Footprints className="h-5 w-5" aria-hidden="true" />
+                                        <UtensilsCrossed className="h-5 w-5" aria-hidden="true" />
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
@@ -188,7 +188,7 @@ export default function Dashboard({ metrics = {} }) {
                             <div className="h-full rounded-2xl border border-emerald-500/70 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-emerald-50/60 dark:border-emerald-500/60 dark:bg-surface-900/40 dark:hover:bg-emerald-500/10">
                                 <div className="flex flex-col gap-3 p-4">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                        <PlusCircle className="h-5 w-5" aria-hidden="true" />
+                                        <Zap className="h-5 w-5" aria-hidden="true" />
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
@@ -208,7 +208,7 @@ export default function Dashboard({ metrics = {} }) {
                             <div className="h-full rounded-2xl border border-surface-300 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-surface-100 dark:border-surface-600 dark:bg-surface-900/40 dark:hover:bg-surface-800">
                                 <div className="flex flex-col gap-3 p-4">
                                     <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-surface-200 text-surface-700 dark:bg-surface-800 dark:text-surface-200">
-                                        <Utensils className="h-5 w-5" aria-hidden="true" />
+                                        <BookOpen className="h-5 w-5" aria-hidden="true" />
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">

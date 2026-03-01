@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
+import { Filter, ChevronDown } from 'lucide-react';
+
+const filterLabelClass = 'block text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1.5';
+const filterInputClass =
+    'w-full rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-sm text-surface-800 dark:text-surface-200 px-3 py-2 focus:ring-2 focus:ring-primary-500 focus:border-transparent';
 
 /**
  * Shared advanced filter panel for logs pages (orders, chatbot).
+ * Styled to match Completed Orders filter panel (collapsible Filters button + same inputs/dropdowns).
  *
  * Props:
  * - context: 'orders' | 'chatbot'
@@ -118,182 +124,195 @@ export function LogFilterPanel({
             : 'Customer name';
 
     return (
-        <section className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 p-4 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400">
-                    <span className="font-semibold">Filters</span>
+        <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+                <button
+                    type="button"
+                    onClick={() => setOpen((v) => !v)}
+                    className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                        activeFilterCount > 0
+                            ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300'
+                            : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700'
+                    }`}
+                >
+                    <Filter className="h-4 w-4" />
+                    Filters
                     {activeFilterCount > 0 && (
-                        <span className="inline-flex items-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300 px-2 py-0.5 text-[11px] font-semibold">
-                            {activeFilterCount} active
+                        <span className="rounded-full bg-primary-600 text-white text-xs font-bold min-w-[1.25rem] h-5 flex items-center justify-center px-1">
+                            {activeFilterCount}
                         </span>
                     )}
-                </div>
-                <div className="flex items-center gap-2">
-                    {activeFilterCount > 0 && (
-                        <button
-                            type="button"
-                            onClick={handleReset}
-                            className="text-xs font-medium text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200"
-                        >
-                            Reset
-                        </button>
-                    )}
+                    <ChevronDown className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+                </button>
+                {activeFilterCount > 0 && (
                     <button
                         type="button"
-                        onClick={() => setOpen((v) => !v)}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-surface-300 dark:border-surface-700 bg-surface-0/80 dark:bg-surface-800/80 px-3 py-1.5 text-xs font-semibold text-surface-700 dark:text-surface-100 hover:bg-surface-100 dark:hover:bg-surface-700"
+                        onClick={handleReset}
+                        className="inline-flex items-center gap-1.5 text-sm text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
                     >
-                        <span>{open ? 'Hide filters' : 'Show filters'}</span>
+                        Clear filters
                     </button>
-                </div>
+                )}
             </div>
 
             {open && (
-                <form className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-xs" onSubmit={handleApply}>
-                    <div className="space-y-1">
-                        <label className="block font-semibold text-surface-600 dark:text-surface-300">Date from</label>
-                        <input
-                            type="date"
-                            name="date_from"
-                            value={local.date_from ?? ''}
-                            onChange={handleChange}
-                            className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-2 py-1.5 text-xs text-surface-900 dark:text-surface-100"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="block font-semibold text-surface-600 dark:text-surface-300">Date to</label>
-                        <input
-                            type="date"
-                            name="date_to"
-                            value={local.date_to ?? ''}
-                            onChange={handleChange}
-                            className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-2 py-1.5 text-xs text-surface-900 dark:text-surface-100"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="block font-semibold text-surface-600 dark:text-surface-300">{customerLabel}</label>
-                        <input
-                            type="text"
-                            name="customer"
-                            value={local.customer ?? ''}
-                            onChange={handleChange}
-                            placeholder={customerLabel}
-                            className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-2 py-1.5 text-xs text-surface-900 dark:text-surface-100"
-                        />
-                    </div>
-
-                    {context === 'orders' && (
-                        <div className="space-y-1">
-                            <label className="block font-semibold text-surface-600 dark:text-surface-300">Order reference</label>
-                            <input
-                                type="text"
-                                name="order_reference"
-                                value={local.order_reference ?? ''}
-                                onChange={handleChange}
-                                placeholder="Order reference"
-                                className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-2 py-1.5 text-xs text-surface-900 dark:text-surface-100"
-                            />
-                        </div>
-                    )}
-
-                    {statusOptions.length > 0 && (
-                        <div className="space-y-1">
-                            <span className="block font-semibold text-surface-600 dark:text-surface-300">Status</span>
-                            <div className="flex flex-wrap gap-2">
-                                {statusOptions.map((opt) => (
-                                    <label key={opt.value} className="inline-flex items-center gap-1.5">
-                                        <input
-                                            type="checkbox"
-                                            name="status"
-                                            value={opt.value}
-                                            checked={Array.isArray(local.status) && local.status.includes(opt.value)}
-                                            onChange={handleCheckboxChange}
-                                            className="h-3 w-3 rounded border-surface-300 dark:border-surface-600"
-                                        />
-                                        <span className="text-[11px] text-surface-600 dark:text-surface-300">
-                                            {opt.label}
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {channelOptions.length > 0 && (
-                        <div className="space-y-1">
-                            <span className="block font-semibold text-surface-600 dark:text-surface-300">Channel</span>
-                            <div className="flex flex-wrap gap-2">
-                                {channelOptions.map((opt) => (
-                                    <label key={opt.value} className="inline-flex items-center gap-1.5">
-                                        <input
-                                            type="checkbox"
-                                            name="channel"
-                                            value={opt.value}
-                                            checked={Array.isArray(local.channel) && local.channel.includes(opt.value)}
-                                            onChange={handleCheckboxChange}
-                                            className="h-3 w-3 rounded border-surface-300 dark:border-surface-600"
-                                        />
-                                        <span className="text-[11px] text-surface-600 dark:text-surface-300">
-                                            {opt.label}
-                                        </span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {showStaff && staffOptions.length > 0 && (
-                        <div className="space-y-1">
-                            <label className="block font-semibold text-surface-600 dark:text-surface-300">Staff</label>
-                            <select
-                                name="staff_id"
-                                value={local.staff_id ?? ''}
-                                onChange={handleChange}
-                                className="w-full rounded-lg border border-surface-300 dark:border-surface-700 bg-surface-0 dark:bg-surface-900 px-2 py-1.5 text-xs text-surface-900 dark:text-surface-100"
-                            >
-                                <option value="">Any</option>
-                                {staffOptions.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {showHasHumanTakeover && (
-                        <div className="space-y-1">
-                            <span className="block font-semibold text-surface-600 dark:text-surface-300">Human takeover</span>
-                            <label className="inline-flex items-center gap-1.5 text-xs text-surface-600 dark:text-surface-300">
+                <div className="rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-800/50 p-4 space-y-4">
+                    <form className="space-y-4" onSubmit={handleApply}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div>
+                                <label htmlFor="log-filter-date-from" className={filterLabelClass}>
+                                    Date from
+                                </label>
                                 <input
-                                    type="checkbox"
-                                    checked={Boolean(local.has_human_takeover)}
-                                    onChange={handleBooleanChange}
-                                    className="h-3 w-3 rounded border-surface-300 dark:border-surface-600"
+                                    id="log-filter-date-from"
+                                    type="date"
+                                    name="date_from"
+                                    value={local.date_from ?? ''}
+                                    onChange={handleChange}
+                                    className={filterInputClass}
                                 />
-                                <span>Show only sessions with human takeover</span>
-                            </label>
-                        </div>
-                    )}
+                            </div>
+                            <div>
+                                <label htmlFor="log-filter-date-to" className={filterLabelClass}>
+                                    Date to
+                                </label>
+                                <input
+                                    id="log-filter-date-to"
+                                    type="date"
+                                    name="date_to"
+                                    value={local.date_to ?? ''}
+                                    onChange={handleChange}
+                                    className={filterInputClass}
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="log-filter-customer" className={filterLabelClass}>
+                                    {customerLabel}
+                                </label>
+                                <input
+                                    id="log-filter-customer"
+                                    type="text"
+                                    name="customer"
+                                    value={local.customer ?? ''}
+                                    onChange={handleChange}
+                                    placeholder={customerLabel}
+                                    className={filterInputClass}
+                                />
+                            </div>
 
-                    <div className="md:col-span-2 lg:col-span-3 flex justify-end gap-2 pt-2">
-                        <button
-                            type="button"
-                            onClick={handleReset}
-                            className="inline-flex items-center rounded-lg border border-surface-300 dark:border-surface-700 px-3 py-1.5 text-xs font-semibold text-surface-700 dark:text-surface-100 hover:bg-surface-100 dark:hover:bg-surface-800"
-                        >
-                            Clear all
-                        </button>
-                        <button
-                            type="submit"
-                            className="inline-flex items-center rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700"
-                        >
-                            Apply filters
-                        </button>
-                    </div>
-                </form>
+                            {context === 'orders' && (
+                                <div>
+                                    <label htmlFor="log-filter-order-ref" className={filterLabelClass}>
+                                        Order reference
+                                    </label>
+                                    <input
+                                        id="log-filter-order-ref"
+                                        type="text"
+                                        name="order_reference"
+                                        value={local.order_reference ?? ''}
+                                        onChange={handleChange}
+                                        placeholder="Order reference"
+                                        className={filterInputClass}
+                                    />
+                                </div>
+                            )}
+
+                            {showStaff && staffOptions.length > 0 && (
+                                <div>
+                                    <label htmlFor="log-filter-staff" className={filterLabelClass}>
+                                        Staff
+                                    </label>
+                                    <select
+                                        id="log-filter-staff"
+                                        name="staff_id"
+                                        value={local.staff_id ?? ''}
+                                        onChange={handleChange}
+                                        className={filterInputClass}
+                                    >
+                                        <option value="">Any</option>
+                                        {staffOptions.map((opt) => (
+                                            <option key={opt.value} value={opt.value}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap items-end gap-4">
+                            {statusOptions.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-xs font-semibold text-surface-600 dark:text-surface-400">Status</span>
+                                    {statusOptions.map((opt) => (
+                                        <label key={opt.value} className="inline-flex items-center gap-1.5 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="status"
+                                                value={opt.value}
+                                                checked={Array.isArray(local.status) && local.status.includes(opt.value)}
+                                                onChange={handleCheckboxChange}
+                                                className="rounded border-surface-300 text-primary-600 focus:ring-primary-500"
+                                            />
+                                            <span className="text-sm text-surface-700 dark:text-surface-300">{opt.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+
+                            {channelOptions.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-xs font-semibold text-surface-600 dark:text-surface-400">Channel</span>
+                                    {channelOptions.map((opt) => (
+                                        <label key={opt.value} className="inline-flex items-center gap-1.5 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                name="channel"
+                                                value={opt.value}
+                                                checked={Array.isArray(local.channel) && local.channel.includes(opt.value)}
+                                                onChange={handleCheckboxChange}
+                                                className="rounded border-surface-300 text-primary-600 focus:ring-primary-500"
+                                            />
+                                            <span className="text-sm text-surface-700 dark:text-surface-300">{opt.label}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+
+                            {showHasHumanTakeover && (
+                                <label className="inline-flex items-center gap-1.5 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={Boolean(local.has_human_takeover)}
+                                        onChange={handleBooleanChange}
+                                        className="rounded border-surface-300 text-primary-600 focus:ring-primary-500"
+                                    />
+                                    <span className="text-sm text-surface-700 dark:text-surface-300">
+                                        Show only sessions with human takeover
+                                    </span>
+                                </label>
+                            )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 pt-2 border-t border-surface-200 dark:border-surface-700">
+                            <button
+                                type="submit"
+                                className="inline-flex items-center gap-2 rounded-lg bg-primary-600 text-white text-sm font-semibold px-4 py-2 hover:bg-primary-700 transition-colors"
+                            >
+                                Apply filters
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleReset}
+                                className="inline-flex items-center rounded-lg border border-surface-200 dark:border-surface-600 text-surface-700 dark:text-surface-300 text-sm font-medium px-4 py-2 hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
+                            >
+                                Clear all
+                            </button>
+                        </div>
+                    </form>
+                </div>
             )}
-        </section>
+        </div>
     );
 }
 
