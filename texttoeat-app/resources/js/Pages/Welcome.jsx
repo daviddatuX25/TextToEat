@@ -29,6 +29,15 @@ export default function Welcome() {
                         Track your order
                     </Link>
                 </div>
+                <p className="text-sm text-surface-500 dark:text-surface-500">
+                    Staff?{' '}
+                    <Link
+                        href="/login"
+                        className="font-medium text-primary-600 dark:text-primary-500 hover:underline"
+                    >
+                        Log in to portal
+                    </Link>
+                </p>
             </section>
         </AppLayout>
     );

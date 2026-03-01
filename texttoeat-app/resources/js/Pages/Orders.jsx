@@ -2,10 +2,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Link } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
 import { OrderListRow } from '../components/staff/OrderListRow';
-import { CreateOrderForm } from '../components/staff/CreateOrderForm';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
 import { usePortalOrdersLive } from '../hooks/usePortalOrdersLive';
-import { LayoutGrid, PanelLeft, StickyNote, ChefHat, UtensilsCrossed, X, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { LayoutGrid, List, StickyNote, ChefHat, UtensilsCrossed, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 const ORDERS_VIEW_MODE_KEY = 'ordersViewMode';
 const SECTIONS = [
@@ -24,9 +22,9 @@ function OrdersSection({ section, list, activeHighlight, isCompact = false }) {
     const Icon = SECTION_ICONS[section.iconKey];
     return (
         <div
-            className={`flex flex-col min-h-0 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/50 dark:bg-surface-800/30 overflow-hidden ${isCompact ? 'min-h-[120px]' : 'min-h-[200px] max-h-[calc(100vh-11rem)]'}`}
+            className={`flex flex-col min-h-0 rounded-xl border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800/50 shadow-sm overflow-hidden ${isCompact ? 'min-h-[120px]' : 'min-h-[200px] max-h-[calc(100vh-11rem)]'}`}
         >
-            <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-surface-200/50 dark:border-surface-700/50 bg-white/80 dark:bg-surface-800/80 shrink-0">
+            <div className="flex items-center justify-between gap-2 px-4 py-3 border-b-2 border-surface-200 dark:border-surface-600 bg-surface-50/80 dark:bg-surface-800/80 shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
                     {Icon && <Icon className="h-4 w-4 shrink-0 text-surface-500 dark:text-surface-400" aria-hidden />}
                     <div className="min-w-0">
@@ -39,7 +37,7 @@ function OrdersSection({ section, list, activeHighlight, isCompact = false }) {
                 </span>
             </div>
             <div
-                className={`flex flex-col gap-2 flex-1 overflow-y-auto p-2 ${isCompact ? '' : 'min-h-0'}`}
+                className={`flex flex-col gap-2 flex-1 overflow-y-auto p-3 ${isCompact ? '' : 'min-h-0'}`}
                 data-scroll-container="1"
             >
                 {list.map((order) => {
@@ -81,10 +79,6 @@ export default function Orders({
     diningMarkersUnavailable = [],
     highlight,
 }) {
-    const [createOpen, setCreateOpen] = useState(() => {
-        if (typeof window === 'undefined') return false;
-        return new URLSearchParams(window.location.search).get('create') === '1';
-    });
     const [viewMode, setViewMode] = useState(() => {
         if (typeof window === 'undefined') return 'columns';
         return window.localStorage?.getItem(ORDERS_VIEW_MODE_KEY) || 'columns';
@@ -247,17 +241,16 @@ export default function Orders({
                                         : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
                                 }`}
                             >
-                                <PanelLeft className="h-4 w-4" />
+                                <List className="h-4 w-4" />
                             </button>
                         </div>
-                        <button
-                            type="button"
-                            onClick={() => setCreateOpen(true)}
+                        <Link
+                            href="/portal/quick-orders"
                             className="inline-flex items-center gap-1.5 bg-primary-600 text-white text-sm font-semibold py-2 px-3.5 rounded-lg hover:bg-primary-700 transition-colors"
                         >
                             <Plus className="h-4 w-4" />
                             New order
-                        </button>
+                        </Link>
                     </div>
                 </header>
 
@@ -266,16 +259,16 @@ export default function Orders({
                         <StickyNote className="h-10 w-10 text-surface-300 dark:text-surface-600 mb-3" />
                         <h3 className="text-base font-semibold text-surface-700 dark:text-surface-300">No orders yet</h3>
                         <p className="text-surface-500 text-sm mt-1">Create an order or wait for new ones to arrive.</p>
-                        <button
-                            type="button"
-                            onClick={() => setCreateOpen(true)}
-                            className="mt-4 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                        <Link
+                            href="/portal/quick-orders"
+                            className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 dark:text-primary-400 hover:underline"
                         >
+                            <Plus className="h-4 w-4" />
                             Create order
-                        </button>
+                        </Link>
                     </div>
                 ) : effectiveViewMode === 'columns' ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6">
                         {SECTIONS.map((section) => (
                             <OrdersSection
                                 key={section.key}
@@ -326,29 +319,6 @@ export default function Orders({
                     </div>
                 )}
             </section>
-
-            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader className="relative pr-8">
-                        <DialogTitle>Create order</DialogTitle>
-                        <button
-                            type="button"
-                            onClick={() => setCreateOpen(false)}
-                            className="absolute right-0 top-0 rounded-lg p-1.5 text-surface-500 hover:text-surface-700 hover:bg-surface-100 dark:hover:bg-surface-800 dark:text-surface-400 dark:hover:text-surface-200"
-                            aria-label="Close"
-                        >
-                            <X className="h-5 w-5" />
-                        </button>
-                    </DialogHeader>
-                    <CreateOrderForm
-                        menuItems={menuItems}
-                        diningMarkers={diningMarkers}
-                        diningMarkersUnavailable={diningMarkersUnavailable}
-                        deliveryAreas={deliveryAreas}
-                        pickupSlots={pickupSlots}
-                    />
-                </DialogContent>
-            </Dialog>
         </PortalLayout>
     );
 }

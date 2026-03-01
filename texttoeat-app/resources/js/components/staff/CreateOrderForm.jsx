@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { router, usePage } from '@inertiajs/react';
 import { Input, Button, Card } from '../ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/Dialog';
-import { Plus, Minus, Utensils, ChevronUp } from 'lucide-react';
+import { Plus, Minus, Utensils, ChevronUp, X } from 'lucide-react';
 
 const filterLabelClass = 'block text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1.5';
 const filterSelectClass =
@@ -34,7 +34,7 @@ function CreateOrderForm({
     }, [rawErrors]);
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
-    const [fulfillment, setFulfillment] = useState('walkin'); // 'walkin' | 'pickup' | 'delivery'
+    const [fulfillment, setFulfillment] = useState('walkin');
     const [orderMarker, setOrderMarker] = useState('');
     const [pickupSlot, setPickupSlot] = useState('');
     const [deliveryPlace, setDeliveryPlace] = useState(DELIVERY_PLACES[0]?.value ?? '');
@@ -48,26 +48,6 @@ function CreateOrderForm({
     useEffect(() => {
         if (standalonePage) setMounted(true);
     }, [standalonePage]);
-
-    // #region agent log
-    useEffect(() => {
-        if (!standalonePage || !itemsGridRef.current) return;
-        const el = itemsGridRef.current;
-        const rect = el.getBoundingClientRect();
-        fetch('http://127.0.0.1:7376/ingest/6bfbe7d4-b4cf-4142-be65-9dec6fac862c', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '267e08' },
-            body: JSON.stringify({
-                sessionId: '267e08',
-                location: 'CreateOrderForm.jsx:itemsGridRef',
-                message: 'items grid rect on desktop',
-                data: { height: rect.height, width: rect.width, top: rect.top, left: rect.left },
-                hypothesisId: 'H1,H3',
-                timestamp: Date.now(),
-            }),
-        }).catch(() => {});
-    }, [standalonePage, menuItems.length]);
-    // #endregion
 
     const adjustQty = useCallback((menuItemId, delta) => {
         setCart((prev) => {
@@ -102,30 +82,6 @@ function CreateOrderForm({
         if (categoryFilter === 'All' || !categoryFilter) return menuItems || [];
         return (menuItems || []).filter((m) => m.category === categoryFilter);
     }, [menuItems, categoryFilter]);
-
-    // #region agent log
-    if (standalonePage && typeof window !== 'undefined') {
-        const gridClass = standalonePage ? 'lg:grid-cols-2 lg:max-h-0 lg:min-h-0 lg:flex-1' : 'lg:grid-cols-4 max-h-[400px]';
-        fetch('http://127.0.0.1:7376/ingest/6bfbe7d4-b4cf-4142-be65-9dec6fac862c', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '267e08' },
-            body: JSON.stringify({
-                sessionId: '267e08',
-                location: 'CreateOrderForm.jsx:render',
-                message: 'create-order desktop data and grid class',
-                data: {
-                    standalonePage,
-                    menuItemsLength: (menuItems || []).length,
-                    filteredItemsLength: filteredItems.length,
-                    gridClassIncludesMaxH0: gridClass.includes('max-h-0'),
-                    innerWidth: window.innerWidth,
-                },
-                hypothesisId: 'H1,H2,H5',
-                timestamp: Date.now(),
-            }),
-        }).catch(() => {});
-    }
-    // #endregion
 
     const total = cart.reduce((sum, line) => sum + Number(line.price) * Number(line.quantity), 0);
     const nameRequired = fulfillment !== 'walkin';
@@ -376,7 +332,7 @@ function CreateOrderForm({
                 {fulfillment === 'walkin' && (
                     <div className="mt-4">
                         <p className={filterLabelClass}>Dining marker (optional)</p>
-                        <div className="overflow-x-auto pb-2 -mx-1">
+                        <div className="pb-2 -mx-1 max-h-[160px] overflow-y-auto">
                             <div className="p-1 flex flex-wrap gap-2">
                                 {(diningMarkers || []).map((m) => {
                                     const taken = markerTaken(m.value);
@@ -474,7 +430,7 @@ function CreateOrderForm({
                     </div>
                 </form>
 
-                {/* Mobile: fixed bottom bar (portaled to body so it stays fixed to viewport) */}
+                {/* Mobile: fixed bottom bar */}
                 {standalonePage &&
                     mounted &&
                     typeof document !== 'undefined' &&
@@ -505,21 +461,45 @@ function CreateOrderForm({
                     )}
                 <div className="h-24 lg:hidden flex-shrink-0" aria-hidden />
 
+                {/* ─── Mobile bottom sheet ─── */}
                 <Dialog open={mobileFormOpen} onOpenChange={setMobileFormOpen}>
                     <DialogContent
-                        className="fixed bottom-0 left-0 right-0 top-auto translate-y-0 translate-x-0 max-h-[90vh] rounded-t-2xl rounded-b-none border-b-0 sm:max-w-none w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom"
+                        className="fixed bottom-0 left-0 right-0 top-auto translate-y-0 translate-x-0 max-h-[75vh] rounded-t-3xl rounded-b-none border-b-0 sm:max-w-none w-full data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom pb-[env(safe-area-inset-bottom)]"
                         onPointerDownOutside={(e) => e.target === e.currentTarget && setMobileFormOpen(false)}
                     >
-                        <div className="flex flex-col gap-2 pb-4">
-                            <div className="w-10 h-1 rounded-full bg-surface-300 dark:bg-surface-600 mx-auto shrink-0" aria-hidden />
-                            <DialogHeader>
-                                <DialogTitle className="text-center">Customer &amp; fulfillment</DialogTitle>
-                            </DialogHeader>
-                        </div>
-                        <div className="overflow-y-auto flex-1 min-h-0 -mx-6 px-6">
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                {formSection}
-                            </form>
+                        <div className="flex flex-col flex-1 min-h-0">
+                            {/* Sheet header */}
+                            <div className="shrink-0 pt-3 pb-4">
+                                {/* Drag handle */}
+                                <div className="w-10 h-1.5 rounded-full bg-surface-300 dark:bg-surface-600 mx-auto mb-4" aria-hidden />
+
+                                {/* Title row with close button */}
+                                <div className="flex items-center justify-between px-6">
+                                    <DialogHeader className="p-0">
+                                        <DialogTitle className="text-base font-semibold text-surface-900 dark:text-surface-100">
+                                            Customer &amp; fulfillment
+                                        </DialogTitle>
+                                    </DialogHeader>
+
+                                    {/* Pill-style close button */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setMobileFormOpen(false)}
+                                        className="flex items-center gap-1.5 rounded-full bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 pl-2.5 pr-3 py-1.5 text-xs font-medium text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-700 hover:text-surface-900 dark:hover:text-surface-100 transition-colors touch-manipulation"
+                                        aria-label="Close"
+                                    >
+                                        <X className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden />
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Scrollable form body */}
+                            <div className="overflow-y-auto flex-1 min-h-0 px-6 pb-6 overscroll-contain">
+                                <form onSubmit={handleSubmit} className="space-y-6">
+                                    {formSection}
+                                </form>
+                            </div>
                         </div>
                     </DialogContent>
                 </Dialog>

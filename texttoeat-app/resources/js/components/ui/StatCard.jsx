@@ -1,7 +1,17 @@
 import { clsx } from 'clsx';
 import { Card } from './Card';
 
-export function StatCard({ label, value, helperText, tone = 'default', className, ...props }) {
+export function StatCard({
+    label,
+    value,
+    helperText,
+    subValue,
+    trend,
+    trendUpIsGood = true,
+    tone = 'default',
+    className,
+    ...props
+}) {
     const toneClasses = {
         default: 'border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40',
         primary: 'border-primary-200 bg-primary-50/60 dark:border-primary-500/40 dark:bg-primary-500/10',
@@ -10,6 +20,8 @@ export function StatCard({ label, value, helperText, tone = 'default', className
     };
 
     const toneClassName = toneClasses[tone] ?? toneClasses.default;
+    const trendPositive = trend != null && trend !== '' && (trendUpIsGood ? Number(trend) > 0 : Number(trend) < 0);
+    const trendNegative = trend != null && trend !== '' && (trendUpIsGood ? Number(trend) < 0 : Number(trend) > 0);
 
     return (
         <Card
@@ -29,6 +41,23 @@ export function StatCard({ label, value, helperText, tone = 'default', className
                 <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-surface-900 dark:text-white">
                     {value}
                 </p>
+                {subValue != null && subValue !== '' && (
+                    <p className="text-sm font-medium text-surface-600 dark:text-surface-300">
+                        {subValue}
+                    </p>
+                )}
+                {trend != null && trend !== '' && (
+                    <p
+                        className={clsx(
+                            'text-xs font-medium',
+                            trendPositive && 'text-emerald-600 dark:text-emerald-400',
+                            trendNegative && 'text-rose-600 dark:text-rose-400',
+                            !trendPositive && !trendNegative && 'text-surface-500 dark:text-surface-400'
+                        )}
+                    >
+                        {typeof trend === 'string' ? trend : `${Number(trend) > 0 ? '+' : ''}${trend}%`}
+                    </p>
+                )}
             </div>
             {helperText && (
                 <p className="mt-2 text-xs text-surface-500 dark:text-surface-400">

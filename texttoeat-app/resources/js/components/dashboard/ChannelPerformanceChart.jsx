@@ -1,4 +1,14 @@
-import { ResponsiveContainer, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar } from 'recharts';
+import {
+    ResponsiveContainer,
+    ComposedChart,
+    CartesianGrid,
+    XAxis,
+    YAxis,
+    Tooltip,
+    Legend,
+    Bar,
+    Line,
+} from 'recharts';
 
 export default function ChannelPerformanceChart({ data, formatCurrency }) {
     const hasData = Array.isArray(data) && data.length > 0;
@@ -11,12 +21,6 @@ export default function ChannelPerformanceChart({ data, formatCurrency }) {
         );
     }
 
-    const chartData = data.map((row) => ({
-        channel: row.channel || 'Unknown',
-        orders_today: Number(row.orders_today ?? 0),
-        revenue_today: Number(row.revenue_today ?? 0),
-    }));
-
     const safeFormatCurrency =
         typeof formatCurrency === 'function'
             ? formatCurrency
@@ -25,10 +29,30 @@ export default function ChannelPerformanceChart({ data, formatCurrency }) {
                   return `₱${value.toFixed(2)}`;
               };
 
+    const chartData = data.map((row) => {
+        const orders = Number(row.orders_today ?? 0);
+        const completed = Number(row.completed_today ?? 0);
+        const revenue = Number(row.revenue_today ?? 0);
+        const completionPct = orders > 0 ? Math.round((completed / orders) * 100) : 0;
+        return {
+            channel: row.channel || 'Unknown',
+            orders_today: orders,
+            revenue_today: revenue,
+            completed_today: completed,
+            completion_pct: completionPct,
+        };
+    });
+
+    const maxOrders = Math.max(1, ...chartData.map((d) => d.orders_today));
+    const maxRevenue = Math.max(1, ...chartData.map((d) => d.revenue_today));
+
     return (
         <div className="h-64 w-full">
             <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+                <ComposedChart
+                    data={chartData}
+                    margin={{ top: 8, right: 48, left: 8, bottom: 8 }}
+                >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis
                         dataKey="channel"
@@ -37,22 +61,42 @@ export default function ChannelPerformanceChart({ data, formatCurrency }) {
                         tick={{ fill: '#6b7280', fontSize: 11 }}
                     />
                     <YAxis
+                        yAxisId="orders"
+                        orientation="left"
                         tickLine={false}
                         axisLine={false}
                         tick={{ fill: '#6b7280', fontSize: 11 }}
+                        domain={[0, maxOrders]}
+                        allowDecimals={false}
+                    />
+                    <YAxis
+                        yAxisId="revenue"
+                        orientation="right"
+                        tickLine={false}
+                        axisLine={false}
+                        tick={{ fill: '#6b7280', fontSize: 11 }}
+                        domain={[0, maxRevenue]}
+                        tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))}
                     />
                     <Tooltip
                         cursor={{ fill: 'rgba(148, 163, 184, 0.15)' }}
-                        formatter={(value, name) => {
-                            if (name === 'revenue_today') {
-                                return [safeFormatCurrency(value), 'Revenue today'];
-                            }
-                            if (name === 'orders_today') {
-                                return [value, 'Orders today'];
-                            }
-                            return [value, name];
+                        content={({ active, payload, label }) => {
+                            if (!active || !payload?.length || !label) return null;
+                            const d = payload[0]?.payload;
+                            if (!d) return null;
+                            return (
+                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md dark:border-slate-700 dark:bg-slate-800">
+                                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                                        {label}
+                                    </p>
+                                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                                        {d.orders_today} order{d.orders_today !== 1 ? 's' : ''} ·{' '}
+                                        {safeFormatCurrency(d.revenue_today)} revenue ·{' '}
+                                        {d.completion_pct}% completion
+                                    </p>
+                                </div>
+                            );
                         }}
-                        labelFormatter={(label) => `Channel: ${label}`}
                     />
                     <Legend
                         formatter={(value) => {
@@ -62,20 +106,23 @@ export default function ChannelPerformanceChart({ data, formatCurrency }) {
                         }}
                     />
                     <Bar
+                        yAxisId="orders"
                         dataKey="orders_today"
                         name="Orders"
                         radius={[4, 4, 0, 0]}
                         fill="#4f46e5"
                     />
-                    <Bar
+                    <Line
+                        yAxisId="revenue"
+                        type="monotone"
                         dataKey="revenue_today"
                         name="Revenue"
-                        radius={[4, 4, 0, 0]}
-                        fill="#10b981"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        dot={{ r: 4, fill: '#10b981' }}
                     />
-                </BarChart>
+                </ComposedChart>
             </ResponsiveContainer>
         </div>
     );
 }
-
