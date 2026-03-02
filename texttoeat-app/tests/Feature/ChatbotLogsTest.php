@@ -92,5 +92,36 @@ class ChatbotLogsTest extends TestCase
                 ->where('sessions.data.0.has_human_takeover', true)
             );
     }
+
+    /** @see DatabaseDialect / JSON select portability: status options come from distinct state->current_state (works on PostgreSQL and MySQL/MariaDB) */
+    public function test_it_returns_status_options_from_json_state(): void
+    {
+        $user = User::factory()->create();
+
+        ChatbotSession::create([
+            'channel' => 'sms',
+            'external_id' => 's1',
+            'language' => 'en',
+            'state' => ['current_state' => 'menu'],
+        ]);
+        ChatbotSession::create([
+            'channel' => 'sms',
+            'external_id' => 's2',
+            'language' => 'en',
+            'state' => ['current_state' => 'human_takeover'],
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get('/portal/logs/chatbot')
+            ->assertStatus(200)
+            ->assertInertia(fn ($page) => $page
+                ->component('ChatbotLogs')
+                ->has('meta.statusOptions')
+            );
+
+        $statusValues = array_column($response->original->getData()['page']['props']['meta']['statusOptions'], 'value');
+        $this->assertContains('menu', $statusValues);
+        $this->assertContains('human_takeover', $statusValues);
+    }
 }
 

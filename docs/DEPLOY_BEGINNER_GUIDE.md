@@ -50,7 +50,7 @@ We keep two branches:
 3. Open `.env.prod`. **`.env.prod.example` lists every variable** the app needs for production and for the build (app, DB, Vite, Facebook, SMS, FCM, channel mode). Fill them in one place so you don’t have to hunt later. At minimum set:
    - `APP_URL` — your live URL (e.g. `https://www.avelinalacasandile-eat.top`).
    - `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` — from your Agila MySQL (and `DB_HOST` if different).
-   - If you use **Pusher:** all `PUSHER_*` and `VITE_PUSHER_*` so the frontend build bakes them in.
+   - If you use **Pusher:** all `PUSHER_*` and **explicit** `VITE_PUSHER_*` so the frontend build bakes them in. (Avoid `VITE_PUSHER_APP_KEY="${PUSHER_APP_KEY}"` in `.env.prod` — Docker env-files do not expand `${...}` placeholders, which can cause the frontend to literally call `ws-"${pusher_app_cluster}".pusher.com`.)
    - For **Facebook Messenger:** `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `FACEBOOK_VERIFY_TOKEN`, `FACEBOOK_PAGE_ACCESS_TOKEN`.
    - For **SMS/FCM and real SIM:** `CHANNEL_MODE=prod`, `FIREBASE_CREDENTIALS` (path on server), and optionally `TEXTBEE_*`. The app generates an SMS device API key (QR on Portal → SMS devices); set `SMS_DEVICE_API_KEY` in `.env` only if you want to override it.
 
@@ -241,15 +241,38 @@ The server will only serve files inside `public`; `.env` and source code are not
 
 The app includes a folder **`php-run-scripts/`** (sibling to `app/`, `vendor/`, `.env`). Use it when you cannot run `php artisan` in a terminal.
 
-- **From the panel:** Point “Run PHP” (or equivalent) at **`php-run-scripts/run.php`** and pass the command, e.g. `run.php?cmd=key:generate` or run via CLI: `php php-run-scripts/run.php key:generate` from the app root.
-- **Allowed commands:** `key:generate`, `storage:link`, `config:cache`, `route:cache`, `migrate` (migrate gets `--force` automatically).
+- **From the panel (CLI-style):** Point “Run PHP” (or equivalent) at **`php-run-scripts/run.php`** and pass the script name as an argument, for example:
+  - `php-run-scripts/run.php initial-setup`
+  - `php-run-scripts/run.php deploy-update`
+  - `php-run-scripts/run.php reseed` (dangerous: `migrate:fresh --seed`, never in real prod)
+- **From the command line (SSH):**
+  ```bash
+  php php-run-scripts/run.php initial-setup
+  php php-run-scripts/run.php deploy-update
+  php php-run-scripts/run.php reseed
+  ```
+  Scripts are:
+  - `initial-setup` — one-time: `key:generate`, `storage:link`, `migrate --force`, `config:cache`, `route:cache`.
+  - `deploy-update` — after uploading a new build: `migrate --force`, `config:cache`, `route:cache`.
+  - `reseed` — **dev only**: `migrate:fresh --seed` (refuses to run when `APP_ENV=production`).
 
 **Security (dev vs production):**
 
 - **.env** stays in the app root (same folder as `app/`, `vendor/`, `php-run-scripts/`). That’s the “higher level” env for the app; create it on the server and never upload it.
 - **App root `.htaccess`** (the only `.htaccess` outside `public/`) denies all web access to the folder that contains `.env`, `vendor/`, and `php-run-scripts/`. With document root set to `public/`, the server never serves that folder anyway; the deny is a safety net.
-- **In production**, `run.php` also refuses to run when called via the web (e.g. from a browser); it only runs when invoked from the command line or your panel’s “Run PHP” (which often runs as CLI). So production stays strict.
-- **In dev** (`APP_ENV=local` or similar), you can run the scripts via browser (e.g. `run.php?cmd=storage:link`) if you relax the app root `.htaccess` locally; in production leave the root `.htaccess` in place (deny all).
+- **In production**, `bootstrap.php` still refuses to run helpers directly via the web (e.g. hitting `initial-setup.php` in a browser), but **`run.php` is allowed** and is guarded by a password:
+  - Set `RUN_SCRIPTS_PASSWORD` in `.env` (or use the default in `config/maintenance.php`).
+  - To trigger a script over HTTP (when you truly have no CLI/panel option), send a **POST** request to:
+    - `https://YOUR_DOMAIN/php-run-scripts/run.php`
+    with body:
+    ```json
+    {
+      "password": "YOUR_RUN_SCRIPTS_PASSWORD",
+      "script": "deploy-update"
+    }
+    ```
+  - Allowed `script` values are: `initial-setup`, `deploy-update`, `reseed` (reseed still refuses in `APP_ENV=production`).
+- **In dev** (`APP_ENV=local` or similar), the password check is skipped; you can call `run.php` from the browser if you relax the app root `.htaccess` locally. In production leave the root `.htaccess` in place (deny all) and prefer running `run.php` via panel/CLI instead of HTTP.
 
 ---
 

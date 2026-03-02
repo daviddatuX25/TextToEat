@@ -21,7 +21,7 @@ class ChatbotOrderService
 
     /**
      * Create order from session state selected_items with inventory check and idempotency.
-     * Channel must be 'sms' or 'web' (maps to OrderChannel).
+     * Channel must be 'sms', 'messenger', or 'web' (maps to OrderChannel).
      *
      * @param array<int, array{menu_item_id: int, name: string, price: float, quantity: int}> $selectedItems
      * @param array{last_order_id?: int, last_order_reference?: string, last_order_cart_fingerprint?: string} $state
@@ -46,7 +46,12 @@ class ChatbotOrderService
             }
         }
 
-        $orderChannel = $channel === 'web' ? OrderChannel::Web : OrderChannel::Sms;
+        $orderChannel = match (strtolower($channel)) {
+            'web' => OrderChannel::Web,
+            'messenger' => OrderChannel::Messenger,
+            'walkin' => OrderChannel::WalkIn,
+            default => OrderChannel::Sms,
+        };
         $menuItemIds = array_unique(array_column($selectedItems, 'menu_item_id'));
         $menuItems = MenuItem::whereIn('id', $menuItemIds)->get()->keyBy('id');
         $virtualAvailable = $this->stockService->getVirtualAvailableForToday($menuItemIds);

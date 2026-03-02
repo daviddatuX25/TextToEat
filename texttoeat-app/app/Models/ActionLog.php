@@ -2,9 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\DatabaseDialect;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 
 class ActionLog extends Model
 {
@@ -94,17 +95,16 @@ class ActionLog extends Model
             })
             ->when($customer, function (Builder $q, string $value): void {
                 $q->whereHas('order', function (Builder $orderQuery) use ($value): void {
-                    $orderQuery->where(function (Builder $subQuery) use ($value): void {
-                        $like = '%' . $value . '%';
-                        $subQuery
-                            ->where('customer_name', 'ilike', $like)
-                            ->orWhere('customer_phone', 'ilike', $like);
-                    });
+                    DatabaseDialect::addCaseInsensitiveLikeOr(
+                        $orderQuery,
+                        ['customer_name', 'customer_phone'],
+                        '%' . $value . '%'
+                    );
                 });
             })
             ->when($orderReference, function (Builder $q, string $reference): void {
                 $q->whereHas('order', function (Builder $orderQuery) use ($reference): void {
-                    $orderQuery->where('reference', 'ilike', '%' . $reference . '%');
+                    DatabaseDialect::addCaseInsensitiveLike($orderQuery, 'reference', '%' . $reference . '%');
                 });
             })
             ->when(is_array($statuses) && $statuses !== [], function (Builder $q) use ($statuses): void {

@@ -1728,4 +1728,66 @@ class ChatbotWebhookTest extends TestCase
         $response->assertStatus(200)->assertJsonPath('state.current_state', 'menu');
         $this->assertStringContainsString('Adobo', $response->json('reply'));
     }
+
+    public function test_messenger_order_stored_with_channel_messenger_and_skip_collect_name(): void
+    {
+        $psid = 'MESSENGER_PSID_999';
+        MenuItem::create([
+            'name' => 'Pancit',
+            'price' => 65.00,
+            'category' => 'main',
+            'units_today' => 10,
+            'is_sold_out' => false,
+            'menu_date' => now()->toDateString(),
+        ]);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $rDone = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'done']);
+        $rDone->assertStatus(200)->assertJsonPath('state.current_state', 'delivery_choice');
+        $this->assertStringContainsString('delivery', strtolower($rDone->json('reply')));
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'yes']);
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
+        $ref = $response->json('state.last_order_reference');
+        $this->assertNotEmpty($ref);
+        $this->assertDatabaseHas('orders', ['reference' => $ref, 'channel' => 'messenger', 'external_id' => $psid]);
+        $order = Order::where('reference', $ref)->first();
+        $this->assertNotNull($order);
+        $this->assertSame('Anonymous', $order->customer_name);
+    }
+
+    public function test_messenger_track_list_shows_recent_orders_after_order_placed(): void
+    {
+        $psid = 'MESSENGER_PSID_TRACK';
+        MenuItem::create([
+            'name' => 'Lumpia',
+            'price' => 55.00,
+            'category' => 'main',
+            'units_today' => 10,
+            'is_sold_out' => false,
+            'menu_date' => now()->toDateString(),
+        ]);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'done']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'yes']);
+        $rMenu = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '2']);
+        $rMenu->assertStatus(200)->assertJsonPath('state.current_state', 'track_choice');
+        $rList = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $rList->assertStatus(200);
+        $reply = $rList->json('reply');
+        $this->assertStringContainsString('recent orders', strtolower($reply));
+        $ref = Order::where('channel', 'messenger')->where('external_id', $psid)->value('reference');
+        $this->assertNotEmpty($ref);
+        $this->assertStringContainsString($ref, $reply);
+    }
 }

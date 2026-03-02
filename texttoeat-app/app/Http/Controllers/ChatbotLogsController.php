@@ -54,7 +54,8 @@ class ChatbotLogsController extends Controller
         });
 
         $statusValues = ChatbotSession::query()
-            ->selectRaw("distinct state->>'current_state' as value")
+            ->select('state->current_state as value')
+            ->distinct()
             ->pluck('value')
             ->filter()
             ->values();

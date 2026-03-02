@@ -47,7 +47,7 @@ class ChatbotFsm
             'language_selection' => $this->fromLanguageSelection($body, $statePayload, $menuItems, $locale),
             'main_menu' => $this->fromMainMenu($body, $statePayload, $menuItems, $locale, $externalId, $channel),
             'menu' => $this->fromMenu($body, $statePayload, $menuItems, $locale),
-            'item_selection' => $this->fromItemSelection($body, $statePayload, $menuItems, $locale),
+            'item_selection' => $this->fromItemSelection($body, $statePayload, $menuItems, $locale, $channel),
             'collect_name' => $this->fromCollectName($body, $statePayload, $menuItems, $locale),
             'delivery_choice' => $this->fromDeliveryChoice($body, $statePayload, $menuItems, $deliveryAreas, $locale),
             'confirm' => $this->fromConfirm($body, $statePayload, $menuItems, $deliveryAreas, $locale),
@@ -285,7 +285,7 @@ class ChatbotFsm
      * @param array<int, array{id: int, name: string, price: float}> $menuItems
      * @return array{string, string, array<string, mixed>}
      */
-    private function fromItemSelection(string $body, array $statePayload, array $menuItems, string $locale): array
+    private function fromItemSelection(string $body, array $statePayload, array $menuItems, string $locale, ?string $channel = null): array
     {
         $keyword = $this->keywordMatcher->match($body);
         if ($keyword === 'back') {
@@ -378,6 +378,22 @@ class ChatbotFsm
                 ];
             }
             $savedName = $statePayload['saved_customer_name'] ?? null;
+            // Messenger: skip collect_name; use saved name or Anonymous (FB name can be set on session separately).
+            if ($channel === 'messenger') {
+                $customerName = ($savedName !== null && $savedName !== '') ? $savedName : 'Anonymous';
+                $payload = [
+                    'selected_items' => $selectedItems,
+                    'customer_name' => $customerName,
+                ];
+                if ($customerName !== 'Anonymous') {
+                    $payload['saved_customer_name'] = $customerName;
+                }
+                return [
+                    'delivery_choice',
+                    __('chatbot.delivery_choice_prompt', [], $locale),
+                    $payload,
+                ];
+            }
             $prompt = ($savedName !== null && $savedName !== '')
                 ? __('chatbot.collect_name_prompt_with_saved', ['name' => $savedName], $locale)
                 : __('chatbot.collect_name_prompt', [], $locale);

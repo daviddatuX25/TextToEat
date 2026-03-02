@@ -25,8 +25,9 @@ $app = require $appRoot . '/bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
 $kernel->bootstrap();
 
-// In production, refuse to run via web (defense in depth with .htaccess).
-if (php_sapi_name() !== 'cli') {
+// In production, refuse to run via web (defense in depth with .htaccess),
+// except when explicitly allowed by the dispatcher (run.php).
+if (php_sapi_name() !== 'cli' && ! defined('PHP_RUN_SCRIPTS_ALLOW_WEB')) {
     $env = $app->environment();
     if ($env === 'production') {
         header('HTTP/1.1 403 Forbidden');

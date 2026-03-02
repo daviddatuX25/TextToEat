@@ -16,31 +16,7 @@
  */
 
 $app = require __DIR__ . '/bootstrap.php';
+require __DIR__ . '/helpers.php';
 
-use Illuminate\Support\Facades\Artisan;
-
-$steps = [
-    'key:generate' => [],
-    'storage:link' => [],
-    'migrate'      => ['--force' => true],
-    'config:cache' => [],
-    'route:cache'  => [],
-];
-
-foreach ($steps as $command => $params) {
-    try {
-        Artisan::call($command, $params);
-        $output = Artisan::output();
-        if ($output !== '') {
-            echo ">>> {$command}\n{$output}\n";
-        } else {
-            echo ">>> {$command} (ok)\n";
-        }
-    } catch (Throwable $e) {
-        echo "!!! Error running {$command}: " . $e->getMessage() . "\n";
-        exit(1);
-    }
-}
-
-echo "Initial setup complete.\n";
+run_initial_setup($app);
 

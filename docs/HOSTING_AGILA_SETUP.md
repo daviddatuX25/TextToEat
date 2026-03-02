@@ -230,7 +230,21 @@ Upload the Firebase service account JSON to the server and set `FIREBASE_CREDENT
 
 ---
 
-## 9. Related docs
+## 9. Database portability (PostgreSQL vs MySQL/MariaDB)
+
+- **Local / Sail:** The app uses **PostgreSQL** (see `compose.yaml`). Run tests and dev against it.
+- **Production (Agila):** The server runs **MySQL or MariaDB**. Set `DB_CONNECTION=mysql` in `.env` and use the panel’s DB host, name, user, and password.
+
+The codebase is written to support both engines:
+
+- **JSON columns:** Use Laravel’s JSON path syntax (e.g. `state->current_state`) in queries so the framework can compile the right SQL per driver. Avoid raw Postgres-only operators like `->>` in application code.
+- **Case-insensitive search:** Use `App\Support\DatabaseDialect::addCaseInsensitiveLike` / `addCaseInsensitiveLikeOr` instead of `ILIKE` so search works on MySQL/MariaDB as well as PostgreSQL.
+
+**Before deploying:** Run the test suite (e.g. `php artisan test`) with your default test DB. Optionally run again with a MySQL test database to confirm portability (e.g. separate `.env.testing.mysql` and `phpunit.xml` config).
+
+---
+
+## 10. Related docs
 
 - **Facebook Messenger:** project root `FACEBOOK_MESSENGER_INTEGRATION.md`
 - **SMS FCM push design:** `docs/SMS_FCM_PUSH_DESIGN.md`
@@ -239,7 +253,7 @@ Upload the Firebase service account JSON to the server and set `FIREBASE_CREDENT
 
 ---
 
-## 10. Security reminder
+## 11. Security reminder
 
 - **FTP password:** Only in FileZilla (or a password manager). Never in the repo or this doc.
 - **`.env`:** Never committed; create and edit only on the server (FileZilla or panel).

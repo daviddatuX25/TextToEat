@@ -6,6 +6,7 @@ use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
 use App\Events\OrderUpdated;
 use App\Models\ActionLog;
+use App\Support\DatabaseDialect;
 use App\Models\OrderItem;
 use App\Services\OrderStatusNotificationService;
 use App\Models\DeliveryArea;
@@ -113,11 +114,11 @@ class OrdersController extends Controller
 
         $search = trim($validated['search'] ?? '');
         if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('customer_name', 'ilike', '%' . $search . '%')
-                    ->orWhere('customer_phone', 'ilike', '%' . $search . '%')
-                    ->orWhere('reference', 'ilike', '%' . $search . '%');
-            });
+            DatabaseDialect::addCaseInsensitiveLikeOr(
+                $query,
+                ['customer_name', 'customer_phone', 'reference'],
+                '%' . $search . '%'
+            );
         }
 
         $sort = $validated['sort'] ?? 'updated_at';
