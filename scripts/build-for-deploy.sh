@@ -2,6 +2,10 @@
 # Build texttoeat-app for manual deploy (composer + npm) using Docker.
 # Run from repo root. Optional: copy .env.prod.example to .env.prod and fill
 # VITE_* (and other vars) so the frontend build gets the right values.
+#
+# The built app (and --zip) includes: vendor/, public/build/, app-root .htaccess
+# (denies all web access to app root), and php-run-scripts/. Excludes .env and
+# .env.* so no secrets are bundled. Create .env on the server after upload.
 # Usage: ./scripts/build-for-deploy.sh [--zip]
 set -e
 
@@ -74,5 +78,6 @@ PY
 fi
 
 echo ""
-echo "Build complete. Upload the contents of texttoeat-app/ (excluding .env, .git, node_modules) via FileZilla."
-echo "Include vendor/ and public/build/. See docs/DEPLOY_BEGINNER_GUIDE.md for steps."
+echo "Build complete. Upload texttoeat-app/ (or the zip) via FileZilla."
+echo "Included: vendor/, public/build/, app-root .htaccess, php-run-scripts/. Excluded: .env, .env.*, .git, node_modules."
+echo "See docs/DEPLOY_BEGINNER_GUIDE.md for steps. Create .env on the server after upload."

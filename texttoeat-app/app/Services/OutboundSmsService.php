@@ -104,7 +104,7 @@ class OutboundSmsService
         try {
             $message = CloudMessage::new()
                 ->withData(['type' => 'heartbeat_check'])
-                ->withToken($device->device_token);
+                ->toToken($device->device_token);
             $messaging->send($message);
 
             return true;
@@ -205,7 +205,7 @@ class OutboundSmsService
         try {
             $message = CloudMessage::new()
                 ->withData($data)
-                ->withToken($token);
+                ->toToken($token);
 
             $messaging->send($message);
 

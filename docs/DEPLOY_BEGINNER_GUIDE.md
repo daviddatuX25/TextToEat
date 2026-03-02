@@ -77,7 +77,7 @@ Optional: create a zip for upload (if your host lets you upload one file and ext
 ./scripts/build-for-deploy.sh --zip
 ```
 
-That creates `texttoeat-app-deploy.zip` in the repo root (excluding `.env`, `.git`, `node_modules`). Upload the zip and extract on the server, or upload the folder as in Step 3.
+That creates `texttoeat-app-deploy.zip` in the repo root. **Included:** `vendor/`, `public/build/`, app-root **`.htaccess`** (denies all web access to the folder containing `.env`, `vendor/`, and `php-run-scripts/` — safety net even if document root were misconfigured), and **`php-run-scripts/`** for running Artisan when you don’t have SSH. **Excluded:** `.env`, `.env.*`, `.git`, `node_modules` (no secrets in the zip). Upload the zip and extract on the server, then create `.env` on the server (Step 4). Or upload the folder as in Step 3.
 
 ---
 
@@ -85,7 +85,7 @@ That creates `texttoeat-app-deploy.zip` in the repo root (excluding `.env`, `.gi
 
 Use **one** of the two layouts below. **Layout A** is the Agila-style setup: `public_html` **is** Laravel’s `public` folder (its contents); `app/`, `vendor/`, etc. are **siblings** of `public_html` in your account home. **Layout B** is for when you prefer (or the panel forces) the whole app inside a subfolder under `public_html`.
 
-**Important:** The document root must always point at the folder that contains only `index.php`, `build/`, etc. — never at the folder that contains `app/`, `vendor/`, or `.env`. Otherwise those could be exposed.
+**Important:** The document root must always point at the folder that contains only `index.php`, `build/`, etc. — never at the folder that contains `app/`, `vendor/`, or `.env`. The app root also has an **`.htaccess`** that denies all web access to that folder (included in the build and in the deploy zip), so even if the document root were wrong, the app root would not be served.
 
 ---
 
@@ -127,7 +127,7 @@ On the server, **`public_html`** holds only what’s inside Laravel’s **`publi
 ```
 
 **Do not upload:** `.env`, `.env.prod`, `.git`, `node_modules`, or the **contents** of `public/` into the account home (you already put public’s contents in `public_html`).  
-**Do upload:** `app/`, `bootstrap/`, `config/`, `storage/`, `vendor/`, `artisan`, `composer.json`, etc. — and in step 3 you already uploaded `public/build/` inside `public_html`.
+**Do upload:** `app/`, `bootstrap/`, `config/`, `storage/`, `vendor/`, `artisan`, `composer.json`, **`.htaccess`** (app root — denies web access to this folder), **`php-run-scripts/`**, etc. — and in step 3 you already uploaded `public/build/` inside `public_html`. If you used the deploy zip, extract it so the app root contains `.htaccess` and `php-run-scripts/`; then create `.env` on the server (Step 4).
 
 **5. (Layout A only) Symlink `public` to `public_html`** so Laravel finds the web root (e.g. for `php artisan storage:link` and asset URLs). From the account home, run once (via SSH or panel):
 ```bash
@@ -171,7 +171,7 @@ If you prefer to keep the app in one place under `public_html`, put the full app
 ```
 
 **Do not upload:** `.env`, `.env.prod`, `.git`, `node_modules`.  
-**Do upload:** `vendor/`, `public/build/`, and all other Laravel files.
+**Do upload:** `vendor/`, `public/build/`, app-root **`.htaccess`**, **`php-run-scripts/`**, and all other Laravel files. If you used the deploy zip, extract it so the app root has `.htaccess` and `php-run-scripts/`; then create `.env` on the server (Step 4).
 
 **4. Set the domain’s document root** to that subfolder’s `public` folder. In the panel:
 ```text
@@ -186,11 +186,11 @@ The server will only serve files inside `public`; `.env` and source code are not
 - [ ] FileZilla: connect to Agila (host, user, password).
 - [ ] **Layout A:** Upload contents of local `texttoeat-app/public/` into remote `public_html/`. Upload everything else from `texttoeat-app/` (except `public/`) into the account home (parent of `public_html`). Then run `ln -s public_html public` from the account home. **Layout B:** Upload full `texttoeat-app/` contents into `public_html/app/`.
 - [ ] Do **not** upload: `.env`, `.env.prod`, `.git`, `node_modules`.
-- [ ] Confirm `vendor/` and (for Layout A) `public_html/build/` or (for Layout B) `public_html/app/public/build/` are present.
+- [ ] Confirm `vendor/`, app-root **`.htaccess`**, and **`php-run-scripts/`** are in the app root; (for Layout A) `public_html/build/` or (for Layout B) `public_html/app/public/build/` are present.
 - [ ] Document root: **Layout A** = `.../public_html`; **Layout B** = `.../public_html/app/public`.
 - [ ] Create `.env` on the server in the app root (Step 4).
 
-**Why Layout A?** `public_html` is the only web root; `app/`, `vendor/`, and `.env` are siblings of `public_html` in the account home, so they are never served. Layout B is also safe as long as the document root is the `public` subfolder.
+**Why Layout A?** `public_html` is the only web root; `app/`, `vendor/`, and `.env` are siblings of `public_html` in the account home, so they are never served. The app-root `.htaccess` (included in the build/zip) denies all web access to that folder as a safety net. Layout B is also safe as long as the document root is the `public` subfolder and the app root has `.htaccess` in place.
 
 **Paths quick reference (replace `YOUR_USER` with your Agila username):**
 

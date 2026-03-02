@@ -9,34 +9,14 @@
  * For migrate, --force is added automatically when not in CLI.
  */
 
-$appRoot = dirname(__DIR__);
-if (!is_file($appRoot . '/vendor/autoload.php')) {
-    die("Laravel app not found. Expected vendor/ at: {$appRoot}\n");
-}
-
-chdir($appRoot);
-
-require $appRoot . '/vendor/autoload.php';
-
-$app = require $appRoot . '/bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
-$kernel->bootstrap();
-
-// In production, refuse to run via web (defense in depth with .htaccess).
-if (php_sapi_name() !== 'cli') {
-    $env = $app->environment();
-    if ($env === 'production') {
-        header('HTTP/1.1 403 Forbidden');
-        die('This script must be run from the command line or your hosting panel in production.');
-    }
-}
+$app = require __DIR__ . '/bootstrap.php';
 
 $allowed = [
     'key:generate' => [],
-    'storage:link'  => [],
-    'config:cache'  => [],
-    'route:cache'   => [],
-    'migrate'       => ['--force' => true],
+    'storage:link' => [],
+    'config:cache' => [],
+    'route:cache'  => [],
+    'migrate'      => ['--force' => true],
 ];
 
 $command = null;
