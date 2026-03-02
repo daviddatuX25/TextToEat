@@ -6,8 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/
 export default function Users({ users = [] }) {
     const [addOpen, setAddOpen] = useState(false);
     const form = useForm({
+        username: '',
         name: '',
-        email: '',
         password: '',
         password_confirmation: '',
     });
@@ -22,8 +22,8 @@ export default function Users({ users = [] }) {
         });
     };
 
-    const sendReset = (user) => {
-        router.post(`/portal/users/${user.id}/send-password-reset`, {}, { preserveScroll: true });
+    const resetPassword = (user) => {
+        router.post(`/portal/users/${user.id}/reset-password`, {}, { preserveScroll: true });
     };
 
     return (
@@ -48,7 +48,7 @@ export default function Users({ users = [] }) {
                         </button>
                     </div>
                     <p className="text-surface-600 dark:text-surface-400 text-sm max-w-xl">
-                        Create staff accounts and send password reset links. Only admins can access this page.
+                        Create staff accounts and reset passwords to the default (Password1!). Remind staff to change it from Account.
                     </p>
                 </header>
 
@@ -62,7 +62,7 @@ export default function Users({ users = [] }) {
                             <thead className="bg-surface-100 dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700">
                                 <tr>
                                     <th className="px-4 py-3 font-semibold text-surface-700 dark:text-surface-300">Name</th>
-                                    <th className="px-4 py-3 font-semibold text-surface-700 dark:text-surface-300">Email</th>
+                                    <th className="px-4 py-3 font-semibold text-surface-700 dark:text-surface-300">Username</th>
                                     <th className="px-4 py-3 font-semibold text-surface-700 dark:text-surface-300">Role</th>
                                     <th className="px-4 py-3 font-semibold text-surface-700 dark:text-surface-300 text-right">Actions</th>
                                 </tr>
@@ -70,8 +70,8 @@ export default function Users({ users = [] }) {
                             <tbody className="divide-y divide-surface-200 dark:divide-surface-700">
                                 {users.map((user) => (
                                     <tr key={user.id} className="bg-white dark:bg-surface-900 hover:bg-surface-50 dark:hover:bg-surface-800/50">
-                                        <td className="px-4 py-3 font-medium text-surface-900 dark:text-white">{user.name}</td>
-                                        <td className="px-4 py-3 text-surface-600 dark:text-surface-400">{user.email}</td>
+                                        <td className="px-4 py-3 font-medium text-surface-900 dark:text-white">{user.name ?? '—'}</td>
+                                        <td className="px-4 py-3 text-surface-600 dark:text-surface-400">{user.username}</td>
                                         <td className="px-4 py-3">
                                             <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${user.role === 'admin' ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' : 'bg-surface-200 text-surface-700 dark:bg-surface-600 dark:text-surface-300'}`}>
                                                 {user.role ?? 'staff'}
@@ -80,10 +80,10 @@ export default function Users({ users = [] }) {
                                         <td className="px-4 py-3 text-right">
                                             <button
                                                 type="button"
-                                                onClick={() => sendReset(user)}
+                                                onClick={() => resetPassword(user)}
                                                 className="text-primary-600 dark:text-primary-400 font-semibold text-sm hover:underline"
                                             >
-                                                Send reset link
+                                                Reset password
                                             </button>
                                         </td>
                                     </tr>
@@ -101,23 +101,25 @@ export default function Users({ users = [] }) {
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <label className="block">
-                            <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Name</span>
+                            <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Username</span>
                             <input
                                 type="text"
                                 required
+                                value={form.data.username}
+                                onChange={(e) => form.setData('username', e.target.value)}
+                                className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                autoComplete="username"
+                            />
+                            <p className="mt-1 text-xs text-surface-500 dark:text-surface-400">Letters, numbers, underscores, hyphens only.</p>
+                        </label>
+                        <label className="block">
+                            <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Name (optional)</span>
+                            <input
+                                type="text"
                                 value={form.data.name}
                                 onChange={(e) => form.setData('name', e.target.value)}
                                 className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
-                            />
-                        </label>
-                        <label className="block">
-                            <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Email</span>
-                            <input
-                                type="email"
-                                required
-                                value={form.data.email}
-                                onChange={(e) => form.setData('email', e.target.value)}
-                                className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                placeholder="Leave blank for device accounts"
                             />
                         </label>
                         <label className="block">

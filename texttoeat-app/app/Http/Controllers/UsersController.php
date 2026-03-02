@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Password;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -15,12 +14,13 @@ class UsersController extends Controller
     public function index(): Response
     {
         $users = User::query()
-            ->orderBy('name')
+            ->orderByRaw('name IS NULL, name ASC')
+            ->orderBy('username')
             ->get()
             ->map(fn (User $u) => [
                 'id' => $u->id,
                 'name' => $u->name,
-                'email' => $u->email,
+                'username' => $u->username,
                 'role' => $u->role ?? 'staff',
                 'created_at' => $u->created_at?->toIso8601String(),
             ]);
@@ -33,14 +33,14 @@ class UsersController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'username' => ['required', 'string', 'max:191', 'alpha_dash', 'unique:users,username'],
+            'name' => ['nullable', 'string', 'max:255'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
         User::create([
-            'name' => $validated['name'],
-            'email' => $validated['email'],
+            'username' => $validated['username'],
+            'name' => $validated['name'] ?? null,
             'password' => Hash::make($validated['password']),
             'role' => 'staff',
         ]);
@@ -48,14 +48,13 @@ class UsersController extends Controller
         return redirect()->back()->with('success', 'User created.');
     }
 
-    public function sendPasswordReset(User $user): RedirectResponse
+    public function resetPassword(User $user): RedirectResponse
     {
-        $status = Password::sendResetLink(['email' => $user->email]);
+        $user->update(['password' => Hash::make('Password1!')]);
 
-        if ($status === Password::RESET_LINK_SENT) {
-            return redirect()->back()->with('success', 'Password reset link sent to ' . $user->email);
-        }
-
-        return redirect()->back()->with('error', __($status));
+        return redirect()->back()->with(
+            'success',
+            'Password for ' . $user->username . ' reset to default (Password1!). Remind them to change it from Account.'
+        );
     }
 }

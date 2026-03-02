@@ -15,6 +15,7 @@ use App\Http\Controllers\ChatbotLogsController;
 use App\Http\Controllers\ConversationInboxController;
 use App\Http\Controllers\PickupController;
 use App\Http\Controllers\PickupSlotsController;
+use App\Http\Controllers\AccountController;
 use App\Http\Controllers\QuickOrdersController;
 use App\Http\Controllers\SmsDevicesController;
 use App\Http\Controllers\UsersController;
@@ -43,6 +44,10 @@ Route::get('/track', function () {
     return Inertia::render('Track');
 });
 
+Route::get('/about', function () {
+    return Inertia::render('About');
+})->name('about');
+
 Route::middleware(['auth', 'admin'])->get('/api/chatbot/outbound-messages', [ChatbotWebhookController::class, 'outboundMessages']);
 
 // Redirect old staff URLs to /portal/* (301)
@@ -70,9 +75,9 @@ Route::prefix('portal')->middleware('auth')->group(function () {
     Route::get('/logs/chatbot', [ChatbotLogsController::class, 'index'])->name('portal.logs.chatbot');
     Route::get('/inbox', [ConversationInboxController::class, 'index'])->name('portal.inbox');
     Route::get('/inbox/{session}', [ConversationInboxController::class, 'show'])->name('portal.inbox.show');
-    Route::get('/sms-devices', [SmsDevicesController::class, 'index'])->name('portal.sms-devices');
-    Route::post('/sms-devices/{deviceId}/heartbeat', [SmsDevicesController::class, 'heartbeat'])->name('portal.sms-devices.heartbeat');
-    Route::patch('/sms-devices/{deviceId}', [SmsDevicesController::class, 'update'])->name('portal.sms-devices.update');
+    Route::get('/sms-devices', [SmsDevicesController::class, 'index'])->name('portal.sms-devices')->middleware('superadmin');
+    Route::post('/sms-devices/{deviceId}/heartbeat', [SmsDevicesController::class, 'heartbeat'])->name('portal.sms-devices.heartbeat')->middleware('superadmin');
+    Route::patch('/sms-devices/{deviceId}', [SmsDevicesController::class, 'update'])->name('portal.sms-devices.update')->middleware('superadmin');
     Route::post('/inbox/sessions/{session}/reply', [ConversationInboxController::class, 'reply'])->name('portal.inbox.reply');
     Route::patch('/inbox/sessions/{session}/automation', [ConversationInboxController::class, 'automation'])->name('portal.inbox.automation');
     Route::post('/inbox/sessions/{session}/resolve', [ConversationInboxController::class, 'resolve'])->name('portal.inbox.resolve');
@@ -93,8 +98,11 @@ Route::prefix('portal')->middleware('auth')->group(function () {
     Route::post('/dining-markers', [DiningMarkersController::class, 'store']);
     Route::put('/dining-markers/{diningMarker}', [DiningMarkersController::class, 'update']);
     Route::delete('/dining-markers/{diningMarker}', [DiningMarkersController::class, 'destroy']);
+    Route::get('/account', [AccountController::class, 'index'])->name('portal.account');
+    Route::put('/account', [AccountController::class, 'updateAccount'])->name('portal.account.update');
+    Route::put('/account/password', [AccountController::class, 'updatePassword'])->name('portal.account.password');
     Route::get('/users', [UsersController::class, 'index'])->name('portal.users')->middleware('admin');
     Route::post('/users', [UsersController::class, 'store'])->middleware('admin');
-    Route::post('/users/{user}/send-password-reset', [UsersController::class, 'sendPasswordReset'])->name('portal.users.send-password-reset')->middleware('admin');
+    Route::post('/users/{user}/reset-password', [UsersController::class, 'resetPassword'])->name('portal.users.reset-password')->middleware('admin');
     Route::get('/simulate', fn () => Inertia::render('Chat', ['webChatExternalId' => request()->session()->getId()]))->name('portal.simulate')->middleware('admin');
 });

@@ -60,7 +60,7 @@ class OrderLogsController extends Controller
                     'created_at' => $log->created_at?->toIso8601String(),
                     'user' => $log->user ? [
                         'id' => $log->user->id,
-                        'name' => $log->user->name,
+                        'name' => $log->user->displayName(),
                     ] : null,
                     'order' => $log->order ? [
                         'id' => $log->order->id,

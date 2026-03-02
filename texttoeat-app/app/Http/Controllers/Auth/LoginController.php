@@ -19,18 +19,18 @@ class LoginController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'email' => ['required', 'string', 'email'],
+            'username' => ['required', 'string'],
             'password' => ['required', 'string'],
         ]);
 
-        if (Auth::attempt($validated, (bool) $request->boolean('remember'))) {
+        if (Auth::attempt(['username' => $validated['username'], 'password' => $validated['password']], (bool) $request->boolean('remember'))) {
             $request->session()->regenerate();
             return redirect()->intended('/portal');
         }
 
         return back()->withErrors([
-            'email' => __('auth.failed'),
-        ])->onlyInput('email');
+            'username' => __('auth.failed'),
+        ])->onlyInput('username');
     }
 
     public function destroy(Request $request): RedirectResponse

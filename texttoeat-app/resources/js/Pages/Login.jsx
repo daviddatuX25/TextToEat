@@ -3,7 +3,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '../components/ui';
 
 export default function Login() {
     const { data, setData, post, processing, errors } = useForm({
-        email: '',
+        username: '',
         password: '',
         remember: false,
     });
@@ -25,13 +25,13 @@ export default function Login() {
                         className="space-y-4"
                     >
                         <Input
-                            id="email"
-                            label="Email"
-                            type="email"
-                            value={data.email}
-                            onChange={(e) => setData('email', e.target.value)}
-                            error={errors.email}
-                            autoComplete="email"
+                            id="username"
+                            label="Username"
+                            type="text"
+                            value={data.username}
+                            onChange={(e) => setData('username', e.target.value)}
+                            error={errors.username}
+                            autoComplete="username"
                         />
                         <Input
                             id="password"

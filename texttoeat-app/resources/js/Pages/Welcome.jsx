@@ -6,6 +6,11 @@ export default function Welcome() {
         <AppLayout>
             <section className="flex flex-col gap-8 text-center animate-fade-in">
                 <header className="space-y-4 pb-8 border-b border-surface-200 dark:border-surface-800">
+                    <img
+                        src="/images/lacasandile-logo.png"
+                        alt="Lacasandile Eatery"
+                        className="mx-auto h-24 w-24 md:h-28 md:w-28 rounded-2xl object-cover shadow-lg"
+                    />
                     <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-surface-900 dark:text-white">
                         Order from <span className="text-primary-600 dark:text-primary-500">Lacasandile Eatery</span>
                     </h1>
@@ -38,6 +43,17 @@ export default function Welcome() {
                         Log in to portal
                     </Link>
                 </p>
+                <div className="pt-6 border-t border-surface-200 dark:border-surface-800">
+                    <p className="text-sm text-surface-500 dark:text-surface-500 mb-2">
+                        Order via SMS, Messenger, or here on the web. One system, one kitchen.
+                    </p>
+                    <Link
+                        href="/about"
+                        className="text-sm font-medium text-primary-600 dark:text-primary-500 hover:underline"
+                    >
+                        About this site →
+                    </Link>
+                </div>
             </section>
         </AppLayout>
     );

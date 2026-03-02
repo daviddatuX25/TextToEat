@@ -48,9 +48,29 @@ fi
 
 if [[ "$DO_ZIP" == true ]]; then
   echo "Creating deploy zip..."
-  (cd "$APP_DIR" && zip -r "$REPO_ROOT/texttoeat-app-deploy.zip" . \
-    -x ".env" ".env.*" ".git/*" "node_modules/*" "*.log" ".phpunit.result.cache" 2>/dev/null || true)
-  echo "Created $REPO_ROOT/texttoeat-app-deploy.zip. Upload and extract on the server if your panel allows."
+  ZIP_OUT="$REPO_ROOT/texttoeat-app-deploy.zip"
+  if command -v zip &>/dev/null; then
+    (cd "$APP_DIR" && zip -r "$ZIP_OUT" . \
+      -x ".env" ".env.*" ".git/*" "node_modules/*" "*.log" ".phpunit.result.cache" 2>/dev/null || true)
+  else
+    (cd "$APP_DIR" && python3 - "$ZIP_OUT" << 'PY' || true
+import zipfile, os, sys
+out = sys.argv[1]
+exclude_dirs = {'.git', 'node_modules'}
+with zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as z:
+    for root, dirs, files in os.walk('.'):
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+        for f in files:
+            path = os.path.join(root, f)
+            if '.git' in path or 'node_modules' in path or path.endswith('.log'): continue
+            if path.startswith('./.env') and 'env.prod.example' not in path and 'env.production' not in path and 'env.dev.example' not in path: continue
+            full = os.path.join(root, f)
+            if not os.path.exists(full) or os.path.islink(full): continue
+            z.write(full, path)
+PY
+    )
+  fi
+  [[ -f "$ZIP_OUT" ]] && echo "Created $ZIP_OUT. Upload and extract on the server if your panel allows." || echo "Warning: zip creation failed (install 'zip' or ensure python3 is available)."
 fi
 
 echo ""

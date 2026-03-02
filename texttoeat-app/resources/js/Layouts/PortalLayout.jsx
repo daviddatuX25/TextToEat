@@ -16,12 +16,13 @@ import {
     Users,
     Sun,
     Moon,
-    Utensils,
     Smartphone,
+    Bot,
+    User,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
-const PORTAL_NAV_ITEMS = [
+const PORTAL_NAV_ITEMS_BASE = [
     { href: '/portal', label: 'Dashboard', Icon: LayoutDashboard },
     { href: '/portal/orders', label: 'Orders', Icon: ListOrdered },
     { href: '/portal/orders/completed', label: 'Completed orders', Icon: CheckCircle },
@@ -33,8 +34,8 @@ const PORTAL_NAV_ITEMS = [
     { href: '/portal/logs/orders', label: 'Order logs', Icon: ClipboardList },
     { href: '/portal/inbox', label: 'Conversation inbox', Icon: Inbox },
     { href: '/portal/logs/chatbot', label: 'Chatbot logs', Icon: MessageCircle },
-    { href: '/portal/sms-devices', label: 'SMS devices', Icon: Smartphone },
 ];
+const PORTAL_NAV_ITEM_SMS_DEVICES = { href: '/portal/sms-devices', label: 'SMS devices', Icon: Smartphone };
 
 function getPathname(url) {
     try {
@@ -114,9 +115,11 @@ function SidebarContent({ navItems, pathname, onNavClick }) {
         <>
             <div className="flex items-center gap-3 px-4 py-5 border-b border-surface-200 dark:border-surface-800">
                 <Link href="/portal" onClick={onNavClick} className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 text-white shrink-0">
-                        <Utensils className="h-6 w-6 relative z-10" aria-hidden />
-                    </div>
+                    <img
+                        src="/images/lacasandile-logo.png"
+                        alt="Lacasandile Eatery"
+                        className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                    />
                     <div className="min-w-0">
                         <span className="block text-lg font-bold leading-tight tracking-tight">Lacasandile Eatery</span>
                         <span className="block text-xs font-medium text-surface-500 dark:text-surface-400">powered by TextToEat</span>
@@ -136,6 +139,18 @@ function SidebarContent({ navItems, pathname, onNavClick }) {
                 ))}
             </nav>
             <div className="p-4 border-t border-surface-200 dark:border-surface-800 space-y-2">
+                <Link
+                    href="/portal/account"
+                    onClick={onNavClick}
+                    className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-xs font-bold transition-colors ${
+                        pathname === '/portal/account'
+                            ? 'border-primary-500 bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300'
+                            : 'border-surface-200 text-surface-600 hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800'
+                    }`}
+                >
+                    <User className="h-4 w-4" strokeWidth={2} />
+                    Account
+                </Link>
                 <div className="flex items-center gap-2">
                     <ThemeToggle />
                     <button
@@ -160,6 +175,7 @@ export default function PortalLayout({ children }) {
     const pageUrl = usePage().url;
     const pathname = getPathname(pageUrl);
     const isAdmin = auth?.user?.role === 'admin';
+    const isSuperAdmin = auth?.user?.role === 'superadmin';
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // #region agent log
@@ -182,9 +198,12 @@ export default function PortalLayout({ children }) {
         if (flash?.success) toast.success(flash.success);
     }, [flash?.error, flash?.success]);
 
-    const navItems = [...PORTAL_NAV_ITEMS];
+    const navItems = [...PORTAL_NAV_ITEMS_BASE];
+    if (isSuperAdmin) {
+        navItems.push(PORTAL_NAV_ITEM_SMS_DEVICES);
+    }
     if (isAdmin) {
-        navItems.push({ href: '/portal/simulate', label: 'Channel simulator', Icon: MessageCircle });
+        navItems.push({ href: '/portal/simulate', label: 'Channel simulator', Icon: Bot });
         navItems.push({ href: '/portal/users', label: 'Manage users', Icon: Users });
     }
 

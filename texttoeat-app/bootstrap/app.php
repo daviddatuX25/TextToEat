@@ -33,6 +33,7 @@ return Application::configure(basePath: $basePath)
         ]);
         $middleware->alias([
             'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            'superadmin' => \App\Http\Middleware\EnsureUserIsSuperAdmin::class,
             'sms.device.api' => \App\Http\Middleware\EnsureSmsDeviceApiKey::class,
         ]);
         Authenticate::redirectUsing(fn ($request) => route('login'));

@@ -18,13 +18,13 @@ class DatabaseSeeder extends Seeder
     {
         // Seeded accounts (password for both: Password1!)
         User::updateOrCreate(
-            ['email' => 'staff@avelinalacasandile-eat.top'],
-            ['name' => 'Staff', 'password' => Hash::make('Password1!'), 'role' => 'staff']
+            ['username' => 'staff'],
+            ['name' => 'Staff', 'email' => 'staff@avelinalacasandile-eat.top', 'password' => Hash::make('Password1!'), 'role' => 'staff']
         );
 
         User::updateOrCreate(
-            ['email' => 'admin@avelinalacasandile-eat.top'],
-            ['name' => 'Admin', 'password' => Hash::make('Password1!'), 'role' => 'admin']
+            ['username' => 'admin'],
+            ['name' => 'Admin', 'email' => 'admin@avelinalacasandile-eat.top', 'password' => Hash::make('Password1!'), 'role' => 'admin']
         );
 
         $this->call(BootstrapAdminSeeder::class);

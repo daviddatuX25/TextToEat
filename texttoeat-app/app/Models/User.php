@@ -19,14 +19,27 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
         'role',
     ];
 
+    public function displayName(): string
+    {
+        return $this->name ?: (string) $this->username;
+    }
+
     public function isAdmin(): bool
     {
-        return ($this->role ?? 'staff') === 'admin';
+        $role = $this->role ?? 'staff';
+
+        return $role === 'admin' || $role === 'superadmin';
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return ($this->role ?? 'staff') === 'superadmin';
     }
 
     /**

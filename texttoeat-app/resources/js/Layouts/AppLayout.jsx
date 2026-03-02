@@ -77,10 +77,11 @@ export default function AppLayout({ children, showDashboard = true }) {
             <nav className="fixed inset-x-0 top-0 z-50 border-b border-surface-200 glass-panel dark:border-surface-800">
                 <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
                     <Link href="/" className="flex items-center gap-3">
-                        <div className="group relative flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary-400 to-primary-600 text-white shadow-float">
-                            <div className="absolute inset-0 translate-y-full bg-white/20 transition-transform duration-300 ease-out group-hover:translate-y-0"></div>
-                            <i className="ph-bold ph-bowl-food relative z-10 text-2xl"></i>
-                        </div>
+                        <img
+                            src="/images/lacasandile-logo.png"
+                            alt="Lacasandile Eatery"
+                            className="h-10 w-10 shrink-0 rounded-xl object-cover shadow-float"
+                        />
                         <div className="flex flex-col">
                             <span className="text-lg font-bold leading-tight tracking-tight">TextToEat</span>
                             <span className="text-[10px] font-semibold uppercase tracking-wider text-primary-600 dark:text-primary-400">
@@ -93,6 +94,7 @@ export default function AppLayout({ children, showDashboard = true }) {
                         <NavLink href="/" pathname={pathname}>Home</NavLink>
                         <NavLink href="/menu" pathname={pathname}>Menu</NavLink>
                         <NavLink href="/track" pathname={pathname}>Track</NavLink>
+                        <NavLink href="/about" pathname={pathname}>About</NavLink>
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -119,7 +121,7 @@ export default function AppLayout({ children, showDashboard = true }) {
                                 <div className="group flex cursor-pointer items-center gap-2">
                                     <img
                                         src="https://ui-avatars.com/api/?name=Admin+Staff&background=ea580c&color=fff&rounded=true&bold=true"
-                                        alt="Staff Profile"
+                                        alt="Staff Account"
                                         className="h-9 w-9 rounded-full ring-2 ring-transparent transition-all group-hover:ring-primary-500"
                                     />
                                     <i className="ph-bold ph-caret-down text-sm text-surface-400 transition-colors group-hover:text-primary-500"></i>
@@ -165,6 +167,7 @@ export default function AppLayout({ children, showDashboard = true }) {
                     <NavLink href="/" pathname={pathname} onClick={() => setMobileOpen(false)}>Home</NavLink>
                     <NavLink href="/menu" pathname={pathname} onClick={() => setMobileOpen(false)}>Menu</NavLink>
                     <NavLink href="/track" pathname={pathname} onClick={() => setMobileOpen(false)}>Track</NavLink>
+                    <NavLink href="/about" pathname={pathname} onClick={() => setMobileOpen(false)}>About</NavLink>
                     <div className="h-px bg-surface-200 dark:bg-surface-800" />
                     <div className="flex items-center gap-3">
                         <ThemeToggle />
