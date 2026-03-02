@@ -1,0 +1,5 @@
+# Block all web access to the Laravel app root.
+# Only public/ should be the document root; this protects .env, vendor/, app/, etc.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>

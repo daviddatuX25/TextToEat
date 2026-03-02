@@ -233,7 +233,23 @@ The server will only serve files inside `public`; `.env` and source code are not
    php artisan storage:link
    php artisan migrate
    ```
-   If there is no SSH, use the panel’s “Run PHP” or “Run script” and run each `php artisan ...` line from the app root, or ask Agila how to run PHP commands.
+   If there is no SSH, use the **php-run-scripts** helper (see below) or the panel’s “Run PHP” / “Run script” from the app root.
+
+---
+
+### Running commands without SSH: php-run-scripts
+
+The app includes a folder **`php-run-scripts/`** (sibling to `app/`, `vendor/`, `.env`). Use it when you cannot run `php artisan` in a terminal.
+
+- **From the panel:** Point “Run PHP” (or equivalent) at **`php-run-scripts/run.php`** and pass the command, e.g. `run.php?cmd=key:generate` or run via CLI: `php php-run-scripts/run.php key:generate` from the app root.
+- **Allowed commands:** `key:generate`, `storage:link`, `config:cache`, `route:cache`, `migrate` (migrate gets `--force` automatically).
+
+**Security (dev vs production):**
+
+- **.env** stays in the app root (same folder as `app/`, `vendor/`, `php-run-scripts/`). That’s the “higher level” env for the app; create it on the server and never upload it.
+- **App root `.htaccess`** (the only `.htaccess` outside `public/`) denies all web access to the folder that contains `.env`, `vendor/`, and `php-run-scripts/`. With document root set to `public/`, the server never serves that folder anyway; the deny is a safety net.
+- **In production**, `run.php` also refuses to run when called via the web (e.g. from a browser); it only runs when invoked from the command line or your panel’s “Run PHP” (which often runs as CLI). So production stays strict.
+- **In dev** (`APP_ENV=local` or similar), you can run the scripts via browser (e.g. `run.php?cmd=storage:link`) if you relax the app root `.htaccess` locally; in production leave the root `.htaccess` in place (deny all).
 
 ---
 
