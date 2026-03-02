@@ -16,5 +16,8 @@ Route::post('/sms/incoming', [TextbeeSmsWebhookController::class, 'handle']);
 
 Route::middleware('sms.device.api')->group(function (): void {
     Route::post('/sms/device/register', [SmsDeviceController::class, 'register']);
+    Route::put('/sms/device/{deviceId}', [SmsDeviceController::class, 'update']);
+    Route::post('/sms/device/{deviceId}/heartbeat', [SmsDeviceController::class, 'heartbeat']);
+    Route::post('/sms/device/{deviceId}/sms/status', [SmsDeviceController::class, 'smsStatus']);
     Route::post('/sms/outbound/mark-sent', [SmsDeviceController::class, 'markSent']);
 });

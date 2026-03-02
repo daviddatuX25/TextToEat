@@ -16,6 +16,7 @@ use App\Http\Controllers\ConversationInboxController;
 use App\Http\Controllers\PickupController;
 use App\Http\Controllers\PickupSlotsController;
 use App\Http\Controllers\QuickOrdersController;
+use App\Http\Controllers\SmsDevicesController;
 use App\Http\Controllers\UsersController;
 use App\Http\Controllers\WalkinController;
 use Illuminate\Support\Facades\Route;
@@ -69,6 +70,9 @@ Route::prefix('portal')->middleware('auth')->group(function () {
     Route::get('/logs/chatbot', [ChatbotLogsController::class, 'index'])->name('portal.logs.chatbot');
     Route::get('/inbox', [ConversationInboxController::class, 'index'])->name('portal.inbox');
     Route::get('/inbox/{session}', [ConversationInboxController::class, 'show'])->name('portal.inbox.show');
+    Route::get('/sms-devices', [SmsDevicesController::class, 'index'])->name('portal.sms-devices');
+    Route::post('/sms-devices/{deviceId}/heartbeat', [SmsDevicesController::class, 'heartbeat'])->name('portal.sms-devices.heartbeat');
+    Route::patch('/sms-devices/{deviceId}', [SmsDevicesController::class, 'update'])->name('portal.sms-devices.update');
     Route::post('/inbox/sessions/{session}/reply', [ConversationInboxController::class, 'reply'])->name('portal.inbox.reply');
     Route::patch('/inbox/sessions/{session}/automation', [ConversationInboxController::class, 'automation'])->name('portal.inbox.automation');
     Route::post('/inbox/sessions/{session}/resolve', [ConversationInboxController::class, 'resolve'])->name('portal.inbox.resolve');

@@ -18,9 +18,13 @@ class OutboundSms extends Model
         'body',
         'status',
         'sent_at',
+        'delivered_at',
         'failure_reason',
+        'error_code',
+        'error_message',
         'channel',
         'chatbot_session_id',
+        'sms_batch_id',
     ];
 
     /**
@@ -30,6 +34,7 @@ class OutboundSms extends Model
     {
         return [
             'sent_at' => 'datetime',
+            'delivered_at' => 'datetime',
         ];
     }
 
@@ -46,6 +51,11 @@ class OutboundSms extends Model
     public function scopeFailed(Builder $query): Builder
     {
         return $query->where('status', 'failed');
+    }
+
+    public function scopeDelivered(Builder $query): Builder
+    {
+        return $query->where('status', 'delivered');
     }
 
     public function chatbotSession(): BelongsTo

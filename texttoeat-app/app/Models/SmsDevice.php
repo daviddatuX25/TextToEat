@@ -12,9 +12,19 @@ class SmsDevice extends Model
      * @var list<string>
      */
     protected $fillable = [
+        'device_id',
         'device_token',
         'name',
+        'brand',
+        'model',
+        'os',
+        'app_version_code',
+        'sim_info',
+        'preferred_sim_subscription_id',
+        'enabled',
         'last_used_at',
+        'last_heartbeat_at',
+        'last_heartbeat_payload',
     ];
 
     /**
@@ -23,7 +33,11 @@ class SmsDevice extends Model
     protected function casts(): array
     {
         return [
+            'sim_info' => 'array',
             'last_used_at' => 'datetime',
+            'last_heartbeat_at' => 'datetime',
+            'last_heartbeat_payload' => 'array',
+            'enabled' => 'boolean',
         ];
     }
 

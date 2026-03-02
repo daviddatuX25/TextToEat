@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\OutboundSms;
 use App\Models\SmsDevice;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\Messaging\CloudMessage;
@@ -19,19 +20,22 @@ class OutboundSmsService
     /**
      * Enqueue outbound SMS (one row per 160-char segment) and send FCM data message(s) to the registered device.
      *
+     * @param  int|null  $simSubscriptionId  Optional SIM subscription ID for multi-SIM targeting.
      * @return array{success: bool, ids?: list<int>, message?: string}
      */
     public function enqueueAndSendFcm(
         string $to,
         string $body,
         ?string $channel = null,
-        ?int $chatbotSessionId = null
+        ?int $chatbotSessionId = null,
+        ?int $simSubscriptionId = null
     ): array {
         $segments = $this->splitMessage($body);
         if ($segments === []) {
             return ['success' => true, 'ids' => []];
         }
 
+        $batchId = (string) Str::uuid();
         $ids = [];
         foreach ($segments as $segment) {
             $row = OutboundSms::create([
@@ -40,25 +44,27 @@ class OutboundSmsService
                 'status' => 'pending',
                 'channel' => $channel,
                 'chatbot_session_id' => $chatbotSessionId,
+                'sms_batch_id' => $batchId,
             ]);
             $ids[] = $row->id;
         }
 
-        $token = $this->resolveFcmToken();
-        if ($token === null || $token === '') {
+        $device = $this->resolveFcmDevice();
+        if ($device === null || $device->device_token === null || $device->device_token === '') {
             Log::debug('OutboundSmsService: no FCM token configured or registered, rows left pending');
 
             return ['success' => true, 'ids' => $ids];
         }
 
-        $device = SmsDevice::where('device_token', $token)->first();
+        $token = $device->device_token;
+        $effectiveSimId = $simSubscriptionId ?? $device->preferred_sim_subscription_id;
         $sent = 0;
         foreach ($ids as $i => $id) {
             $row = OutboundSms::find($id);
             if (! $row || $row->status !== 'pending') {
                 continue;
             }
-            $result = $this->sendFcmToToken($token, (string) $id, $to, $row->body);
+            $result = $this->sendFcmToToken($token, (string) $id, $to, $row->body, $batchId, $effectiveSimId);
             if ($result['sent']) {
                 $sent++;
             } else {
@@ -69,11 +75,44 @@ class OutboundSmsService
             }
         }
 
-        if ($device && $sent > 0) {
+        if ($device && $sent > 0 && $device->exists) {
             $device->touchLastUsedAt();
         }
 
         return ['success' => true, 'ids' => $ids];
+    }
+
+    /**
+     * Send FCM data message of type "heartbeat_check" so the app triggers a heartbeat request.
+     * Target device by device_id or use first enabled device.
+     */
+    public function sendHeartbeatCheck(?string $deviceId = null): bool
+    {
+        $device = $deviceId !== null
+            ? SmsDevice::where('device_id', $deviceId)->where('enabled', true)->first()
+            : SmsDevice::where('enabled', true)->orderByDesc('last_used_at')->first();
+
+        if ($device === null || $device->device_token === null || $device->device_token === '') {
+            return false;
+        }
+
+        $messaging = $this->getMessaging();
+        if ($messaging === null) {
+            return false;
+        }
+
+        try {
+            $message = CloudMessage::new()
+                ->withData(['type' => 'heartbeat_check'])
+                ->withToken($device->device_token);
+            $messaging->send($message);
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::warning('OutboundSmsService: heartbeat_check FCM failed', ['message' => $e->getMessage()]);
+
+            return false;
+        }
     }
 
     /**
@@ -104,34 +143,68 @@ class OutboundSmsService
         return $segments;
     }
 
-    private function resolveFcmToken(): ?string
+    /**
+     * Resolve the enabled device to use for FCM (most recently used). Returns null if none.
+     */
+    private function resolveFcmDevice(): ?SmsDevice
     {
-        $device = SmsDevice::orderByDesc('last_used_at')->first();
+        $device = SmsDevice::where('enabled', true)->orderByDesc('last_used_at')->first();
         if ($device !== null) {
-            return $device->device_token;
+            return $device;
         }
-        $fallback = config('firebase.device_token');
+        $fallbackToken = config('firebase.device_token');
+        if ($fallbackToken !== null && $fallbackToken !== '') {
+            $legacy = SmsDevice::where('device_token', $fallbackToken)->first();
+            if ($legacy !== null) {
+                return $legacy;
+            }
+            $legacy = new SmsDevice;
+            $legacy->device_token = $fallbackToken;
+            $legacy->enabled = true;
 
-        return $fallback !== null && $fallback !== '' ? $fallback : null;
+            return $legacy;
+        }
+
+        return null;
     }
 
     /**
      * @return array{sent: bool, invalid_token?: bool}
      */
-    private function sendFcmToToken(string $token, string $id, string $to, string $body): array
-    {
+    private function sendFcmToToken(
+        string $token,
+        string $id,
+        string $to,
+        string $body,
+        ?string $batchId = null,
+        ?int $simSubscriptionId = null
+    ): array {
         $messaging = $this->getMessaging();
         if ($messaging === null) {
             return ['sent' => false];
         }
 
+        $smsData = [
+            'recipients' => [$to],
+            'message' => $body,
+            'smsId' => (int) $id,
+            'smsBatchId' => $batchId ?? '',
+        ];
+
+        $data = [
+            'type' => 'smsData',
+            'smsData' => json_encode($smsData),
+            'id' => $id,
+            'to' => $to,
+            'body' => $body,
+        ];
+        if ($simSubscriptionId !== null) {
+            $data['simSubscriptionId'] = (string) $simSubscriptionId;
+        }
+
         try {
             $message = CloudMessage::new()
-                ->withData([
-                    'id' => $id,
-                    'to' => $to,
-                    'body' => $body,
-                ])
+                ->withData($data)
                 ->withToken($token);
 
             $messaging->send($message);

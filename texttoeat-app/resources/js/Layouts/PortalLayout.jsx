@@ -17,6 +17,7 @@ import {
     Sun,
     Moon,
     Utensils,
+    Smartphone,
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 
@@ -32,6 +33,7 @@ const PORTAL_NAV_ITEMS = [
     { href: '/portal/logs/orders', label: 'Order logs', Icon: ClipboardList },
     { href: '/portal/inbox', label: 'Conversation inbox', Icon: Inbox },
     { href: '/portal/logs/chatbot', label: 'Chatbot logs', Icon: MessageCircle },
+    { href: '/portal/sms-devices', label: 'SMS devices', Icon: Smartphone },
 ];
 
 function getPathname(url) {

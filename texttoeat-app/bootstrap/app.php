@@ -5,6 +5,9 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 $basePath = dirname(__DIR__);
 $webRoutes = $basePath.'/routes/web.php';
@@ -35,5 +38,21 @@ return Application::configure(basePath: $basePath)
         Authenticate::redirectUsing(fn ($request) => route('login'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (ValidationException $e, Request $request) {
+            if ($request->is('api/sms/*') && $request->expectsJson()) {
+                $errors = $e->errors();
+                $first = reset($errors);
+                $message = is_array($first) ? implode(' ', $first) : $e->getMessage();
+                if ($message === null || $message === '') {
+                    $message = $e->getMessage();
+                }
+
+                return response()->json(['success' => false, 'error' => $message], 422);
+            }
+        });
+        $exceptions->render(function (NotFoundHttpException $e, Request $request) {
+            if ($request->is('api/sms/*') && $request->expectsJson()) {
+                return response()->json(['success' => false, 'error' => 'Device not found.'], 404);
+            }
+        });
     })->create();
