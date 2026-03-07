@@ -75,4 +75,12 @@ return [
     'cart_invalid_option' => 'Reply 1=Add item, 2=View cart, 3=Edit, 4=Confirm, or done.',
     'back_main_menu_options' => 'Reply "back" for previous step or "main menu" to go to main menu.',
     'confirm_slots_full_warning' => 'Note: Some items have full or limited slots. Your order may not go through if slots are taken. Do you want to still proceed?',
+
+    'messenger' => [
+        'choose_language' => 'Choose language:',
+        'main_menu' => 'What would you like to do?',
+        'track_choice' => 'Choose:',
+        'delivery_choice' => 'How would you like to receive your order?',
+        'menu_header' => "Here's our menu:",
+    ],
 ];

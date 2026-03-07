@@ -1,7 +1,9 @@
 <?php
 
+use App\Messenger\MessengerPayloads;
 use App\Models\OutboundSms;
 use App\Models\ChatbotSession;
+use App\Messenger\FacebookMessengerClient;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -59,3 +61,21 @@ Artisan::command('chatbot:expire-takeover-sessions', function () {
 })->purpose('Expire human_takeover sessions after inactivity and restore bot mode');
 
 Schedule::command('chatbot:expire-takeover-sessions')->everyTenMinutes();
+
+Artisan::command('messenger:set-persistent-menu', function () {
+    $token = (string) config('facebook.page_access_token', '');
+    if ($token === '') {
+        $this->warn('FACEBOOK_PAGE_ACCESS_TOKEN is not set. Skipping.');
+
+        return;
+    }
+
+    $client = app(FacebookMessengerClient::class);
+    $menu = [
+        ['title' => 'Home', 'payload' => MessengerPayloads::MAIN_HOME],
+        ['title' => 'Track order', 'payload' => MessengerPayloads::MAIN_TRACK],
+        ['title' => 'Talk to staff', 'payload' => MessengerPayloads::MAIN_SUPPORT],
+    ];
+    $client->setPersistentMenu($menu);
+    $this->info('Persistent menu set successfully.');
+})->purpose('Set the Messenger persistent menu (Home, Track order, Talk to staff)');

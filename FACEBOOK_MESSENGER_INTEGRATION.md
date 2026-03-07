@@ -258,6 +258,34 @@ Use this when you add your webhook URL and tokens. The app already implements th
 | **6. Subscribe Page to webhook** | In Webhooks, select your Page and click **Subscribe** so events are sent to your callback. |
 | **7. .env** | Set `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `FACEBOOK_VERIFY_TOKEN`, `FACEBOOK_PAGE_ACCESS_TOKEN`. |
 | **8. Test** | Send a message to your Page; confirm the webhook receives the POST and the bot replies. For production: add test users in Roles; request `pages_messaging` and submit App Review; after approval, the bot is public. |
+| **9. Persistent menu** | Run `php artisan messenger:set-persistent-menu` (or `./vendor/bin/sail artisan messenger:set-persistent-menu`) after setting `FACEBOOK_PAGE_ACCESS_TOKEN`. This sets the hamburger menu (≡) with: Home, Track order, Talk to staff. |
+
+---
+
+## Persistent menu
+
+The app can set a **persistent menu** (the ≡ menu next to the composer) so users always have quick access to Home, Track order, and Talk to staff.
+
+- **Command**: `php artisan messenger:set-persistent-menu`
+- **When**: Run once after deployment or whenever you change the menu. Requires `FACEBOOK_PAGE_ACCESS_TOKEN` in `.env`.
+- **Payloads**: Menu items send postback payloads (`MAIN_HOME`, `MAIN_TRACK`, `MAIN_SUPPORT`) that the chatbot normalizes and handles like typed options.
+
+---
+
+## Messenger UX (quick replies, templates, carousel)
+
+The Messenger flow uses **Quick Replies**, **Button Template**, and **Generic Template (carousel)** so users can tap instead of typing numbers:
+
+- **Language selection**: Quick replies (English, Tagalog, Ilocano).
+- **Main menu**: Quick replies (Place order, Track order, Language, Talk to staff).
+- **Track choice**: Quick replies (List my orders, Enter reference).
+- **Delivery choice**: Quick replies (Pickup, delivery areas, Other).
+- **Confirm order**: Button template (Yes / No).
+- **Menu**: Carousel of up to 10 items with an "Add" button per card.
+
+Payloads follow the convention `CATEGORY_ACTION_ID` (e.g. `LANG_EN`, `MAIN_ORDER`, `CONFIRM_YES`, `MENU_ITEM_1`). See `App\Messenger\MessengerPayloads` and `App\Messenger\MessengerReplyBuilder`.
+
+- **Order confirmation**: After an order is placed, a **Receipt Template** is sent (order reference, items, total, payment method: Cash). Implemented in `FacebookMessengerWebhookController::buildReceiptPayload()` and sent when `state.current_state` is `order_placed` and `last_order_id` is set.
 
 ---
 

@@ -75,4 +75,12 @@ return [
     'cart_invalid_option' => 'Sumungbat 1=Aginayon, 2=Kitaen cart, 3=Baliwan, 4=Ikumpirma, wenno done.',
     'back_main_menu_options' => 'Sumungbat "back" para iti napalabas a rabii wenno "main menu" tapno agsubli iti main menu.',
     'confirm_slots_full_warning' => 'Pangngaasi: Dagiti dadduma nga item ket addaan iti napno wenno limitado a slots. Ti order mo ket mabalin a saan a tumuloy no naibusen dagiti slots. Kayat mo kadi nga ituloy?',
+
+    'messenger' => [
+        'choose_language' => 'Agpili ti pagsasao:',
+        'main_menu' => 'Ania ti kayat mo nga aramiden?',
+        'track_choice' => 'Agpili:',
+        'delivery_choice' => 'Kasano ti panangawat mo iti order?',
+        'menu_header' => 'Daytoy ti menu mi:',
+    ],
 ];

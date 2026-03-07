@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Contracts\MessengerSenderInterface;
 use App\Models\ChatbotSession;
+use App\Messenger\FacebookMessengerClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -70,15 +70,16 @@ class FacebookMessengerWebhookTest extends TestCase
         $rawBody = json_encode($payload, JSON_THROW_ON_ERROR);
         $signature = 'sha256=' . hash_hmac('sha256', $rawBody, 'test-secret');
 
-        $clientMock = Mockery::mock(MessengerSenderInterface::class);
-        $clientMock->shouldReceive('send')
-            ->atLeast()
+        $clientMock = Mockery::mock(FacebookMessengerClient::class);
+        $clientMock->shouldReceive('sendTextMessage')->andReturnNull();
+        $clientMock->shouldReceive('sendQuickReply')
             ->once()
             ->with(
                 $psid,
-                Mockery::on(fn ($text): bool => \is_string($text) && $text !== '')
+                Mockery::on(fn ($text): bool => \is_string($text) && str_contains($text, 'language')),
+                Mockery::on(fn ($opts): bool => \is_array($opts) && count($opts) === 3)
             );
-        $this->app->instance(MessengerSenderInterface::class, $clientMock);
+        $this->app->instance(FacebookMessengerClient::class, $clientMock);
 
         $response = $this
             ->withHeaders(['X-Hub-Signature-256' => $signature])
@@ -126,15 +127,17 @@ class FacebookMessengerWebhookTest extends TestCase
         $rawBody = json_encode($payload, JSON_THROW_ON_ERROR);
         $signature = 'sha256=' . hash_hmac('sha256', $rawBody, 'test-secret');
 
-        $clientMock = Mockery::mock(MessengerSenderInterface::class);
-        $clientMock->shouldReceive('send')
+        $clientMock = Mockery::mock(FacebookMessengerClient::class);
+        $clientMock->shouldReceive('sendTextMessage')->andReturnNull();
+        $clientMock->shouldReceive('sendQuickReply')
             ->atLeast()
             ->once()
             ->with(
                 $psid,
-                Mockery::on(fn ($text): bool => \is_string($text) && $text !== '')
+                Mockery::on(fn ($text): bool => \is_string($text) && $text !== ''),
+                Mockery::type('array')
             );
-        $this->app->instance(MessengerSenderInterface::class, $clientMock);
+        $this->app->instance(FacebookMessengerClient::class, $clientMock);
 
         $response = $this
             ->withHeaders(['X-Hub-Signature-256' => $signature])

@@ -20,6 +20,7 @@ import {
     Bot,
     User,
 } from 'lucide-react';
+import { SiFacebook } from 'react-icons/si';
 import { Toaster, toast } from 'sonner';
 
 const PORTAL_NAV_ITEMS_BASE = [
@@ -36,6 +37,7 @@ const PORTAL_NAV_ITEMS_BASE = [
     { href: '/portal/logs/chatbot', label: 'Chatbot logs', Icon: MessageCircle },
 ];
 const PORTAL_NAV_ITEM_SMS_DEVICES = { href: '/portal/sms-devices', label: 'SMS devices', Icon: Smartphone };
+const PORTAL_NAV_ITEM_FACEBOOK_MESSENGER = { href: '/portal/facebook-messenger', label: 'Facebook Messenger', Icon: SiFacebook };
 
 function getPathname(url) {
     try {
@@ -64,8 +66,8 @@ function NavLink({ href, label, Icon, pathname, onClick }) {
             aria-current={isActive ? 'page' : undefined}
         >
             {Icon && (
-                <span className="flex shrink-0 items-center justify-center text-[1.125rem]" aria-hidden>
-                    <Icon className="h-5 w-5" strokeWidth={2} />
+                <span className="flex shrink-0 w-6 min-w-6 items-center justify-center text-[1.125rem]" aria-hidden>
+                    <Icon className="h-5 w-5 shrink-0" strokeWidth={2} />
                 </span>
             )}
             {label}
@@ -175,7 +177,6 @@ export default function PortalLayout({ children }) {
     const pageUrl = usePage().url;
     const pathname = getPathname(pageUrl);
     const isAdmin = auth?.user?.role === 'admin';
-    const isSuperAdmin = auth?.user?.role === 'superadmin';
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     // #region agent log
@@ -199,10 +200,9 @@ export default function PortalLayout({ children }) {
     }, [flash?.error, flash?.success]);
 
     const navItems = [...PORTAL_NAV_ITEMS_BASE];
-    if (isSuperAdmin) {
-        navItems.push(PORTAL_NAV_ITEM_SMS_DEVICES);
-    }
     if (isAdmin) {
+        navItems.push(PORTAL_NAV_ITEM_SMS_DEVICES);
+        navItems.push(PORTAL_NAV_ITEM_FACEBOOK_MESSENGER);
         navItems.push({ href: '/portal/simulate', label: 'Channel simulator', Icon: Bot });
         navItems.push({ href: '/portal/users', label: 'Manage users', Icon: Users });
     }

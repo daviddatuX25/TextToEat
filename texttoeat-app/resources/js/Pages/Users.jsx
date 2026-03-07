@@ -29,13 +29,9 @@ export default function Users({ users = [] }) {
     return (
         <PortalLayout>
             <section className="flex flex-col gap-8 animate-fade-in">
-                <header className="space-y-4">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-surface-200 bg-surface-100 px-3 py-1.5 text-sm font-semibold tracking-wide text-surface-600 dark:bg-surface-700 dark:text-surface-300">
-                        <i className="ph-bold ph-users-three"></i>
-                        User management
-                    </div>
+                <header className="space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-surface-900 dark:text-white">
+                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
                             Manage users
                         </h1>
                         <button
@@ -47,7 +43,7 @@ export default function Users({ users = [] }) {
                             Add user
                         </button>
                     </div>
-                    <p className="text-surface-600 dark:text-surface-400 text-sm max-w-xl">
+                    <p className="text-surface-500 dark:text-surface-400 text-sm">
                         Create staff accounts and reset passwords to the default (Password1!). Remind staff to change it from Account.
                     </p>
                 </header>

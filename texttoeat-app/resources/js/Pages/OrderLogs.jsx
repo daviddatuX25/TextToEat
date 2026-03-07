@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, router } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
+import { TypewriterText } from '../components/ui';
 import { LogFilterPanel } from '../components/logs/LogFilterPanel';
 import { OrderLogTableRow } from '../components/logs/OrderLogTableRow';
 import { OrderLogCard } from '../components/logs/OrderLogCard';
@@ -33,20 +34,11 @@ export default function OrderLogs({ logs, filters = {}, meta = {} }) {
     return (
         <PortalLayout>
             <section className="flex flex-col gap-5 animate-fade-in">
-                <header className="space-y-4">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm font-semibold tracking-wide text-primary-600 dark:border-primary-500/20 dark:bg-primary-500/10 dark:text-primary-400">
-                        <i className="ph-bold ph-list-checks" aria-hidden />
-                        Order logs
-                    </div>
+                <header className="space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
-                                Order logs
-                            </h1>
-                            <p className="text-surface-600 dark:text-surface-400 text-sm mt-1">
-                                Recent staff actions on orders. Filter by date, status, channel, customer, and staff.
-                            </p>
-                        </div>
+                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
+                            Order logs
+                        </h1>
                         <Link
                             href="/portal/orders"
                             className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
@@ -54,6 +46,9 @@ export default function OrderLogs({ logs, filters = {}, meta = {} }) {
                             ← Back to orders
                         </Link>
                     </div>
+                    <p className="text-surface-500 dark:text-surface-400 text-sm">
+                        <TypewriterText text="Recent staff actions on orders. Filter by date, status, channel, customer, and staff." />
+                    </p>
                 </header>
 
                 <div className="flex flex-wrap items-center justify-between gap-3">

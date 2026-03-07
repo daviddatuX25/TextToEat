@@ -3,7 +3,7 @@
 namespace App\Services\Channels;
 
 use App\Contracts\MessengerSenderInterface;
-use App\Services\FacebookMessengerClient;
+use App\Messenger\FacebookMessengerClient;
 
 class FacebookMessengerSender implements MessengerSenderInterface
 {

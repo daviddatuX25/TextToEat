@@ -75,4 +75,12 @@ return [
     'cart_invalid_option' => 'Tumugon 1=Magdagdag, 2=Tingnan cart, 3=Baguhin, 4=Kumpirmahin, o done.',
     'back_main_menu_options' => 'Tumugon "back" para sa nakaraang hakbang o "main menu" para bumalik sa main menu.',
     'confirm_slots_full_warning' => 'Paalala: Ang ilang item ay may puno o limitadong slots. Maaaring hindi magtuloy ang iyong order kung naubos na ang slots. Gusto mo pa bang magpatuloy?',
+
+    'messenger' => [
+        'choose_language' => 'Pumili ng wika:',
+        'main_menu' => 'Ano ang gusto mong gawin?',
+        'track_choice' => 'Pumili:',
+        'delivery_choice' => 'Paano mo gustong matanggap ang order mo?',
+        'menu_header' => 'Narito ang aming menu:',
+    ],
 ];

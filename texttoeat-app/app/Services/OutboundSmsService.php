@@ -237,19 +237,38 @@ class OutboundSmsService
         }
 
         $credentialsPath = config('firebase.credentials');
-        if ($credentialsPath === null || $credentialsPath === '' || ! is_file($credentialsPath)) {
-            Log::debug('OutboundSmsService: FIREBASE_CREDENTIALS not set or file missing');
+        if ($credentialsPath === null || $credentialsPath === '') {
+            Log::warning('OutboundSmsService: FIREBASE_CREDENTIALS not set');
+
+            return null;
+        }
+
+        $isAbsolute = str_starts_with($credentialsPath, '/')
+            || preg_match('#^[A-Za-z]:[/\\\]#', $credentialsPath);
+        $resolved = $isAbsolute
+            ? $credentialsPath
+            : base_path(ltrim($credentialsPath, './'));
+
+        if (! is_file($resolved)) {
+            Log::warning('OutboundSmsService: FIREBASE_CREDENTIALS file missing', [
+                'path' => $resolved,
+                'raw' => $credentialsPath,
+                'base_path' => base_path(),
+            ]);
 
             return null;
         }
 
         try {
-            $factory = (new Factory)->withServiceAccount($credentialsPath);
+            $factory = (new Factory)->withServiceAccount($resolved);
             $this->messaging = $factory->createMessaging();
 
             return $this->messaging;
         } catch (\Throwable $e) {
-            Log::warning('OutboundSmsService: failed to create Firebase Messaging', ['message' => $e->getMessage()]);
+            Log::warning('OutboundSmsService: failed to create Firebase Messaging', [
+                'message' => $e->getMessage(),
+                'path' => $resolved,
+            ]);
 
             return null;
         }

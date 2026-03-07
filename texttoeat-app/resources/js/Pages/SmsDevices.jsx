@@ -65,35 +65,29 @@ export default function SmsDevices({ devices = [], api_key_for_qr = null }) {
 
     return (
         <PortalLayout>
-            <section className="flex flex-col gap-8 animate-fade-in">
-                <header className="space-y-4">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-surface-200 bg-surface-100 px-3 py-1.5 text-sm font-semibold tracking-wide text-surface-600 dark:bg-surface-700 dark:text-surface-300">
-                        <Smartphone className="h-4 w-4" />
-                        SMS gateway
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-surface-900 dark:text-white">
-                            SMS devices
-                        </h1>
-                    </div>
-                    <p className="text-surface-600 dark:text-surface-400 text-sm max-w-xl">
+            <section className="flex flex-col gap-8 animate-fade-in pt-2 pb-12">
+                <header className="space-y-3">
+                    <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
+                        SMS devices
+                    </h1>
+                    <p className="text-surface-500 dark:text-surface-400 text-sm">
                         Android devices that send and receive SMS via FCM. Use &quot;Refresh status&quot; to request battery and network info. Set a preferred SIM for outbound SMS when the device has multiple SIMs.
                     </p>
                 </header>
 
                 <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
-                    <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-900/40">
+                    <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-900/40 px-6 py-5">
                         <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 inline-flex items-center gap-2">
                             <QrCode className="h-4 w-4" />
                             Register device via QR code
                         </p>
-                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-3">
                             {api_key_for_qr
                                 ? 'Scan this QR code with the Android app. The code contains only your API key; the app will then register this device automatically.'
                                 : 'The app generates an API key after migration. If no QR appears, run: php artisan migrate. Optionally set SMS_DEVICE_API_KEY in .env to use your own key.'}
                         </p>
                     </CardHeader>
-                    <CardContent className="p-6 flex flex-col sm:flex-row items-start gap-6">
+                    <CardContent className="p-6 sm:p-8 flex flex-col sm:flex-row items-start gap-6">
                         {api_key_for_qr ? (
                             qrDataUrl ? (
                                 <div className="flex shrink-0 rounded-xl border-2 border-surface-200 dark:border-surface-600 bg-white p-2">
@@ -109,9 +103,9 @@ export default function SmsDevices({ devices = [], api_key_for_qr = null }) {
                                 Loading… Run php artisan migrate if the QR does not appear. You can also set SMS_DEVICE_API_KEY in .env to override.
                             </div>
                         )}
-                        <div className="text-sm text-surface-600 dark:text-surface-400 space-y-2">
+                        <div className="text-sm text-surface-600 dark:text-surface-400 space-y-3">
                             <p><strong className="text-surface-800 dark:text-surface-200">Zero-config flow:</strong></p>
-                            <ol className="list-decimal list-inside space-y-1">
+                            <ol className="list-decimal list-inside space-y-2">
                                 <li>Open the SMS gateway app on your Android device.</li>
                                 <li>Tap &quot;Scan QR&quot; or &quot;Register device&quot;.</li>
                                 <li>{api_key_for_qr ? 'Scan the code above. The app uses the API key to register and sync settings.' : 'Once the QR is visible above, scan it with the app.'}</li>
@@ -122,12 +116,12 @@ export default function SmsDevices({ devices = [], api_key_for_qr = null }) {
 
                 {devices.length === 0 ? (
                     <Card className="rounded-2xl border-surface-200 dark:border-surface-700">
-                        <CardContent className="p-8 text-center">
+                        <CardContent className="py-12 my-5 px-8 text-center">
                             <Smartphone className="mx-auto h-12 w-12 text-surface-400 dark:text-surface-500" />
-                            <p className="mt-3 text-surface-600 dark:text-surface-400">
+                            <p className="mt-4 text-surface-600 dark:text-surface-400">
                                 No devices registered yet.
                             </p>
-                            <p className="mt-1 text-sm text-surface-500 dark:text-surface-500">
+                            <p className="mt-3 text-sm text-surface-500 dark:text-surface-500">
                                 Register from the Android app (POST /api/sms/device/register) to appear here.
                             </p>
                         </CardContent>
