@@ -6,10 +6,8 @@
  * - GET  /php-run-scripts/run.php: shows form
  * - POST /php-run-scripts/run.php: runs a whitelisted script
  *
- * In production:
- * - Requires password (RUN_SCRIPTS_PASSWORD).
- * - Only runs whitelisted scripts: initial-setup, deploy-update, reseed.
- * - Custom Artisan commands are NOT allowed.
+ * Whitelisted scripts: initial-setup, deploy-update, reseed, force-reseed, menu-reset, schedule-cron-info.
+ * In production: requires RUN_SCRIPTS_PASSWORD. Custom Artisan commands (dev only) when not in production.
  */
 
 define('PHP_RUN_SCRIPTS_ALLOW_WEB', true);
@@ -97,7 +95,8 @@ function render_form(string $env, string $message = ''): void
                     <option value="deploy-update">deploy-update</option>
                     <option value="reseed">reseed (dev / staging)</option>
                     <option value="force-reseed">force-reseed (DANGEROUS: wipes DB; requires ALLOW_FORCE_RESEED=true)</option>
-                    <option value="menu-reset">menu-reset (reset today&apos;s menu, flag greeting)</option>
+                    <option value="menu-reset">menu-reset (manual menu rollover; or use Portal → Menu settings)</option>
+                    <option value="schedule-cron-info">schedule-cron-info (print cron line for Laravel scheduler)</option>
                 </select>
             </label>
         </div>
@@ -125,7 +124,7 @@ function handle_cli(Application $app, array $argv): void
     $script = $argv[1] ?? null;
     if (!is_string($script) || $script === '') {
         echo "Usage: php php-run-scripts/run.php <script>\n";
-        echo "Allowed scripts: initial-setup, deploy-update, reseed, menu-reset\n";
+        echo "Allowed scripts: initial-setup, deploy-update, reseed, force-reseed, menu-reset, schedule-cron-info\n";
         exit(1);
     }
 

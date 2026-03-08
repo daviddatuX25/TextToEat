@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\OrderStatus;
 use App\Models\ChatbotSession;
+use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Services\MenuItemStockService;
@@ -49,17 +50,14 @@ class PortalNavBadgesController extends Controller
             ->sessionState(['active', 'pending'])
             ->count();
 
-        // Low-stock badge counts only today's menu (menu_date = today); never include previous days.
+        // Low-stock badge: same definition as menu page (units_today < threshold).
         $today = Carbon::today();
         $threshold = (int) Setting::get('menu.low_stock_threshold', 5);
         $badgeStyle = Setting::get('menu.low_stock_badge_style', 'count');
-        $virtualAvailable = $this->stockService->getVirtualAvailableForToday([]);
-        $lowCount = 0;
-        foreach ($virtualAvailable as $available) {
-            if ($available < $threshold) {
-                $lowCount++;
-            }
-        }
+        $lowCount = MenuItem::query()
+            ->whereDate('menu_date', $today)
+            ->where('units_today', '<', $threshold)
+            ->count();
         $low_stock_meals = $badgeStyle === 'one' ? min(1, $lowCount) : $lowCount;
 
         return response()->json([

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
 use App\Models\ActionLog;
+use App\Models\Category;
 use App\Models\DeliveryArea;
 use App\Models\DiningMarker;
 use App\Models\MenuItem;
@@ -18,13 +19,13 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
 /**
- * Demo-only: seeds orders, order items, and action logs across multiple days
- * so that Dashboard, Analytics, Reports, Deliveries, Pickup, Walk-in have data.
+ * Demo-only: seeds menu per day, then orders/order items/action logs per day so that
+ * each day's order quantities never exceed that day's menu item quantities.
  *
  * Not run by default. For demo/presentation:
  *   php artisan db:seed --class=AnalyticsAndWorkflowsSeeder
  *
- * Requires: users, menu items (FilipinoMealsSeeder), pickup slots, delivery areas, dining markers.
+ * Requires: users, pickup slots, delivery areas, dining markers. Creates menu for each date if missing.
  */
 class AnalyticsAndWorkflowsSeeder extends Seeder
 {
@@ -70,23 +71,109 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
 
     private ?int $userId = null;
 
+    /**
+     * Meal definitions (name, price, category, units_today, etc.) for creating menu per date.
+     * Must match FilipinoMealsSeeder so today's menu is consistent when run after ProductionSeeder.
+     *
+     * @return list<array{name: string, price: float, category: string, image_url: string, units_today: int, is_sold_out: bool}>
+     */
+    private function getMealDefinitions(): array
+    {
+        return [
+            ['name' => 'Chicken Adobo', 'price' => 125.00, 'category' => 'Ulam', 'image_url' => 'https://picsum.photos/seed/chicken-adobo/800/600', 'units_today' => 30, 'is_sold_out' => false],
+            ['name' => 'Pork Sinigang na Baboy', 'price' => 135.00, 'category' => 'Ulam', 'image_url' => 'https://picsum.photos/seed/sinigang/800/600', 'units_today' => 25, 'is_sold_out' => false],
+            ['name' => 'Lechon Kawali', 'price' => 185.00, 'category' => 'Ulam', 'image_url' => 'https://picsum.photos/seed/lechon/800/600', 'units_today' => 20, 'is_sold_out' => false],
+            ['name' => 'Kare-Kare', 'price' => 165.00, 'category' => 'Ulam', 'image_url' => 'https://picsum.photos/seed/kare-kare/800/600', 'units_today' => 18, 'is_sold_out' => false],
+            ['name' => 'Beef Caldereta', 'price' => 155.00, 'category' => 'Ulam', 'image_url' => 'https://picsum.photos/seed/caldereta/800/600', 'units_today' => 22, 'is_sold_out' => false],
+            ['name' => 'Pork Sisig', 'price' => 145.00, 'category' => 'Ulam', 'image_url' => 'https://picsum.photos/seed/sisig/800/600', 'units_today' => 28, 'is_sold_out' => false],
+            ['name' => 'Lumpiang Shanghai (6 pcs)', 'price' => 85.00, 'category' => 'Merienda', 'image_url' => 'https://picsum.photos/seed/lumpia/800/600', 'units_today' => 40, 'is_sold_out' => false],
+            ['name' => 'Pancit Canton', 'price' => 95.00, 'category' => 'Noodles', 'image_url' => 'https://picsum.photos/seed/pancit/800/600', 'units_today' => 35, 'is_sold_out' => false],
+            ['name' => 'Tapsilog', 'price' => 115.00, 'category' => 'Silog', 'image_url' => 'https://picsum.photos/seed/tapsilog/800/600', 'units_today' => 25, 'is_sold_out' => false],
+            ['name' => 'Longsilog', 'price' => 95.00, 'category' => 'Silog', 'image_url' => 'https://picsum.photos/seed/longsilog/800/600', 'units_today' => 30, 'is_sold_out' => false],
+            ['name' => 'Halo-Halo', 'price' => 75.00, 'category' => 'Dessert', 'image_url' => 'https://picsum.photos/seed/halo-halo/800/600', 'units_today' => 45, 'is_sold_out' => false],
+            ['name' => 'Turon (2 pcs)', 'price' => 45.00, 'category' => 'Dessert', 'image_url' => 'https://picsum.photos/seed/turon/800/600', 'units_today' => 50, 'is_sold_out' => false],
+            ['name' => 'Leche Flan', 'price' => 65.00, 'category' => 'Dessert', 'image_url' => 'https://picsum.photos/seed/leche-flan/800/600', 'units_today' => 20, 'is_sold_out' => false],
+            ['name' => 'Dinuguan', 'price' => 105.00, 'category' => 'Ulam', 'image_url' => 'https://picsum.photos/seed/dinuguan/800/600', 'units_today' => 15, 'is_sold_out' => false],
+            ['name' => 'Pinakbet', 'price' => 95.00, 'category' => 'Ulam', 'image_url' => 'https://picsum.photos/seed/pinakbet/800/600', 'units_today' => 25, 'is_sold_out' => false],
+        ];
+    }
+
+    /**
+     * Ensure menu items and daily stock exist for the given date (so orders for that day can respect quantities).
+     */
+    private function ensureMenuForDate(Carbon $date): void
+    {
+        $menuDate = $date->toDateString();
+        foreach ($this->getMealDefinitions() as $meal) {
+            $category = Category::firstOrCreate(['name' => $meal['category']], ['name' => $meal['category']]);
+            $item = MenuItem::updateOrCreate(
+                [
+                    'name' => $meal['name'],
+                    'menu_date' => $menuDate,
+                ],
+                [
+                    'price' => $meal['price'],
+                    'category_id' => $category->id,
+                    'image_url' => $meal['image_url'],
+                    'units_today' => $meal['units_today'],
+                    'is_sold_out' => $meal['is_sold_out'],
+                ]
+            );
+            MenuItemDailyStock::updateOrCreate(
+                [
+                    'menu_item_id' => $item->id,
+                    'menu_date' => $menuDate,
+                ],
+                [
+                    'units_set' => $meal['units_today'],
+                    'units_sold' => 0,
+                    'units_leftover' => $meal['units_today'],
+                ]
+            );
+        }
+    }
+
+    /**
+     * Load this date's menu into menuItemNamesPrices, unitsSetPerItem, and reset reserved/sold for the day.
+     */
+    private function loadMenuForDate(Carbon $date): void
+    {
+        $this->menuItemNamesPrices = [];
+        $this->unitsSetPerItem = [];
+        $this->reservedPerItemToday = [];
+        $this->soldPerItemToday = [];
+        $items = MenuItem::query()->whereDate('menu_date', $date)->get();
+        foreach ($items as $item) {
+            $this->menuItemNamesPrices[$item->id] = ['name' => $item->name, 'price' => (float) $item->price];
+            $this->unitsSetPerItem[$item->id] = (int) $item->units_today;
+            $this->reservedPerItemToday[$item->id] = 0;
+            $this->soldPerItemToday[$item->id] = 0;
+        }
+    }
+
     public function run(): void
     {
         $this->loadDependencies();
-        if ($this->menuItemNamesPrices === []) {
-            $this->command->warn('No menu items for today found. Run FilipinoMealsSeeder first.');
-            return;
+        $today = Carbon::today(config('app.timezone'));
+
+        $this->command->info('Ensuring menu exists for each date (today first so current day menu is never empty)...');
+        $this->ensureMenuForDate($today);
+        for ($day = 0; $day < self::DAYS_BACK; $day++) {
+            $date = $today->copy()->subDays(self::DAYS_BACK - $day)->startOfDay();
+            $this->ensureMenuForDate($date);
         }
 
-        $this->command->info('Seeding orders, order items, and action logs for analytics and workflows...');
+        $this->command->info('Seeding orders, order items, and action logs per day (order quantities capped by that day\'s menu)...');
         $orderCount = 0;
-        $from = Carbon::today()->subDays(self::DAYS_BACK)->startOfDay();
-        $to = Carbon::today()->endOfDay();
-
         $activeCountToday = 0;
         $dummyRef = 0;
+
         for ($day = 0; $day <= self::DAYS_BACK; $day++) {
-            $date = Carbon::today()->subDays(self::DAYS_BACK - $day);
+            $date = $today->copy()->subDays(self::DAYS_BACK - $day)->startOfDay();
+            $this->loadMenuForDate($date);
+            if ($this->menuItemNamesPrices === []) {
+                continue;
+            }
             $ordersPerDay = $this->ordersCountForDay($day);
             for ($i = 0; $i < $ordersPerDay; $i++) {
                 $activeRef = $date->isToday() ? $activeCountToday : $dummyRef;
@@ -102,14 +189,6 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
 
     private function loadDependencies(): void
     {
-        $today = Carbon::today();
-        $items = MenuItem::query()->whereDate('menu_date', $today)->get();
-        foreach ($items as $item) {
-            $this->menuItemNamesPrices[$item->id] = ['name' => $item->name, 'price' => (float) $item->price];
-            $this->unitsSetPerItem[$item->id] = (int) $item->units_today;
-            $this->reservedPerItemToday[$item->id] = 0;
-            $this->soldPerItemToday[$item->id] = 0;
-        }
         $this->pickupSlots = PickupSlot::query()->pluck('value')->all();
         $this->deliveryAreas = DeliveryArea::query()->get()->map(fn ($a) => [
             'name' => $a->name,
@@ -147,23 +226,34 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
         }
 
         $reference = $this->uniqueReference();
-        $availablePerItem = null;
-        if ($date->isToday()) {
-            foreach ($this->unitsSetPerItem as $id => $set) {
-                $res = $this->reservedPerItemToday[$id] ?? 0;
-                $sold = $this->soldPerItemToday[$id] ?? 0;
-                $availablePerItem[$id] = max(0, $set - $res - $sold);
+        $availablePerItem = [];
+        foreach ($this->unitsSetPerItem as $id => $set) {
+            $res = $this->reservedPerItemToday[$id] ?? 0;
+            $sold = $this->soldPerItemToday[$id] ?? 0;
+            $availablePerItem[$id] = max(0, $set - $res - $sold);
+        }
+        $itemRows = $this->randomOrderItems($availablePerItem);
+        if ($itemRows === [] || array_sum(array_column($itemRows, 'quantity')) === 0) {
+            if ($this->isActiveStatus($status) && $date->isToday()) {
+                $activeCountToday = max(0, $activeCountToday - 1);
             }
-            // For today, always cap order quantities by available stock so we never exceed units_set per item.
-            $itemRows = $this->randomOrderItems($availablePerItem);
-            if ($itemRows === [] || array_sum(array_column($itemRows, 'quantity')) === 0) {
-                if ($this->isActiveStatus($status)) {
-                    $activeCountToday = max(0, $activeCountToday - 1);
-                }
-                return;
+            return;
+        }
+        // Cap each line to current available so DB never exceeds set per item (defensive)
+        foreach ($itemRows as &$row) {
+            $id = $row['menu_item_id'] ?? null;
+            if ($id !== null && isset($availablePerItem[$id])) {
+                $row['quantity'] = min($row['quantity'], $availablePerItem[$id]);
+                $row['subtotal'] = $row['price'] * $row['quantity'];
             }
-        } else {
-            $itemRows = $this->randomOrderItems();
+        }
+        unset($row);
+        $itemRows = array_values(array_filter($itemRows, fn ($r) => ($r['quantity'] ?? 0) > 0));
+        if ($itemRows === [] || array_sum(array_column($itemRows, 'quantity')) === 0) {
+            if ($this->isActiveStatus($status) && $date->isToday()) {
+                $activeCountToday = max(0, $activeCountToday - 1);
+            }
+            return;
         }
         $total = array_sum(array_column($itemRows, 'subtotal'));
 
@@ -195,7 +285,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
                 'quantity' => $row['quantity'],
                 'price' => $row['price'],
             ]);
-            if ($date->isToday() && $row['menu_item_id']) {
+            if ($row['menu_item_id']) {
                 $id = $row['menu_item_id'];
                 $qty = $row['quantity'];
                 $set = $this->unitsSetPerItem[$id] ?? 0;
@@ -232,17 +322,28 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
     private function resolveStatusForDate(Carbon $date, int &$activeCountToday): string
     {
         if (! $date->isToday()) {
-            return $this->randomStatus();
-        }
-        if ($activeCountToday >= self::MAX_ACTIVE_ORDERS_TODAY) {
             return $this->randomCompletedOrCancelled();
         }
-        $status = $this->randomStatus();
-        if ($this->isActiveStatus($status)) {
-            $activeCountToday++;
-        }
+        return $this->resolveStatusForToday($activeCountToday);
+    }
 
-        return $status;
+    /**
+     * Today only: 90% done (completed/cancelled), 10% active; cap active count at MAX_ACTIVE_ORDERS_TODAY.
+     */
+    private function resolveStatusForToday(int &$activeCountToday): string
+    {
+        if ($this->randomBool(0.9) || $activeCountToday >= self::MAX_ACTIVE_ORDERS_TODAY) {
+            return $this->randomCompletedOrCancelled();
+        }
+        $activeStatuses = [
+            OrderStatus::Received->value,
+            OrderStatus::Preparing->value,
+            OrderStatus::Ready->value,
+            OrderStatus::OnTheWay->value,
+        ];
+        $activeCountToday++;
+
+        return $activeStatuses[array_rand($activeStatuses)];
     }
 
     private function isActiveStatus(string $status): bool
@@ -329,16 +430,73 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
     }
 
     /**
-     * Sync menu_item_daily_stock.units_sold and menu_items.units_today for today so the app's
-     * virtual available matches the seeded completed/cancelled orders.
+     * Sync menu_item_daily_stock and menu_items.units_today for today so the app's
+     * display is consistent: units_today = set - sold - reserved.
+     * Recomputes sold/reserved from DB for today's menu items so today's menu is never left empty or out of sync.
      */
     private function syncTodayStockFromSeededOrders(): void
     {
-        $today = Carbon::today();
-        foreach (array_keys($this->unitsSetPerItem) as $menuItemId) {
-            $sold = $this->soldPerItemToday[$menuItemId] ?? 0;
-            $set = $this->unitsSetPerItem[$menuItemId] ?? 0;
-            $leftover = max(0, $set - $sold);
+        $today = Carbon::today(config('app.timezone'));
+        $pendingStatuses = [
+            OrderStatus::Received->value,
+            OrderStatus::Preparing->value,
+            OrderStatus::Ready->value,
+            OrderStatus::OnTheWay->value,
+        ];
+
+        $todayItemIds = MenuItem::query()->whereDate('menu_date', $today)->pluck('id')->all();
+        if ($todayItemIds === []) {
+            $this->command->warn('No menu items for today found; ensuring today\'s menu.');
+            $this->ensureMenuForDate($today);
+            $todayItemIds = MenuItem::query()->whereDate('menu_date', $today)->pluck('id')->all();
+        }
+
+        $stockRows = MenuItemDailyStock::query()
+            ->whereIn('menu_item_id', $todayItemIds)
+            ->whereDate('menu_date', $today)
+            ->get()
+            ->keyBy('menu_item_id');
+
+        $soldByItem = OrderItem::query()
+            ->whereIn('menu_item_id', $todayItemIds)
+            ->whereHas('order', fn ($q) => $q->whereDate('created_at', $today)
+                ->whereIn('status', [OrderStatus::Completed->value, OrderStatus::Cancelled->value]))
+            ->selectRaw('menu_item_id, COALESCE(SUM(quantity), 0) as qty')
+            ->groupBy('menu_item_id')
+            ->pluck('qty', 'menu_item_id')
+            ->all();
+
+        $reservedByItem = OrderItem::query()
+            ->whereIn('menu_item_id', $todayItemIds)
+            ->whereHas('order', fn ($q) => $q->whereDate('created_at', $today)->whereIn('status', $pendingStatuses))
+            ->selectRaw('menu_item_id, COALESCE(SUM(quantity), 0) as qty')
+            ->groupBy('menu_item_id')
+            ->pluck('qty', 'menu_item_id')
+            ->all();
+
+        $defaultSetByName = collect($this->getMealDefinitions())->pluck('units_today', 'name')->all();
+        $items = MenuItem::query()->whereIn('id', $todayItemIds)->get()->keyBy('id');
+
+        $minQtyBuffer = 10; // Ensure today's menu always shows quantity > current orders
+
+        foreach ($todayItemIds as $menuItemId) {
+            $item = $items->get($menuItemId);
+            $stock = $stockRows->get($menuItemId);
+            $set = $stock ? (int) $stock->units_set : (int) ($defaultSetByName[$item->name ?? ''] ?? $item->units_today ?? 0);
+            if ($set <= 0 && $item) {
+                $set = (int) ($defaultSetByName[$item->name ?? ''] ?? 30);
+            }
+            $sold = (int) ($soldByItem[$menuItemId] ?? 0);
+            $reserved = (int) ($reservedByItem[$menuItemId] ?? 0);
+            $leftover = max(0, $set - $sold - $reserved);
+
+            // At end of seeding: ensure today's Qty is always > current orders (never 0)
+            $minLeftover = max($reserved + $minQtyBuffer, $minQtyBuffer);
+            if ($leftover < $minLeftover) {
+                $leftover = $minLeftover;
+                $set = $leftover + $sold + $reserved;
+            }
+
             MenuItemDailyStock::updateOrCreate(
                 [
                     'menu_item_id' => $menuItemId,

@@ -12,7 +12,7 @@ class ProductionSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed production-ready data: 1 admin, 2 staff, pickup slots,
+     * Seed production-ready data: 1 superadmin, 1 admin, 2 staff, pickup slots,
      * dining markers (counts from config/seed.php), delivery areas,
      * categories, and today's menu.
      */
@@ -28,6 +28,10 @@ class ProductionSeeder extends Seeder
     private function seedUsers(): void
     {
         // Seeded accounts (password for all: Password1!)
+        User::updateOrCreate(
+            ['username' => 'superadmin'],
+            ['name' => 'Super Admin', 'email' => 'superadmin@avelinalacasandile-eat.top', 'password' => Hash::make('Password1!'), 'role' => 'superadmin']
+        );
         User::updateOrCreate(
             ['username' => 'admin'],
             ['name' => 'Admin', 'email' => 'admin@avelinalacasandile-eat.top', 'password' => Hash::make('Password1!'), 'role' => 'admin']

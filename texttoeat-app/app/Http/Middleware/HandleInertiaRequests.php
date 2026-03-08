@@ -36,6 +36,7 @@ class HandleInertiaRequests extends Middleware
                     'name' => $request->user()->name,
                     'username' => $request->user()->username,
                     'role' => $request->user()->role ?? 'staff',
+                    'is_admin' => $request->user()->isAdmin(),
                 ] : null,
             ],
             'show_daily_greeting' => fn () => $request->user() && $request->is('portal*')

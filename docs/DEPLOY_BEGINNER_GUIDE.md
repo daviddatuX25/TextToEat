@@ -244,17 +244,17 @@ The app includes a folder **`php-run-scripts/`** (sibling to `app/`, `vendor/`, 
 - **From the panel (CLI-style):** Point “Run PHP” (or equivalent) at **`php-run-scripts/run.php`** and pass the script name as an argument, for example:
   - `php-run-scripts/run.php initial-setup`
   - `php-run-scripts/run.php deploy-update`
-  - `php-run-scripts/run.php reseed` (dangerous: `migrate:fresh --seed`, never in real prod)
+  - `php-run-scripts/run.php menu-reset` (or use Portal → Menu settings)
+  - `php-run-scripts/run.php schedule-cron-info` (prints cron line for scheduler)
+  - `php-run-scripts/run.php reseed` (dangerous: dev only)
 - **From the command line (SSH):**
   ```bash
   php php-run-scripts/run.php initial-setup
   php php-run-scripts/run.php deploy-update
-  php php-run-scripts/run.php reseed
+  php php-run-scripts/run.php menu-reset
+  php php-run-scripts/run.php schedule-cron-info
   ```
-  Scripts are:
-  - `initial-setup` — one-time: `key:generate`, `storage:link`, `migrate --force`, `config:cache`, `route:cache`.
-  - `deploy-update` — after uploading a new build: `migrate --force`, `config:cache`, `route:cache`.
-  - `reseed` — **dev only**: `migrate:fresh --seed` (refuses to run when `APP_ENV=production`).
+  Scripts: `initial-setup` (one-time), `deploy-update` (after code deploy), `menu-reset` (manual menu rollover; or use Portal → Menu settings), `schedule-cron-info` (prints cron line for Laravel scheduler), `reseed` (dev only), `force-reseed` (dangerous; in prod requires `ALLOW_FORCE_RESEED=true`).
 
 **Security (dev vs production):**
 
@@ -271,8 +271,20 @@ The app includes a folder **`php-run-scripts/`** (sibling to `app/`, `vendor/`, 
       "script": "deploy-update"
     }
     ```
-  - Allowed `script` values are: `initial-setup`, `deploy-update`, `reseed` (reseed still refuses in `APP_ENV=production`).
+  - Allowed `script` values: `initial-setup`, `deploy-update`, `menu-reset`, `schedule-cron-info`, `reseed`, `force-reseed` (reseed refuses in production unless force-reseed with `ALLOW_FORCE_RESEED=true`).
 - **In dev** (`APP_ENV=local` or similar), the password check is skipped; you can call `run.php` from the browser if you relax the app root `.htaccess` locally. In production leave the root `.htaccess` in place (deny all) and prefer running `run.php` via panel/CLI instead of HTTP.
+
+---
+
+### Laravel scheduler (cron)
+
+For **automatic** menu reset at a set hour, SMS pending timeout, and chatbot takeover expiry, add **one** cron job that runs every minute. In your hosting panel → Cron Jobs, add:
+
+```bash
+* * * * * cd /path/to/your/app/root && php artisan schedule:run >> /dev/null 2>&1
+```
+
+Replace `/path/to/your/app/root` with your app root (e.g. Layout A: `/home/YOUR_USER`; Layout B: `/home/YOUR_USER/public_html/app`). To get the exact line for your server, run `php php-run-scripts/run.php schedule-cron-info` (or choose **schedule-cron-info** in the run.php form).
 
 ---
 

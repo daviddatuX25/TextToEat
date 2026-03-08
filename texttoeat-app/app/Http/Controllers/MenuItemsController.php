@@ -79,13 +79,11 @@ class MenuItemsController extends Controller
 
         $totalMenuItems = MenuItem::query()->whereDate('menu_date', $today)->count();
         $threshold = (int) Setting::get('menu.low_stock_threshold', 5);
-        $virtualAvailableAll = $this->stockService->getVirtualAvailableForToday([]);
-        $lowStockCount = 0;
-        foreach ($virtualAvailableAll as $available) {
-            if ($available < $threshold) {
-                $lowStockCount++;
-            }
-        }
+        // Base low-stock count on same Qty (units_today) shown in UI, not virtual_available
+        $lowStockCount = MenuItem::query()
+            ->whereDate('menu_date', $today)
+            ->where('units_today', '<', $threshold)
+            ->count();
 
         return Inertia::render('MenuItems', [
             'menuItems' => $menuItems,

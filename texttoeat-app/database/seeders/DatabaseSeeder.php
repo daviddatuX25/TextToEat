@@ -9,7 +9,7 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application database.
      *
-     * Default: production data only (1 admin, 2 staff, pickup slots, dining
+     * Default: production data only (1 superadmin, 1 admin, 2 staff, pickup slots, dining
      * markers, delivery areas, categories, menu). Counts come from config/seed.php.
      *
      * For demo (production + analytics, orders, action logs):

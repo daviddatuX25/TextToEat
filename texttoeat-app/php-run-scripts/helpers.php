@@ -153,6 +153,24 @@ if (! function_exists('run_menu_reset')) {
     }
 }
 
+if (! function_exists('run_schedule_cron_info')) {
+    /**
+     * Print the cron line and instructions for Laravel's scheduler (no side effects).
+     */
+    function run_schedule_cron_info(Application $app): void
+    {
+        $appRoot = realpath($app->basePath()) ?: $app->basePath();
+        $cronLine = '* * * * * cd ' . $appRoot . ' && php artisan schedule:run >> /dev/null 2>&1';
+        echo "Add this single cron job (runs every minute) so Laravel's scheduler can run:\n";
+        echo "  - menu:reset-today (when enabled in Portal → Menu settings)\n";
+        echo "  - sms:mark-old-pending-failed (every 10 min)\n";
+        echo "  - chatbot:expire-takeover-sessions (every 10 min)\n\n";
+        echo "Cron line (copy into your hosting panel → Cron Jobs):\n\n";
+        echo $cronLine . "\n\n";
+        echo "Replace the path above if your app root is different on this server.\n";
+    }
+}
+
 if (! function_exists('run_script_by_name')) {
     /**
      * Dispatch helper to run a named maintenance script.
@@ -182,9 +200,13 @@ if (! function_exists('run_script_by_name')) {
                 run_menu_reset($app);
 
                 return true;
+            case 'schedule-cron-info':
+                run_schedule_cron_info($app);
+
+                return true;
             default:
                 echo "Unknown script: {$script}\n";
-                echo "Allowed scripts: initial-setup, deploy-update, reseed, force-reseed, menu-reset\n";
+                echo "Allowed scripts: initial-setup, deploy-update, reseed, force-reseed, menu-reset, schedule-cron-info\n";
 
                 return false;
         }

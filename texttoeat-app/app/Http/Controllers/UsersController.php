@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActionLog;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -38,19 +39,35 @@ class UsersController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
-        User::create([
+        $user = User::create([
             'username' => $validated['username'],
             'name' => $validated['name'] ?? null,
             'password' => Hash::make($validated['password']),
             'role' => 'staff',
         ]);
 
+        ActionLog::create([
+            'user_id' => $request->user()->id,
+            'action' => 'user_created',
+            'model' => 'User',
+            'model_id' => $user->id,
+            'payload' => ['username' => $user->username, 'role' => $user->role],
+        ]);
+
         return redirect()->back()->with('success', 'User created.');
     }
 
-    public function resetPassword(User $user): RedirectResponse
+    public function resetPassword(Request $request, User $user): RedirectResponse
     {
         $user->update(['password' => Hash::make('Password1!')]);
+
+        ActionLog::create([
+            'user_id' => $request->user()->id,
+            'action' => 'password_reset',
+            'model' => 'User',
+            'model_id' => $user->id,
+            'payload' => ['reason' => 'admin_reset'],
+        ]);
 
         return redirect()->back()->with(
             'success',
@@ -67,6 +84,14 @@ class UsersController extends Controller
         if ($user->isAdmin() && User::whereIn('role', ['admin', 'superadmin'])->count() <= 1) {
             return redirect()->back()->with('error', 'Cannot deactivate the last admin.');
         }
+
+        ActionLog::create([
+            'user_id' => $request->user()->id,
+            'action' => 'user_deactivated',
+            'model' => 'User',
+            'model_id' => $user->id,
+            'payload' => ['username' => $user->username],
+        ]);
 
         $user->delete();
 

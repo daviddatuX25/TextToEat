@@ -1,5 +1,5 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Menu,
     BarChart3,
@@ -202,8 +202,11 @@ function NavLink({ href, label, Icon, pathname, onClick, iconOnly, badgeCount })
     );
 }
 
-function NavGroup({ group, pathname, onNavClick, iconOnly, badgeCount, navBadges }) {
-    const { label, Icon, items } = group;
+function NavGroup({ group, pathname, onNavClick, iconOnly, badgeCount, navBadges, isAdmin }) {
+    const { label, Icon, items: rawItems } = group;
+    const items = (rawItems || []).filter(
+        (item) => item.href !== '/portal/menu-settings' || isAdmin
+    );
     const isActive = isGroupActive(items, pathname);
     const [userOpen, setUserOpen] = useState(() => isGroupActive(items, pathname));
     useEffect(() => {
@@ -303,7 +306,7 @@ function NavGroup({ group, pathname, onNavClick, iconOnly, badgeCount, navBadges
     );
 }
 
-function SidebarContent({ navEntries, pathname, onNavClick, iconOnly, navBadges }) {
+function SidebarContent({ navEntries, pathname, onNavClick, iconOnly, navBadges, isAdmin }) {
     return (
         <>
             <div
@@ -356,6 +359,7 @@ function SidebarContent({ navEntries, pathname, onNavClick, iconOnly, navBadges 
                             iconOnly={iconOnly}
                             badgeCount={entry.badgeKey != null ? (navBadges[entry.badgeKey] ?? 0) : undefined}
                             navBadges={navBadges}
+                            isAdmin={isAdmin}
                         />
                     );
                 })}
@@ -396,27 +400,12 @@ function SidebarContent({ navEntries, pathname, onNavClick, iconOnly, navBadges 
     );
 }
 
-const DEBUG_LOG = (location, message, data, hypothesisId) => {
-    fetch('http://127.0.0.1:7376/ingest/6bfbe7d4-b4cf-4142-be65-9dec6fac862c', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '91eb81' }, body: JSON.stringify({ sessionId: '91eb81', location, message, data: data || {}, timestamp: Date.now(), hypothesisId }) }).catch(() => {});
-};
-
 export default function PortalLayout({ children }) {
     const { auth, flash, show_daily_greeting } = usePage().props;
     const pageUrl = usePage().url;
     const pathname = getPathname(pageUrl);
-    const isAdmin = auth?.user?.role === 'admin';
+    const isAdmin = auth?.user?.is_admin === true;
     const [sidebarOpen, setSidebarOpen] = useState(false);
-
-    // #region agent log
-    useEffect(() => {
-        DEBUG_LOG('PortalLayout.jsx:mount', 'PortalLayout mounted', { pathname }, 'H4');
-        const onStart = (e) => { DEBUG_LOG('PortalLayout.jsx:inertia', 'Inertia start', { phase: 'start', url: e?.detail?.visit?.url ?? window.location.href }, 'H3'); };
-        const onFinish = () => { DEBUG_LOG('PortalLayout.jsx:inertia', 'Inertia finish', { phase: 'finish' }, 'H3'); };
-        const offStart = router.on('start', onStart);
-        const offFinish = router.on('finish', onFinish);
-        return () => { offStart(); offFinish(); };
-    }, []);
-    // #endregion
 
     useEffect(() => {
         setSidebarOpen(false);
@@ -427,14 +416,17 @@ export default function PortalLayout({ children }) {
         if (flash?.success) toast.success(flash.success);
     }, [flash?.error, flash?.success]);
 
-    const navEntries = [
-        PORTAL_NAV_LINK_DASHBOARD,
-        PORTAL_NAV_LINK_ANALYTICS,
-        PORTAL_NAV_GROUP_ORDERS,
-        PORTAL_NAV_GROUP_MENU,
-        PORTAL_NAV_GROUP_CONVERSATIONS,
-        ...(isAdmin ? [PORTAL_NAV_GROUP_CHANNELS_SETTINGS] : []),
-    ];
+    const navEntries = useMemo(
+        () => [
+            PORTAL_NAV_LINK_DASHBOARD,
+            PORTAL_NAV_LINK_ANALYTICS,
+            PORTAL_NAV_GROUP_ORDERS,
+            PORTAL_NAV_GROUP_MENU,
+            PORTAL_NAV_GROUP_CONVERSATIONS,
+            ...(isAdmin ? [PORTAL_NAV_GROUP_CHANNELS_SETTINGS] : []),
+        ],
+        [isAdmin]
+    );
 
     const closeSidebar = () => setSidebarOpen(false);
     const openSidebar = () => setSidebarOpen(true);
@@ -485,7 +477,7 @@ export default function PortalLayout({ children }) {
                     sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
                 }`}
             >
-                <SidebarContent navEntries={navEntries} pathname={pathname} onNavClick={closeSidebar} iconOnly={iconOnly} navBadges={getEffectiveNavBadges(pathname, navBadges)} />
+                <SidebarContent navEntries={navEntries} pathname={pathname} onNavClick={closeSidebar} iconOnly={iconOnly} navBadges={getEffectiveNavBadges(pathname, navBadges)} isAdmin={isAdmin} />
             </aside>
 
             {/* Main content area */}
