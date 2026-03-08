@@ -59,7 +59,12 @@ export default function Dashboard({ metrics = {} }) {
 
     return (
         <PortalLayout>
-            <section className="flex flex-col gap-8 animate-fade-in">
+            <div className="pointer-events-none fixed inset-0 z-0 flex justify-center opacity-40 dark:opacity-20 mix-blend-multiply dark:mix-blend-screen overflow-hidden">
+                <div className="absolute -top-[20%] -left-[10%] w-[800px] h-[800px] rounded-full bg-primary-300/40 dark:bg-primary-600/20 blur-[120px]" />
+                <div className="absolute top-[40%] right-[0%] w-[600px] h-[600px] rounded-full bg-orange-300/30 dark:bg-orange-800/20 blur-[100px]" />
+            </div>
+
+            <section className="relative z-10 flex flex-col gap-8 animate-fade-in">
                 <PageHeader
                     title="Dashboard"
                     description="Today's operations and performance — data refreshes every 15s."
@@ -68,9 +73,9 @@ export default function Dashboard({ metrics = {} }) {
                 {/* Grid: Today's sales (wider min for revenue digits) | Revenue chart */}
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(22rem,28rem)_1fr] lg:gap-6">
                     {/* Row 1 — Today's sales | Revenue chart */}
-                    <Card className="rounded-2xl border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-900/40 overflow-hidden lg:row-span-1 min-w-0">
-                        <CardHeader className="border-b border-surface-200/80 dark:border-surface-700/80 pb-3">
-                            <p className="text-sm font-bold text-surface-800 dark:text-surface-100">
+                    <Card className="rounded-2xl border-primary-200/60 dark:border-primary-800/40 bg-white/60 dark:bg-surface-900/60 backdrop-blur-md overflow-hidden lg:row-span-1 min-w-0 shadow-sm">
+                        <CardHeader className="border-b border-primary-100 dark:border-primary-800/50 bg-primary-50/50 dark:bg-primary-900/20 pb-3">
+                            <p className="text-sm font-bold text-primary-900 dark:text-primary-100">
                                 Today&apos;s sales
                             </p>
                         </CardHeader>
@@ -122,12 +127,12 @@ export default function Dashboard({ metrics = {} }) {
                     </Card>
 
                     {/* Revenue by type: chart fills card (Walk-in, Delivery, Pickup) */}
-                    <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden flex flex-col min-h-[360px] min-w-0">
-                        <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 shrink-0">
-                            <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">
+                    <Card className="rounded-2xl border-primary-200/60 dark:border-primary-800/40 bg-white/60 dark:bg-surface-900/60 backdrop-blur-md overflow-hidden flex flex-col min-h-[360px] min-w-0 shadow-sm">
+                        <CardHeader className="border-b border-primary-100 dark:border-primary-800/50 bg-primary-50/50 dark:bg-primary-900/20 shrink-0">
+                            <p className="text-sm font-semibold text-primary-900 dark:text-primary-100">
                                 Revenue by type
                             </p>
-                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                            <p className="text-xs text-primary-700/80 dark:text-primary-200/60 mt-1">
                                 By hour today — Walk-in · Delivery · Pickup (completed orders).
                             </p>
                         </CardHeader>
@@ -142,31 +147,31 @@ export default function Dashboard({ metrics = {} }) {
 
                     {/* Row 2 — Top items (1 col when fulfillment exists, else full width) | Fulfillment (1) */}
                     <Card
-                        className={`rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden ${Array.isArray(analyticsByFulfillment) && analyticsByFulfillment.length > 0 ? 'lg:col-span-1' : 'lg:col-span-2'}`}
+                        className={`rounded-2xl border-primary-200/60 dark:border-primary-800/40 bg-white/60 dark:bg-surface-900/60 backdrop-blur-md overflow-hidden shadow-sm ${Array.isArray(analyticsByFulfillment) && analyticsByFulfillment.length > 0 ? 'lg:col-span-1' : 'lg:col-span-2'}`}
                     >
-                        <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40">
-                            <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">
+                        <CardHeader className="border-b border-primary-100 dark:border-primary-800/50 bg-primary-50/50 dark:bg-primary-900/20">
+                            <p className="text-sm font-semibold text-primary-900 dark:text-primary-100">
                                 Top items today
                             </p>
-                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                            <p className="text-xs text-primary-700/80 dark:text-primary-200/60 mt-1">
                                 By quantity sold.
                             </p>
                         </CardHeader>
                         <CardContent className="p-0 pt-4">
-                            <div className="p-4 border-b border-surface-100 dark:border-surface-800 min-h-[200px]">
+                            <div className="p-4 border-b border-primary-100 dark:border-primary-800/40 min-h-[200px]">
                                 <TopItemsChart data={analyticsTopItems} formatCurrency={formatCurrency} maxItems={5} />
                             </div>
-                            <div className="overflow-x-auto max-h-[200px] overflow-y-auto">
+                            <div className="overflow-x-auto max-h-[200px] overflow-y-auto w-full no-scrollbar">
                                 <table className="min-w-full text-left text-sm">
-                                    <thead className="bg-surface-50 dark:bg-surface-900/60 sticky top-0">
-                                        <tr className="border-b border-surface-200 dark:border-surface-700">
-                                            <th className="px-4 py-2 text-xs font-semibold text-surface-500 dark:text-surface-400">
+                                    <thead className="bg-primary-50/80 dark:bg-primary-900/40 sticky top-0 backdrop-blur-sm z-10">
+                                        <tr className="border-b border-primary-200/60 dark:border-primary-800/50">
+                                            <th className="px-4 py-2 text-xs font-semibold text-primary-700 dark:text-primary-300">
                                                 Item
                                             </th>
-                                            <th className="px-4 py-2 text-xs font-semibold text-surface-500 dark:text-surface-400 text-right">
+                                            <th className="px-4 py-2 text-xs font-semibold text-primary-700 dark:text-primary-300 text-right">
                                                 Qty
                                             </th>
-                                            <th className="px-4 py-2 text-xs font-semibold text-surface-500 dark:text-surface-400 text-right">
+                                            <th className="px-4 py-2 text-xs font-semibold text-primary-700 dark:text-primary-300 text-right">
                                                 Revenue
                                             </th>
                                         </tr>
@@ -180,7 +185,7 @@ export default function Dashboard({ metrics = {} }) {
                                             </tr>
                                         ) : (
                                             analyticsTopItems.map((row) => (
-                                                <tr key={row.name ?? 'unknown'} className="border-b last:border-b-0 border-surface-100 dark:border-surface-800">
+                                                <tr key={row.name ?? 'unknown'} className="border-b last:border-b-0 border-primary-100/60 dark:border-primary-800/30 hover:bg-primary-50/40 dark:hover:bg-primary-900/20 transition-colors">
                                                     <td className="px-4 py-2 font-medium text-surface-800 dark:text-surface-100" title={row.name}>
                                                         {row.name || '—'}
                                                     </td>
@@ -200,29 +205,29 @@ export default function Dashboard({ metrics = {} }) {
                     </Card>
 
                     {Array.isArray(analyticsByFulfillment) && analyticsByFulfillment.length > 0 ? (
-                        <div className="flex flex-col gap-4">
-                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
-                                <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40">
-                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">
+                        <div className="flex flex-col gap-4 z-10 relative">
+                            <Card className="rounded-2xl border-primary-200/60 dark:border-primary-800/40 bg-white/60 dark:bg-surface-900/60 backdrop-blur-md overflow-hidden shadow-sm">
+                                <CardHeader className="border-b border-primary-100 dark:border-primary-800/50 bg-primary-50/50 dark:bg-primary-900/20">
+                                    <p className="text-sm font-semibold text-primary-900 dark:text-primary-100">
                                         Today by fulfillment
                                     </p>
-                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                                    <p className="text-xs text-primary-700/80 dark:text-primary-200/60 mt-1">
                                         Delivery · Pickup · Walk-in
                                     </p>
                                 </CardHeader>
                                 <CardContent className="p-0 pt-4">
                                     <table className="min-w-full text-left text-sm">
-                                        <thead className="bg-surface-50 dark:bg-surface-900/60">
-                                            <tr className="border-b border-surface-200 dark:border-surface-700">
-                                                <th className="px-3 py-2 text-xs font-semibold text-surface-500 dark:text-surface-400">Type</th>
-                                                <th className="px-3 py-2 text-xs font-semibold text-surface-500 dark:text-surface-400 text-right">Orders</th>
-                                                <th className="px-3 py-2 text-xs font-semibold text-surface-500 dark:text-surface-400 text-right">Done</th>
-                                                <th className="px-3 py-2 text-xs font-semibold text-surface-500 dark:text-surface-400 text-right">Revenue</th>
+                                        <thead className="bg-primary-50/80 dark:bg-primary-900/40 backdrop-blur-sm">
+                                            <tr className="border-b border-primary-200/60 dark:border-primary-800/50">
+                                                <th className="px-3 py-2 text-xs font-semibold text-primary-700 dark:text-primary-300">Type</th>
+                                                <th className="px-3 py-2 text-xs font-semibold text-primary-700 dark:text-primary-300 text-right">Orders</th>
+                                                <th className="px-3 py-2 text-xs font-semibold text-primary-700 dark:text-primary-300 text-right">Done</th>
+                                                <th className="px-3 py-2 text-xs font-semibold text-primary-700 dark:text-primary-300 text-right">Revenue</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {analyticsByFulfillment.map((row) => (
-                                                <tr key={row.type ?? 'unknown'} className="border-b last:border-b-0 border-surface-100 dark:border-surface-800">
+                                                <tr key={row.type ?? 'unknown'} className="border-b last:border-b-0 border-primary-100/60 dark:border-primary-800/30 hover:bg-primary-50/40 dark:hover:bg-primary-900/20 transition-colors">
                                                     <td className="px-3 py-2 font-medium text-surface-800 dark:text-surface-100">
                                                         {row.type === 'delivery' && <span className="inline-flex items-center gap-1"><Truck className="h-3.5 w-3.5 text-primary-500" /> Delivery</span>}
                                                         {row.type === 'pickup' && <span className="inline-flex items-center gap-1"><Store className="h-3.5 w-3.5 text-amber-500" /> Pickup</span>}
@@ -249,7 +254,7 @@ export default function Dashboard({ metrics = {} }) {
                                 </Link>
                                 <Link
                                     href="/portal/orders"
-                                    className="group block rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 p-4 transition hover:border-surface-300 dark:hover:border-surface-600 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                    className="group block rounded-2xl border border-primary-200 dark:border-primary-800/60 bg-white/60 dark:bg-surface-900/60 backdrop-blur-sm p-4 transition hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 >
                                     <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Preparing</p>
                                     <p className="mt-1 text-2xl font-extrabold text-surface-900 dark:text-white">{pipeline_preparing}</p>
@@ -278,7 +283,7 @@ export default function Dashboard({ metrics = {} }) {
                             </Link>
                             <Link
                                 href="/portal/orders"
-                                className="group block rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 p-5 transition hover:border-surface-300 dark:hover:border-surface-600 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
+                                className="group block rounded-2xl border border-primary-200 dark:border-primary-800/60 bg-white/60 dark:bg-surface-900/60 backdrop-blur-sm p-5 transition hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                             >
                                 <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Preparing</p>
                                 <p className="mt-1 text-3xl font-extrabold text-surface-900 dark:text-white">{pipeline_preparing}</p>

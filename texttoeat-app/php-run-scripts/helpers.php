@@ -161,12 +161,15 @@ if (! function_exists('run_schedule_cron_info')) {
     {
         $appRoot = realpath($app->basePath()) ?: $app->basePath();
         $cronLine = '* * * * * cd ' . $appRoot . ' && php artisan schedule:run >> /dev/null 2>&1';
+        $hestiaLine = '* * * * * /usr/bin/php8.2 ' . $appRoot . '/artisan schedule:run >> /dev/null 2>&1';
         echo "Add this single cron job (runs every minute) so Laravel's scheduler can run:\n";
         echo "  - menu:reset-today (when enabled in Portal → Menu settings)\n";
         echo "  - sms:mark-old-pending-failed (every 10 min)\n";
         echo "  - chatbot:expire-takeover-sessions (every 10 min)\n\n";
-        echo "Cron line (copy into your hosting panel → Cron Jobs):\n\n";
+        echo "Cron line (generic; copy into your hosting panel → Cron Jobs):\n\n";
         echo $cronLine . "\n\n";
+        echo "Hestia (use full path to php8.2 and artisan):\n\n";
+        echo $hestiaLine . "\n\n";
         echo "Replace the path above if your app root is different on this server.\n";
     }
 }

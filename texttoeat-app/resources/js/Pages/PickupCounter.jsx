@@ -351,7 +351,7 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
                 <PageHeader
                     title={
                         <>
-                            Pickup <span className="bg-gradient-to-r from-primary-500 to-orange-400 bg-clip-text text-transparent">counter</span>
+                            Pickup <span className="bg-gradient-to-r from-primary-500 to-orange-400 bg-clip-text text-transparent [text-shadow:0_1px_2px_rgb(0_0_0_/_0.12)] dark:[text-shadow:0_1px_2px_rgb(0_0_0_/_0.35)]">counter</span>
                         </>
                     }
                     description="Assign pickup slots and manage orders for customer pickup."

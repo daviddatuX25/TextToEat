@@ -202,11 +202,15 @@ function NavLink({ href, label, Icon, pathname, onClick, iconOnly, badgeCount })
     );
 }
 
-function NavGroup({ group, pathname, onNavClick, iconOnly, badgeCount, navBadges, isAdmin }) {
+function NavGroup({ group, pathname, onNavClick, iconOnly, badgeCount, navBadges, isAdmin, isSuperAdmin }) {
     const { label, Icon, items: rawItems } = group;
-    const items = (rawItems || []).filter(
-        (item) => item.href !== '/portal/menu-settings' || isAdmin
+    let items = (rawItems || []).filter(
+        (item) => (item.href !== '/portal/menu-settings' && item.href !== '/portal/categories') || isAdmin
     );
+    // Channels & settings: admin sees only Manage users; superadmin sees all
+    if (label === 'Channels & settings' && isAdmin && !isSuperAdmin) {
+        items = items.filter((item) => item.href === '/portal/users');
+    }
     const isActive = isGroupActive(items, pathname);
     const [userOpen, setUserOpen] = useState(() => isGroupActive(items, pathname));
     useEffect(() => {
@@ -306,7 +310,7 @@ function NavGroup({ group, pathname, onNavClick, iconOnly, badgeCount, navBadges
     );
 }
 
-function SidebarContent({ navEntries, pathname, onNavClick, iconOnly, navBadges, isAdmin }) {
+function SidebarContent({ navEntries, pathname, onNavClick, iconOnly, navBadges, isAdmin, isSuperAdmin }) {
     return (
         <>
             <div
@@ -360,6 +364,7 @@ function SidebarContent({ navEntries, pathname, onNavClick, iconOnly, navBadges,
                             badgeCount={entry.badgeKey != null ? (navBadges[entry.badgeKey] ?? 0) : undefined}
                             navBadges={navBadges}
                             isAdmin={isAdmin}
+                            isSuperAdmin={isSuperAdmin}
                         />
                     );
                 })}
@@ -405,6 +410,7 @@ export default function PortalLayout({ children }) {
     const pageUrl = usePage().url;
     const pathname = getPathname(pageUrl);
     const isAdmin = auth?.user?.is_admin === true;
+    const isSuperAdmin = auth?.user?.role === 'superadmin';
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
@@ -419,7 +425,7 @@ export default function PortalLayout({ children }) {
     const navEntries = useMemo(
         () => [
             PORTAL_NAV_LINK_DASHBOARD,
-            PORTAL_NAV_LINK_ANALYTICS,
+            ...(isAdmin ? [PORTAL_NAV_LINK_ANALYTICS] : []),
             PORTAL_NAV_GROUP_ORDERS,
             PORTAL_NAV_GROUP_MENU,
             PORTAL_NAV_GROUP_CONVERSATIONS,
@@ -442,6 +448,15 @@ export default function PortalLayout({ children }) {
 
     return (
         <div className="flex min-h-screen w-full bg-surface-50 text-surface-900 transition-colors duration-500 selection:bg-primary-500 selection:text-white dark:bg-surface-900 dark:text-surface-50 antialiased overflow-x-hidden">
+            {/* Fixed background: eatery image + opacity + orange hue */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
+                <div
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat bg-fixed opacity-15 dark:opacity-10"
+                    style={{ backgroundImage: "url('/images/eatery_bg.png')" }}
+                />
+                <div className="absolute inset-0 bg-orange-500/12 dark:bg-orange-900/10 mix-blend-multiply dark:mix-blend-overlay" />
+            </div>
+
             <Toaster richColors position="top-right" />
 
             <Dialog open={!!show_daily_greeting} onOpenChange={() => {}}>
@@ -477,11 +492,11 @@ export default function PortalLayout({ children }) {
                     sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
                 }`}
             >
-                <SidebarContent navEntries={navEntries} pathname={pathname} onNavClick={closeSidebar} iconOnly={iconOnly} navBadges={getEffectiveNavBadges(pathname, navBadges)} isAdmin={isAdmin} />
+                <SidebarContent navEntries={navEntries} pathname={pathname} onNavClick={closeSidebar} iconOnly={iconOnly} navBadges={getEffectiveNavBadges(pathname, navBadges)} isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} />
             </aside>
 
             {/* Main content area */}
-            <div className="flex flex-col flex-1 min-w-0 md:ml-16 lg:ml-64">
+            <div className="relative z-10 flex flex-col flex-1 min-w-0 md:ml-16 lg:ml-64">
                 {/* Mobile top bar: only when viewport < md (drawer mode) */}
                 <header className="md:hidden sticky top-0 z-30 flex h-16 items-center justify-between gap-4 px-4 border-b border-surface-200 bg-white/95 dark:bg-surface-900/95 dark:border-surface-800 glass-panel backdrop-blur">
                     <div className="flex items-center gap-3 min-w-0 flex-1">

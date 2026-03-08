@@ -473,7 +473,7 @@ export default function Deliveries({ orders = [], deliveryAreas = [], highlight 
                 <PageHeader
                     title={
                         <>
-                            Delivery <span className="bg-gradient-to-r from-primary-500 to-orange-400 bg-clip-text text-transparent">orders</span>
+                            Delivery <span className="bg-gradient-to-r from-primary-500 to-orange-400 bg-clip-text text-transparent [text-shadow:0_1px_2px_rgb(0_0_0_/_0.12)] dark:[text-shadow:0_1px_2px_rgb(0_0_0_/_0.35)]">orders</span>
                         </>
                     }
                     description="Track and fulfill delivery orders. Mark paid and update status."

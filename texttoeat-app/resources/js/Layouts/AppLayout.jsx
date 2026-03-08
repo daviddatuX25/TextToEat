@@ -35,6 +35,15 @@ export default function AppLayout({ children, showDashboard = true }) {
 
     return (
         <div className="flex min-h-screen w-full flex-col bg-surface-50 text-surface-900 transition-colors duration-500 selection:bg-primary-500 selection:text-white dark:bg-surface-900 dark:text-surface-50 antialiased overflow-x-hidden">
+            {/* Fixed background: eatery image + opacity + orange hue */}
+            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
+                <div
+                    className="absolute inset-0 bg-cover bg-center bg-no-repeat bg-fixed opacity-15 dark:opacity-10"
+                    style={{ backgroundImage: "url('/images/eatery_bg.png')" }}
+                />
+                <div className="absolute inset-0 bg-orange-500/12 dark:bg-orange-900/10 mix-blend-multiply dark:mix-blend-overlay" />
+            </div>
+
             {/* Global Navigation (Glassmorphism) */}
             <nav className="fixed inset-x-0 top-0 z-50 border-b border-surface-200 glass-panel dark:border-surface-800">
                 <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
@@ -182,7 +191,7 @@ export default function AppLayout({ children, showDashboard = true }) {
             </div>
 
             {/* Main Content Area */}
-            <main className="mx-auto w-full max-w-7xl px-6 pt-28 pb-20">
+            <main className="relative z-10 mx-auto w-full max-w-7xl px-6 pt-28 pb-20">
                 {children}
             </main>
         </div>

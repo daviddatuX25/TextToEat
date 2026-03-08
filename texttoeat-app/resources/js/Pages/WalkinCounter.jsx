@@ -353,7 +353,7 @@ export default function WalkinCounter({ orders = [], orderMarkers = [], diningMa
                 <PageHeader
                     title={
                         <>
-                            Walk-in <span className="bg-gradient-to-r from-primary-500 to-violet-400 bg-clip-text text-transparent">counter</span>
+                            Walk-in <span className="bg-gradient-to-r from-primary-500 to-violet-400 bg-clip-text text-transparent [text-shadow:0_1px_2px_rgb(0_0_0_/_0.12)] dark:[text-shadow:0_1px_2px_rgb(0_0_0_/_0.35)]">counter</span>
                         </>
                     }
                     description="Dine-in and takeout orders. Assign markers and manage orders."

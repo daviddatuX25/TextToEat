@@ -43,6 +43,8 @@ Scheduled tasks (menu reset at a set hour, SMS pending timeout, chatbot takeover
 
 Replace `/path/to/your/app/root` with your app root (e.g. `/home/YOUR_USER` for Layout A, or `/home/YOUR_USER/public_html/app` for Layout B). Run **schedule-cron-info** to print the exact line for your deploy path.
 
+On **Hestia**, use the full path to PHP and to `artisan` (e.g. `/usr/bin/php8.2 /home/USER/web/DOMAIN/public_html/artisan schedule:run >> /dev/null 2>&1`). **schedule-cron-info** prints a Hestia-ready line when run on the server.
+
 ---
 
 ## Standalone scripts (alternative)

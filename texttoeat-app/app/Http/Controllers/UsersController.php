@@ -37,13 +37,19 @@ class UsersController extends Controller
             'username' => ['required', 'string', 'max:191', 'alpha_dash', 'unique:users,username'],
             'name' => ['nullable', 'string', 'max:255'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'role' => ['nullable', 'string', 'in:staff,admin'],
         ]);
+
+        $role = 'staff';
+        if ($request->user()->isSuperAdmin()) {
+            $role = $validated['role'] ?? 'staff';
+        }
 
         $user = User::create([
             'username' => $validated['username'],
             'name' => $validated['name'] ?? null,
             'password' => Hash::make($validated['password']),
-            'role' => 'staff',
+            'role' => $role,
         ]);
 
         ActionLog::create([
@@ -59,6 +65,10 @@ class UsersController extends Controller
 
     public function resetPassword(Request $request, User $user): RedirectResponse
     {
+        if (! $request->user()->isSuperAdmin() && $user->isSuperAdmin()) {
+            return redirect()->back()->with('error', 'Only a super administrator can reset a super administrator\'s password.');
+        }
+
         $user->update(['password' => Hash::make('Password1!')]);
 
         ActionLog::create([
@@ -79,6 +89,10 @@ class UsersController extends Controller
     {
         if ($request->user()->id === $user->id) {
             return redirect()->back()->with('error', 'You cannot deactivate your own account.');
+        }
+
+        if (! $request->user()->isSuperAdmin() && $user->isAdmin()) {
+            return redirect()->back()->with('error', 'Only a super administrator can deactivate administrators.');
         }
 
         if ($user->isAdmin() && User::whereIn('role', ['admin', 'superadmin'])->count() <= 1) {

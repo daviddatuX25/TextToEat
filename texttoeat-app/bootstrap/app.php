@@ -7,6 +7,8 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Inertia\Inertia;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 $basePath = dirname(__DIR__);
@@ -54,6 +56,13 @@ return Application::configure(basePath: $basePath)
         $exceptions->render(function (NotFoundHttpException $e, Request $request) {
             if ($request->is('api/sms/*') && $request->expectsJson()) {
                 return response()->json(['success' => false, 'error' => 'Device not found.'], 404);
+            }
+        });
+        $exceptions->render(function (HttpException $e, Request $request) {
+            if ($e->getStatusCode() === 403 && $request->header('X-Inertia')) {
+                return Inertia::render('Forbidden', [
+                    'message' => $e->getMessage() ?: 'Forbidden',
+                ])->toResponse($request)->setStatusCode(403);
             }
         });
     })->create();

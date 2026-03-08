@@ -23,7 +23,7 @@ export function PageHeader({ title, description, children, titleClassName = '' }
                 {children}
             </div>
             {description != null && description !== '' && (
-                <p className="text-surface-500 dark:text-surface-400 text-sm">
+                <p className="text-surface-500 dark:text-surface-400 text-sm [text-shadow:0_1px_2px_rgb(255_255_255_/_0.8),0_1px_3px_rgb(0_0_0_/_0.08)] dark:[text-shadow:0_1px_2px_rgb(0_0_0_/_0.4)]">
                     <TypewriterText text={description} />
                 </p>
             )}

@@ -1,10 +1,14 @@
-import { Link, router, useForm } from '@inertiajs/react';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import PortalLayout from '../Layouts/PortalLayout';
 import { PageHeader } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
 
 export default function Users({ users = [] }) {
+    const { auth } = usePage().props;
+    const currentUserId = auth?.user?.id;
+    const isSuperAdmin = auth?.user?.role === 'superadmin';
+
     const [addOpen, setAddOpen] = useState(false);
     const [deleteUser, setDeleteUser] = useState(null);
     const form = useForm({
@@ -12,11 +16,21 @@ export default function Users({ users = [] }) {
         name: '',
         password: '',
         password_confirmation: '',
+        role: 'staff',
     });
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        form.post('/portal/users', {
+        const payload = {
+            username: form.data.username,
+            name: form.data.name,
+            password: form.data.password,
+            password_confirmation: form.data.password_confirmation,
+        };
+        if (isSuperAdmin) {
+            payload.role = form.data.role;
+        }
+        form.transform(() => payload).post('/portal/users', {
             onSuccess: () => {
                 form.reset();
                 setAddOpen(false);
@@ -84,20 +98,24 @@ export default function Users({ users = [] }) {
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex items-center justify-end gap-3">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => resetPassword(user)}
-                                                    className="text-primary-600 dark:text-primary-400 font-semibold text-sm hover:underline"
-                                                >
-                                                    Reset password
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => confirmDeleteAccount(user)}
-                                                    className="text-red-600 dark:text-red-400 font-semibold text-sm hover:underline"
-                                                >
-                                                    Deactivate account
-                                                </button>
+                                                {(isSuperAdmin || user.role !== 'superadmin') && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => resetPassword(user)}
+                                                        className="text-primary-600 dark:text-primary-400 font-semibold text-sm hover:underline"
+                                                    >
+                                                        Reset password
+                                                    </button>
+                                                )}
+                                                {user.id !== currentUserId && (isSuperAdmin || (user.role !== 'admin' && user.role !== 'superadmin')) && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => confirmDeleteAccount(user)}
+                                                        className="text-red-600 dark:text-red-400 font-semibold text-sm hover:underline"
+                                                    >
+                                                        Deactivate account
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -136,6 +154,19 @@ export default function Users({ users = [] }) {
                                 placeholder="Leave blank for device accounts"
                             />
                         </label>
+                        {isSuperAdmin && (
+                            <label className="block">
+                                <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Role</span>
+                                <select
+                                    value={form.data.role}
+                                    onChange={(e) => form.setData('role', e.target.value)}
+                                    className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                >
+                                    <option value="staff">Staff</option>
+                                    <option value="admin">Admin</option>
+                                </select>
+                            </label>
+                        )}
                         <label className="block">
                             <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Password</span>
                             <input

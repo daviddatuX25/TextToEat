@@ -31,10 +31,6 @@ return new class extends Migration
         Schema::table('menu_items', function (Blueprint $table) {
             $table->dropColumn('category');
         });
-
-        Schema::table('menu_items', function (Blueprint $table) {
-            $table->unsignedBigInteger('category_id')->nullable(false)->change();
-        });
     }
 
     /**

@@ -34,7 +34,7 @@ export default function About() {
                             <span>System Architecture Overview</span>
                         </div>
                         <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-surface-900 dark:text-white leading-tight">
-                            Powering <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-amber-500 dark:from-primary-400 dark:to-amber-400">TextToEat</span>
+                            Powering <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-amber-500 dark:from-primary-400 dark:to-amber-400 [text-shadow:0_1px_2px_rgb(0_0_0_/_0.12)] dark:[text-shadow:0_1px_2px_rgb(0_0_0_/_0.35)]">TextToEat</span>
                         </h1>
                         <p className="text-lg md:text-xl text-surface-600 dark:text-surface-400 font-medium">
                             An advanced hybrid ordering and kitchen management system built specifically for Lacasandile Eatery.

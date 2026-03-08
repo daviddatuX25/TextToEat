@@ -11,7 +11,7 @@ class EnsureUserIsAdmin
     public function handle(Request $request, Closure $next): Response
     {
         if (! $request->user()?->isAdmin()) {
-            abort(403, 'Only administrators can manage users.');
+            abort(403, 'This page is only available to administrators.');
         }
 
         return $next($request);
