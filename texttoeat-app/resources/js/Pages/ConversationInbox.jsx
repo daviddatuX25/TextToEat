@@ -32,7 +32,7 @@ function InboxSessionTableRow({ session }) {
             </td>
             <td className="py-2.5 px-3 whitespace-nowrap">
                 {session.mode === 'staff_only' ? (
-                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-500/20 dark:text-slate-200 text-[11px] font-semibold uppercase">
+                    <span className="px-2 py-0.5 rounded-full bg-surface-100 text-surface-800 dark:bg-surface-500/20 dark:text-surface-200 text-[11px] font-semibold uppercase">
                         Staff only
                     </span>
                 ) : session.has_human_takeover ? (
@@ -57,7 +57,7 @@ function InboxSessionCard({ session }) {
     return (
         <Link
             href={`/portal/inbox/${session.id}`}
-            className="block rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 p-4 transition-colors hover:border-primary-300 dark:hover:border-primary-600 hover:shadow-md"
+            className="block rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 p-4 transition-colors hover:border-surface-300 dark:hover:border-surface-600 hover:shadow-md"
         >
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0 space-y-1">
@@ -77,7 +77,7 @@ function InboxSessionCard({ session }) {
                             </span>
                         )}
                         {session.mode === 'staff_only' && (
-                            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-500/20 dark:text-slate-200 font-semibold uppercase tracking-wide">
+                            <span className="px-2 py-0.5 rounded-full bg-surface-100 text-surface-800 dark:bg-surface-500/20 dark:text-surface-200 font-semibold uppercase tracking-wide">
                                 Staff only
                             </span>
                         )}
@@ -139,7 +139,7 @@ export default function ConversationInbox({ sessions, filters = {}, meta = {} })
                         </h1>
                         <Link
                             href="/portal"
-                            className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
+                            className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800 smooth-hover"
                         >
                             ← Back to dashboard
                         </Link>
@@ -170,7 +170,7 @@ export default function ConversationInbox({ sessions, filters = {}, meta = {} })
                             aria-pressed={viewMode === 'card'}
                             className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
                                 viewMode === 'card'
-                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400'
+                                    ? 'bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                     : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
                             }`}
                         >
@@ -184,7 +184,7 @@ export default function ConversationInbox({ sessions, filters = {}, meta = {} })
                             aria-pressed={viewMode === 'table'}
                             className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
                                 viewMode === 'table'
-                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400'
+                                    ? 'bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                     : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
                             }`}
                         >
@@ -236,7 +236,7 @@ export default function ConversationInbox({ sessions, filters = {}, meta = {} })
                                                 preserveScroll
                                                 className={`px-2.5 py-1 rounded-md border text-xs ${
                                                     link.active
-                                                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200'
+                                                        ? 'border-surface-500 bg-surface-100 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                                         : 'border-transparent text-surface-600 hover:bg-surface-100 dark:text-surface-300 dark:hover:bg-surface-800'
                                                 }`}
                                                 dangerouslySetInnerHTML={{ __html: link.label }}
@@ -274,7 +274,7 @@ export default function ConversationInbox({ sessions, filters = {}, meta = {} })
                                                 preserveScroll
                                                 className={`px-2.5 py-1 rounded-md border text-xs ${
                                                     link.active
-                                                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200'
+                                                        ? 'border-surface-500 bg-surface-100 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                                         : 'border-transparent text-surface-600 hover:bg-surface-100 dark:text-surface-300 dark:hover:bg-surface-800'
                                                 }`}
                                                 dangerouslySetInnerHTML={{ __html: link.label }}

@@ -43,8 +43,8 @@ export default function Users({ users = [] }) {
                             Add user
                         </button>
                     </div>
-                    <p className="text-surface-500 dark:text-surface-400 text-sm">
-                        Create staff accounts and reset passwords to the default (Password1!). Remind staff to change it from Account.
+                    <p className="text-surface-500 dark:text-surface-400 text-xs">
+                        <strong>Role:</strong> <span className="font-medium text-surface-600 dark:text-surface-300">Admin</span> — full access to settings and user management. <span className="font-medium text-surface-600 dark:text-surface-300">Staff</span> — orders, deliveries, pickup, walk-in, and conversations only.
                     </p>
                 </header>
 
@@ -69,8 +69,8 @@ export default function Users({ users = [] }) {
                                         <td className="px-4 py-3 font-medium text-surface-900 dark:text-white">{user.name ?? '—'}</td>
                                         <td className="px-4 py-3 text-surface-600 dark:text-surface-400">{user.username}</td>
                                         <td className="px-4 py-3">
-                                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${user.role === 'admin' ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' : 'bg-surface-200 text-surface-700 dark:bg-surface-600 dark:text-surface-300'}`}>
-                                                {user.role ?? 'staff'}
+                                            <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-bold uppercase ${user.role === 'admin' || user.role === 'superadmin' ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300' : 'bg-surface-200 text-surface-700 dark:bg-surface-600 dark:text-surface-300'}`} title={user.role === 'admin' || user.role === 'superadmin' ? 'Full access to settings and user management' : 'Orders, deliveries, and conversations only'}>
+                                                {user.role === 'superadmin' ? 'Super admin' : (user.role ?? 'staff')}
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-right">

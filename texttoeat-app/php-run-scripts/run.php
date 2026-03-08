@@ -97,6 +97,7 @@ function render_form(string $env, string $message = ''): void
                     <option value="deploy-update">deploy-update</option>
                     <option value="reseed">reseed (dev / staging)</option>
                     <option value="force-reseed">force-reseed (DANGEROUS: wipes DB; requires ALLOW_FORCE_RESEED=true)</option>
+                    <option value="menu-reset">menu-reset (reset today&apos;s menu, flag greeting)</option>
                 </select>
             </label>
         </div>
@@ -124,7 +125,7 @@ function handle_cli(Application $app, array $argv): void
     $script = $argv[1] ?? null;
     if (!is_string($script) || $script === '') {
         echo "Usage: php php-run-scripts/run.php <script>\n";
-        echo "Allowed scripts: initial-setup, deploy-update, reseed\n";
+        echo "Allowed scripts: initial-setup, deploy-update, reseed, menu-reset\n";
         exit(1);
     }
 

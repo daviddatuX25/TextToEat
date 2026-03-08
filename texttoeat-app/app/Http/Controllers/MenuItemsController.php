@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreMenuItemRequest;
 use App\Http\Requests\UpdateMenuItemRequest;
 use App\Models\MenuItem;
+use App\Models\MenuItemDailyStock;
 use App\Services\MenuItemImageService;
 use App\Services\MenuItemStockService;
 use Carbon\Carbon;
@@ -38,13 +39,14 @@ class MenuItemsController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $virtualAvailable = $this->stockService->getVirtualAvailableForToday(
-            $menuItems->pluck('id')->all()
-        );
+        $ids = $menuItems->pluck('id')->all();
+        $virtualAvailable = $this->stockService->getVirtualAvailableForToday($ids);
+        $currentOrders = $this->stockService->getReservedForToday($ids);
 
-        $menuItems = $menuItems->through(function ($item) use ($virtualAvailable) {
+        $menuItems = $menuItems->through(function ($item) use ($virtualAvailable, $currentOrders) {
             $arr = $item->toArray();
             $arr['virtual_available'] = $virtualAvailable[$item->id] ?? (int) $item->units_today;
+            $arr['current_orders'] = $currentOrders[$item->id] ?? 0;
 
             return $arr;
         });
@@ -80,7 +82,15 @@ class MenuItemsController extends Controller
             }
         }
 
-        MenuItem::create($validated);
+        $menuItem = MenuItem::create($validated);
+
+        MenuItemDailyStock::create([
+            'menu_item_id' => $menuItem->id,
+            'menu_date' => $menuItem->menu_date,
+            'units_set' => (int) ($validated['units_today'] ?? 0),
+            'units_sold' => 0,
+            'units_leftover' => (int) ($validated['units_today'] ?? 0),
+        ]);
 
         return redirect()->back()->with('success', 'Menu item added.');
     }
@@ -109,6 +119,28 @@ class MenuItemsController extends Controller
         }
 
         $menuItem->update($validated);
+
+        if (array_key_exists('units_today', $validated)) {
+            $set = (int) $validated['units_today'];
+            $stock = MenuItemDailyStock::query()
+                ->where('menu_item_id', $menuItem->id)
+                ->whereDate('menu_date', $menuItem->menu_date)
+                ->first();
+            if ($stock) {
+                $stock->update([
+                    'units_set' => $set,
+                    'units_leftover' => max(0, $set - (int) $stock->units_sold),
+                ]);
+            } else {
+                MenuItemDailyStock::create([
+                    'menu_item_id' => $menuItem->id,
+                    'menu_date' => $menuItem->menu_date,
+                    'units_set' => $set,
+                    'units_sold' => 0,
+                    'units_leftover' => $set,
+                ]);
+            }
+        }
 
         return redirect()->back()->with('success', 'Menu item updated.');
     }

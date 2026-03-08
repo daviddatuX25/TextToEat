@@ -6,13 +6,13 @@ const variantClasses = {
     secondary:
         'bg-primary/10 text-primary hover:bg-primary/20 transition-all',
     outline:
-        'border-2 border-slate-200 text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all',
+        'border-2 border-surface-200 text-surface-700 hover:bg-surface-50 dark:border-surface-700 dark:text-surface-300 dark:hover:bg-surface-800 transition-all',
     destructive:
         'bg-destructive text-white hover:opacity-90 transition-all',
     ghost:
-        'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition-all',
+        'text-surface-600 hover:bg-surface-100 dark:text-surface-400 dark:hover:bg-surface-800 transition-all',
     disabled:
-        'bg-slate-200 text-slate-400 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600',
+        'bg-surface-200 text-surface-400 cursor-not-allowed dark:bg-surface-800 dark:text-surface-600',
 };
 
 export function Button({

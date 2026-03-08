@@ -168,4 +168,30 @@ Either one list with an optional "Messenger short" override per key, or two sect
 - ChatbotFsm (and/or MessengerReplyBuilder) would need to use this provider instead of raw `__('chatbot.xxx')` where overridable keys are used.
 - UI: form with key labels and text inputs (and locale/channel selectors if multi-locale/channel). Save → store overrides and optionally clear cache.
 
-This is **planned only**; no implementation in the current scope. The plan document can be copied to the project as `docs/MESSENGER_AND_REPLIES_CUSTOMIZATION_PLAN.md` for reference.
+---
+
+## Replies customization (per language) – implementation
+
+This section documents the implementation of the admin Portal page to customize chatbot reply strings per language (en, tl, ilo). Reference: strengthened plan "Chatbot Replies Customization (Per Language)" and its full checklist.
+
+### Cache strategy and invalidation
+
+- **Resolver:** All override lookups go through `ChatbotReplyResolver::get($key, $locale, $replace)`. For keys in the allow list, the resolver checks cache first (key: `chatbot_reply:{locale}:{key}`), then DB. TTL: configurable (e.g. 6 hours). If no override row exists, use lang file for that locale only (no cross-locale fallback).
+- **Invalidation:** On save and on destroy in `ChatbotRepliesController`, call `Cache::forget("chatbot_reply:{$locale}:{$key}")` for the affected key/locale. Implementing the resolver without cache invalidation would cause stale overrides in production.
+
+### Placeholder validation rules
+
+- Overridable keys that use placeholders (e.g. `:reference`, `:summary`, `:name`) are defined in `config/chatbot.php` under `reply_overridable_keys` with optional `required_placeholders` per key.
+- On store, the controller validates that every entry in `required_placeholders` appears in the submitted value. If any are missing, return 422 with a clear message (e.g. "Custom text must include :reference").
+
+### Locale fallback
+
+- Always fall back to the **lang file for that locale only**. Never use another locale’s override (e.g. do not use `en` override when `ilo` has no override). Resolver: no row ⇒ `__('chatbot.' . $key, $replace, $locale)`.
+
+### Reset to default
+
+- Use **DELETE** only. Do not store an empty string. Controller exposes destroy (delete row); frontend "Reset to default" calls it. Resolver treats "no row" as "use lang default".
+
+### Audit
+
+- Table `chatbot_reply_overrides` has `updated_by` (nullable FK to users). On store, set `updated_by` to the current user id. Timestamps provide "who last changed and when" for recovery.

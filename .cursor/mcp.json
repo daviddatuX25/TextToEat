@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "stitch": {
+      "command": "bash",
+      "args": [".cursor/scripts/stitch-mcp-run.sh"],
+      "description": "Google Stitch — generate UI designs from prompts, extract design context, fetch screens/code"
+    }
+  }
+}

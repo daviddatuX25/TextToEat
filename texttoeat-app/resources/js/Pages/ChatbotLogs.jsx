@@ -41,7 +41,7 @@ export default function ChatbotLogs({ sessions, filters = {}, meta = {} }) {
                         </h1>
                         <Link
                             href="/portal/inbox"
-                            className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
+                            className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800 smooth-hover"
                         >
                             ← Back to inbox
                         </Link>
@@ -72,7 +72,7 @@ export default function ChatbotLogs({ sessions, filters = {}, meta = {} }) {
                             aria-pressed={viewMode === 'card'}
                             className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
                                 viewMode === 'card'
-                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400'
+                                    ? 'bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                     : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
                             }`}
                         >
@@ -86,7 +86,7 @@ export default function ChatbotLogs({ sessions, filters = {}, meta = {} }) {
                             aria-pressed={viewMode === 'table'}
                             className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
                                 viewMode === 'table'
-                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400'
+                                    ? 'bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                     : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
                             }`}
                         >
@@ -138,7 +138,7 @@ export default function ChatbotLogs({ sessions, filters = {}, meta = {} }) {
                                                 preserveScroll
                                                 className={`px-2.5 py-1 rounded-md border text-xs ${
                                                     link.active
-                                                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200'
+                                                        ? 'border-surface-500 bg-surface-100 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                                         : 'border-transparent text-surface-600 hover:bg-surface-100 dark:text-surface-300 dark:hover:bg-surface-800'
                                                 }`}
                                                 dangerouslySetInnerHTML={{ __html: link.label }}
@@ -176,7 +176,7 @@ export default function ChatbotLogs({ sessions, filters = {}, meta = {} }) {
                                                 preserveScroll
                                                 className={`px-2.5 py-1 rounded-md border text-xs ${
                                                     link.active
-                                                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200'
+                                                        ? 'border-surface-500 bg-surface-100 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                                         : 'border-transparent text-surface-600 hover:bg-surface-100 dark:text-surface-300 dark:hover:bg-surface-800'
                                                 }`}
                                                 dangerouslySetInnerHTML={{ __html: link.label }}

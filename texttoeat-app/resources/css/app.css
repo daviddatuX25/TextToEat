@@ -7,13 +7,15 @@
 @source '../**/*.js';
 @source '../**/*.jsx';
 
-/* Theme aligned with TextToEat v2 Premium UI Kit */
+/* Class-based dark mode for theme toggle (Tailwind v4 default is media query) */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Theme aligned with TextToEat v2 Premium UI Kit — unified light/dark */
 
 @theme {
-    /* Typography — Premium UI kit: Outfit */
-    --font-sans: 'Outfit', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
-    
-    /* Semantic Colors from UI Kit */
+    --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+
+    /* Brand: Orange */
     --color-primary-50: #fff7ed;
     --color-primary-100: #ffedd5;
     --color-primary-200: #fed7aa;
@@ -26,6 +28,7 @@
     --color-primary-900: #7c2d12;
     --color-primary-950: #431407;
 
+    /* Surface: Stone neutrals */
     --color-surface-50: #fafaf9;
     --color-surface-100: #f5f5f4;
     --color-surface-200: #e7e5e4;
@@ -38,71 +41,72 @@
     --color-surface-900: #1c1917;
     --color-surface-950: #0c0a09;
 
-    /* Shadcn UI compatibility mappings to new premium colors */
+    /* Semantic (shadcn-style) — light mode defaults */
     --color-background: var(--color-surface-50);
     --color-foreground: var(--color-surface-900);
+    --color-card: #ffffff;
+    --color-card-foreground: var(--color-surface-900);
     --color-primary: var(--color-primary-600);
     --color-primary-foreground: #ffffff;
     --color-muted: var(--color-surface-100);
     --color-muted-foreground: var(--color-surface-500);
-    --color-destructive: oklch(64% 0.24 25);
-    --color-destructive-foreground: oklch(98.5% 0 0);
     --color-border: var(--color-surface-200);
     --color-input: var(--color-surface-200);
     --color-ring: var(--color-primary-500);
-    --color-card: #ffffff;
-    --color-card-foreground: var(--color-surface-900);
+    --color-destructive: #ef4444;
+    --color-destructive-foreground: #ffffff;
 
-    /* Elevation and Shadows */
-    --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    /* Elevation (in-use) */
     --shadow-float: 0 20px 40px -10px rgba(234, 88, 12, 0.15);
 
-    /* Animations */
-    --animate-bounce-subtle: bounceSubtle 2s infinite;
+    /* Animations (in-use) */
     --animate-fade-in: fadeIn 0.5s ease-out forwards;
 
-    @keyframes bounceSubtle {
-        0%, 100% { transform: translateY(-2%) }
-        50% { transform: translateY(0) }
-    }
-    
     @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px) }
-        to { opacity: 1; transform: translateY(0) }
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
     }
-
     @keyframes highlightRing {
         0%, 100% { box-shadow: 0 0 0 3px var(--color-primary-400), 0 0 0 6px var(--color-primary-200); }
         50% { box-shadow: 0 0 0 6px var(--color-primary-500), 0 0 0 12px var(--color-primary-300); }
     }
-
     @keyframes proceedBlink {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.88; }
     }
-
     @keyframes cursorBlink {
         0%, 100% { opacity: 1; }
         50% { opacity: 0; }
     }
 }
 
+/* Dark mode semantic overrides */
+.dark {
+    --color-background: var(--color-surface-900);
+    --color-foreground: var(--color-surface-50);
+    --color-card: var(--color-surface-800);
+    --color-card-foreground: var(--color-surface-50);
+    --color-muted: var(--color-surface-800);
+    --color-muted-foreground: var(--color-surface-400);
+    --color-border: var(--color-surface-700);
+    --color-input: var(--color-surface-700);
+}
+
 /* Base custom utilities */
 @layer utilities {
     .glass-panel {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.4);
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--color-surface-200);
     }
-    
     .dark .glass-panel {
-        background: rgba(28, 25, 23, 0.75);
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: rgba(28, 25, 23, 0.85);
+        border-bottom: 1px solid var(--color-surface-700);
     }
-    
     .smooth-hover {
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        transition: background-color 150ms ease, color 150ms ease,
+                    border-color 150ms ease, opacity 150ms ease;
     }
     
     .no-scrollbar::-webkit-scrollbar {

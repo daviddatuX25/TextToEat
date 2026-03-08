@@ -6,7 +6,7 @@ import PortalLayout from '../Layouts/PortalLayout';
 function ModeBadge({ mode }) {
     if (mode === 'staff_only') {
         return (
-            <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-800 dark:bg-slate-500/20 dark:text-slate-200 text-[11px] font-semibold uppercase tracking-wide">
+            <span className="px-2 py-0.5 rounded-full bg-surface-100 text-surface-800 dark:bg-surface-500/20 dark:text-surface-200 text-[11px] font-semibold uppercase tracking-wide">
                 Staff only
             </span>
         );
@@ -160,7 +160,7 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
                                 onClick={() => setAutomation(false)}
                                 className={`rounded-lg px-3 py-1.5 text-sm font-semibold border transition-colors ${
                                     !automationEnabled
-                                        ? 'border-slate-500 bg-slate-50 text-slate-800 dark:bg-slate-500/20 dark:text-slate-200'
+                                        ? 'border-surface-500 bg-surface-50 text-surface-800 dark:bg-surface-500/20 dark:text-surface-200'
                                         : 'border-surface-200 bg-surface-50 text-surface-600 hover:bg-surface-100 dark:border-surface-700 dark:bg-surface-800 dark:text-surface-300 dark:hover:bg-surface-700'
                                 }`}
                             >

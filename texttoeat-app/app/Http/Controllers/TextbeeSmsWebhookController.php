@@ -6,6 +6,7 @@ use App\Contracts\SmsSenderInterface;
 use App\Events\ConversationUpdated;
 use App\Models\ChatbotSession;
 use App\Models\InboundMessage;
+use App\Services\ChatbotSmsNumberLayer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -13,7 +14,8 @@ class TextbeeSmsWebhookController extends Controller
 {
     public function __construct(
         private SmsSenderInterface $smsSender,
-        private ChatbotWebhookController $chatbot
+        private ChatbotWebhookController $chatbot,
+        private ChatbotSmsNumberLayer $smsNumberLayer
     ) {}
 
     public function handle(Request $request): JsonResponse
@@ -54,13 +56,18 @@ class TextbeeSmsWebhookController extends Controller
             }
         }
 
+        $currentState = $existingSession !== null
+            ? ($existingSession->state['current_state'] ?? null)
+            : null;
+        $bodyForWebhook = $this->smsNumberLayer->normalizeBodyForChoiceState($currentState, $body);
+
         $chatbotRequest = Request::create(
             '/api/chatbot/webhook',
             'POST',
             [
                 'channel' => 'sms',
                 'external_id' => $normalizedPhone,
-                'body' => $body,
+                'body' => $bodyForWebhook,
             ]
         );
 
@@ -70,18 +77,35 @@ class TextbeeSmsWebhookController extends Controller
         $sessionId = $existingSession?->id
             ?? ChatbotSession::where('channel', 'sms')->where('external_id', $normalizedPhone)->value('id');
 
+        $nextState = $data['state']['current_state'] ?? null;
+        $locale = $data['state']['selected_language'] ?? 'en';
+
         $replies = $data['replies'] ?? null;
-        if (\is_array($replies) && $replies !== []) {
-            foreach ($replies as $replyText) {
-                if (\is_string($replyText) && $replyText !== '') {
-                    $this->smsSender->send($normalizedPhone, $replyText, 'sms', $sessionId);
-                }
-            }
-        } else {
+        if (! \is_array($replies) || $replies === []) {
             $reply = $data['reply'] ?? null;
-            if (\is_string($reply) && $reply !== '') {
-                $this->smsSender->send($normalizedPhone, $reply, 'sms', $sessionId);
+            $replies = \is_string($reply) && $reply !== '' ? [$reply] : [];
+        }
+
+        $formattedChoice = null;
+        $promptOnly = null;
+        if ($nextState !== null && $this->smsNumberLayer->isChoiceState($nextState)) {
+            $context = [];
+            if ($nextState === 'delivery_choice' && isset($data['delivery_areas']) && is_array($data['delivery_areas'])) {
+                $context['delivery_areas'] = $data['delivery_areas'];
             }
+            $formattedChoice = $this->smsNumberLayer->formatChoiceStateReply($nextState, $locale, $context);
+            $promptOnly = $this->smsNumberLayer->getChoiceStatePromptOnly($nextState, $locale);
+        }
+
+        foreach ($replies as $replyText) {
+            if (! \is_string($replyText) || $replyText === '') {
+                continue;
+            }
+            // If this segment contains the bare prompt (e.g. "Invalid option. What would you like to do?"), include options.
+            if ($formattedChoice !== null && $promptOnly !== null && str_contains($replyText, $promptOnly)) {
+                $replyText = str_replace($promptOnly, $formattedChoice, $replyText);
+            }
+            $this->smsSender->send($normalizedPhone, $replyText, 'sms', $sessionId);
         }
 
         return response()->json([

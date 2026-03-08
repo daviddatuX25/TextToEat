@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { ListOrdered, Truck, Store, UtensilsCrossed, Zap, BookOpen, ArrowRight } from 'lucide-react';
+import { Truck, Store, UtensilsCrossed, ArrowRight } from 'lucide-react';
 import PortalLayout from '../Layouts/PortalLayout';
 import { Card, CardContent, CardHeader, SectionHeading, StatCard } from '../components/ui';
 import { usePortalRefresh } from '../hooks/usePortalRefresh';
@@ -234,7 +234,7 @@ export default function Dashboard({ metrics = {} }) {
                                             {analyticsByFulfillment.map((row) => (
                                                 <tr key={row.type ?? 'unknown'} className="border-b last:border-b-0 border-surface-100 dark:border-surface-800">
                                                     <td className="px-3 py-2 font-medium text-surface-800 dark:text-surface-100">
-                                                        {row.type === 'delivery' && <span className="inline-flex items-center gap-1"><Truck className="h-3.5 w-3.5 text-blue-500" /> Delivery</span>}
+                                                        {row.type === 'delivery' && <span className="inline-flex items-center gap-1"><Truck className="h-3.5 w-3.5 text-primary-500" /> Delivery</span>}
                                                         {row.type === 'pickup' && <span className="inline-flex items-center gap-1"><Store className="h-3.5 w-3.5 text-amber-500" /> Pickup</span>}
                                                         {row.type === 'walkin' && <span className="inline-flex items-center gap-1"><UtensilsCrossed className="h-3.5 w-3.5 text-violet-500" /> Walk-in</span>}
                                                         {row.type !== 'delivery' && row.type !== 'pickup' && row.type !== 'walkin' && (row.type || '—')}
@@ -259,9 +259,9 @@ export default function Dashboard({ metrics = {} }) {
                                 </Link>
                                 <Link
                                     href="/portal/orders"
-                                    className="group block rounded-2xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/60 dark:bg-blue-950/30 p-4 transition hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                    className="group block rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 p-4 transition hover:border-surface-300 dark:hover:border-surface-600 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 >
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">Confirmed</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Confirmed</p>
                                     <p className="mt-1 text-2xl font-extrabold text-surface-900 dark:text-white">{pipeline_confirmed}</p>
                                     <p className="mt-0.5 text-xs text-surface-500 dark:text-surface-400">In kitchen</p>
                                 </Link>
@@ -288,12 +288,12 @@ export default function Dashboard({ metrics = {} }) {
                             </Link>
                             <Link
                                 href="/portal/orders"
-                                className="group block rounded-2xl border border-blue-200 dark:border-blue-800/60 bg-blue-50/60 dark:bg-blue-950/30 p-5 transition hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                                className="group block rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 p-5 transition hover:border-surface-300 dark:hover:border-surface-600 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                             >
-                                <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-400">Confirmed</p>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Confirmed</p>
                                 <p className="mt-1 text-3xl font-extrabold text-surface-900 dark:text-white">{pipeline_confirmed}</p>
                                 <p className="mt-1 text-xs text-surface-500 dark:text-surface-400">In kitchen</p>
-                                <ArrowRight className="mt-2 h-4 w-4 text-blue-500 opacity-0 group-hover:opacity-100 transition" aria-hidden />
+                                <ArrowRight className="mt-2 h-4 w-4 text-primary-500 opacity-0 group-hover:opacity-100 transition" aria-hidden />
                             </Link>
                             <Link
                                 href="/portal/orders"
@@ -306,135 +306,6 @@ export default function Dashboard({ metrics = {} }) {
                             </Link>
                         </>
                     )}
-
-                    {/* Row 4 — Quick actions */}
-                    <div className={Array.isArray(analyticsByFulfillment) && analyticsByFulfillment.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}>
-                        <SectionHeading as="h2" className="text-lg font-bold text-surface-800 dark:text-surface-100 mb-3">
-                            Quick actions
-                        </SectionHeading>
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                        <Link
-                            href="/portal/orders"
-                            className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500"
-                        >
-                            <div className="h-full rounded-2xl border border-primary-500/70 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-primary-50/60 dark:border-primary-500/60 dark:bg-surface-900/40 dark:hover:bg-primary-500/10">
-                                <div className="flex flex-col gap-3 p-4">
-                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-primary-500/10 text-primary-600 dark:text-primary-400">
-                                        <ListOrdered className="h-5 w-5" aria-hidden="true" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
-                                            Orders
-                                        </p>
-                                        <p className="text-xs text-surface-500 dark:text-surface-400">
-                                            Manage all orders in one place.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                        <Link
-                            href="/portal/deliveries"
-                            className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
-                        >
-                            <div className="h-full rounded-2xl border border-blue-500/70 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-blue-50/60 dark:border-blue-500/60 dark:bg-surface-900/40 dark:hover:bg-blue-500/10">
-                                <div className="flex flex-col gap-3 p-4">
-                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-                                        <Truck className="h-5 w-5" aria-hidden="true" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
-                                            Deliveries
-                                        </p>
-                                        <p className="text-xs text-surface-500 dark:text-surface-400">
-                                            Track orders going out for delivery.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                        <Link
-                            href="/portal/pickup"
-                            className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-amber-500"
-                        >
-                            <div className="h-full rounded-2xl border border-amber-500/70 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-amber-50/60 dark:border-amber-500/60 dark:bg-surface-900/40 dark:hover:bg-amber-500/10">
-                                <div className="flex flex-col gap-3 p-4">
-                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-                                        <Store className="h-5 w-5" aria-hidden="true" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
-                                            Pickup
-                                        </p>
-                                        <p className="text-xs text-surface-500 dark:text-surface-400">
-                                            See orders queued for pickup.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                        <Link
-                            href="/portal/walkin"
-                            className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-violet-500"
-                        >
-                            <div className="h-full rounded-2xl border border-violet-500/70 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-violet-50/60 dark:border-violet-500/60 dark:bg-surface-900/40 dark:hover:bg-violet-500/10">
-                                <div className="flex flex-col gap-3 p-4">
-                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                                        <UtensilsCrossed className="h-5 w-5" aria-hidden="true" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
-                                            Walk-in
-                                        </p>
-                                        <p className="text-xs text-surface-500 dark:text-surface-400">
-                                            Manage guests at the counter.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                        <Link
-                            href="/portal/quick-orders"
-                            className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-500"
-                        >
-                            <div className="h-full rounded-2xl border border-emerald-500/70 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-emerald-50/60 dark:border-emerald-500/60 dark:bg-surface-900/40 dark:hover:bg-emerald-500/10">
-                                <div className="flex flex-col gap-3 p-4">
-                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-                                        <Zap className="h-5 w-5" aria-hidden="true" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
-                                            Create order
-                                        </p>
-                                        <p className="text-xs text-surface-500 dark:text-surface-400">
-                                            Start a new order quickly.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                        <Link
-                            href="/portal/menu-items"
-                            className="group block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-surface-400"
-                        >
-                            <div className="h-full rounded-2xl border border-surface-300 bg-surface-50/80 shadow-sm transition hover:shadow-md hover:bg-surface-100 dark:border-surface-600 dark:bg-surface-900/40 dark:hover:bg-surface-800">
-                                <div className="flex flex-col gap-3 p-4">
-                                    <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-surface-200 text-surface-700 dark:bg-surface-800 dark:text-surface-200">
-                                        <BookOpen className="h-5 w-5" aria-hidden="true" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-50">
-                                            Menu items
-                                        </p>
-                                        <p className="text-xs text-surface-500 dark:text-surface-400">
-                                            Review and manage your menu.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </Link>
-                        </div>
-                    </div>
                 </div>
             </section>
         </PortalLayout>

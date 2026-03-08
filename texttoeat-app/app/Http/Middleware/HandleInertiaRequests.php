@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 use Inertia\Middleware;
 
@@ -36,6 +38,10 @@ class HandleInertiaRequests extends Middleware
                     'role' => $request->user()->role ?? 'staff',
                 ] : null,
             ],
+            'show_daily_greeting' => fn () => $request->user() && $request->is('portal*')
+                ? (Cache::get('menu_reset_date') === Carbon::today()->toDateString()
+                    && Session::get('daily_greeting_dismissed_date') !== Carbon::today()->toDateString())
+                : false,
         ];
     }
 }

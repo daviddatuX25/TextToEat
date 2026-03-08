@@ -18,6 +18,7 @@ class AccountController extends Controller
             'user' => [
                 'name' => $user->name,
                 'username' => $user->username,
+                'role' => $user->role ?? 'staff',
             ],
         ]);
     }

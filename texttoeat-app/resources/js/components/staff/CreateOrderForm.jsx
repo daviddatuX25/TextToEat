@@ -437,7 +437,7 @@ function CreateOrderForm({
                     document.body &&
                     createPortal(
                         <div
-                            className="fixed left-0 right-0 bottom-0 z-[100] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white dark:bg-slate-900 border-t border-surface-200 dark:border-surface-700 shadow-[0_-4px_20px_rgba(0,0,0,0.12)] lg:hidden"
+                            className="fixed left-0 right-0 bottom-0 z-[100] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] bg-white dark:bg-surface-900 border-t border-surface-200 dark:border-surface-700 shadow-[0_-4px_20px_rgba(0,0,0,0.12)] lg:hidden"
                             style={{ position: 'fixed', left: 0, right: 0, bottom: 0 }}
                             data-create-order-footer
                         >

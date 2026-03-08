@@ -131,6 +131,28 @@ if (! function_exists('run_reseed')) {
     }
 }
 
+if (! function_exists('run_menu_reset')) {
+    /**
+     * Reset today's menu: rollover yesterday to today, reset today items to disabled with zero stock, flag greeting modal.
+     */
+    function run_menu_reset(Application $app): void
+    {
+        try {
+            Artisan::call('menu:reset-today', ['--force' => true]);
+            $output = Artisan::output();
+            if ($output !== '') {
+                echo ">>> menu:reset-today --force\n{$output}\n";
+            } else {
+                echo ">>> menu:reset-today --force (ok)\n";
+            }
+        } catch (\Throwable $e) {
+            echo "!!! Error running menu:reset-today: " . $e->getMessage() . "\n";
+            exit(1);
+        }
+        echo "Menu reset complete. Greeting modal will show for portal users.\n";
+    }
+}
+
 if (! function_exists('run_script_by_name')) {
     /**
      * Dispatch helper to run a named maintenance script.
@@ -156,9 +178,13 @@ if (! function_exists('run_script_by_name')) {
                 run_reseed($app, true);
 
                 return true;
+            case 'menu-reset':
+                run_menu_reset($app);
+
+                return true;
             default:
                 echo "Unknown script: {$script}\n";
-                echo "Allowed scripts: initial-setup, deploy-update, reseed, force-reseed\n";
+                echo "Allowed scripts: initial-setup, deploy-update, reseed, force-reseed, menu-reset\n";
 
                 return false;
         }

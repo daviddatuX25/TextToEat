@@ -85,11 +85,11 @@ export default function ChannelPerformanceChart({ data, formatCurrency }) {
                             const d = payload[0]?.payload;
                             if (!d) return null;
                             return (
-                                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-md dark:border-slate-700 dark:bg-slate-800">
-                                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-100">
+                                <div className="rounded-lg border border-surface-200 bg-white px-3 py-2 shadow-md dark:border-surface-700 dark:bg-surface-800">
+                                    <p className="text-xs font-semibold text-surface-800 dark:text-surface-100">
                                         {label}
                                     </p>
-                                    <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                                    <p className="mt-1 text-xs text-surface-600 dark:text-surface-300">
                                         {d.orders_today} order{d.orders_today !== 1 ? 's' : ''} ·{' '}
                                         {safeFormatCurrency(d.revenue_today)} revenue ·{' '}
                                         {d.completion_pct}% completion

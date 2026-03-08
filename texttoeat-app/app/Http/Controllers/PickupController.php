@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
 use App\Events\OrderUpdated;
 use App\Models\Order;
@@ -17,6 +18,7 @@ class PickupController extends Controller
     {
         $orders = Order::with('orderItems')
             ->where('delivery_type', 'pickup')
+            ->where('channel', '!=', OrderChannel::WalkIn)
             ->whereNotIn('status', [OrderStatus::Completed, OrderStatus::Cancelled])
             ->orderByDesc('created_at')
             ->get();

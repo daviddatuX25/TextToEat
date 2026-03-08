@@ -6,6 +6,7 @@ use App\Contracts\MessengerSenderInterface;
 use App\Contracts\SmsSenderInterface;
 use App\Models\ChatbotSession;
 use App\Models\Order;
+use App\Services\ChatbotReplyResolver;
 use Illuminate\Support\Facades\Log;
 
 class OrderStatusNotificationService
@@ -96,8 +97,9 @@ class OrderStatusNotificationService
         $isPaid = $paymentStatus === 'paid' || (is_object($paymentStatus) && $paymentStatus->value === 'paid');
         $totalFormatted = number_format((float) ($order->total ?? 0), 2);
 
+        $resolver = app(ChatbotReplyResolver::class);
         if ($toStatus === 'on_the_way' && $deliveryType === 'delivery') {
-            $message = __('chatbot.status_push_on_the_way', ['reference' => $reference], $locale);
+            $message = $resolver->get('status_push_on_the_way', $locale, ['reference' => $reference]);
             if (! $isPaid) {
                 $message .= "\n\n" . $this->unpaidDeliveryReminder($order, $locale, $totalFormatted);
             }
@@ -107,15 +109,15 @@ class OrderStatusNotificationService
 
         if ($toStatus === 'ready' && $deliveryType === 'pickup') {
             if ($pickupSlot !== '') {
-                $message = __('chatbot.status_push_ready_pickup_slot', [
+                $message = $resolver->get('status_push_ready_pickup_slot', $locale, [
                     'reference' => $reference,
                     'slot' => $pickupSlot,
-                ], $locale);
+                ]);
             } else {
-                $message = __('chatbot.status_push_ready_pickup', ['reference' => $reference], $locale);
+                $message = $resolver->get('status_push_ready_pickup', $locale, ['reference' => $reference]);
             }
             if (! $isPaid) {
-                $message .= "\n\n" . __('chatbot.status_push_unpaid_pickup', ['total' => $totalFormatted], $locale);
+                $message .= "\n\n" . $resolver->get('status_push_unpaid_pickup', $locale, ['total' => $totalFormatted]);
             }
 
             return $message;
@@ -130,11 +132,12 @@ class OrderStatusNotificationService
     private function unpaidDeliveryReminder(Order $order, string $locale, string $totalFormatted): string
     {
         $place = $order->delivery_place ?? '';
+        $resolver = app(ChatbotReplyResolver::class);
 
         if ($place === 'Other (paid on delivery)') {
-            return __('chatbot.status_push_unpaid_delivery_cash', [], $locale);
+            return $resolver->get('status_push_unpaid_delivery_cash', $locale);
         }
 
-        return __('chatbot.status_push_unpaid_delivery_total', ['total' => $totalFormatted], $locale);
+        return $resolver->get('status_push_unpaid_delivery_total', $locale, ['total' => $totalFormatted]);
     }
 }

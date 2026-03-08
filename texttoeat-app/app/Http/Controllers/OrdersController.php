@@ -12,10 +12,12 @@ use App\Services\OrderStatusNotificationService;
 use App\Models\DeliveryArea;
 use App\Models\DiningMarker;
 use App\Models\MenuItem;
+use App\Models\MenuItemDailyStock;
 use App\Models\Order;
 use App\Models\PickupSlot;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -167,14 +169,37 @@ class OrdersController extends Controller
 
         if ($originalStatus !== $order->status && (string) $order->status === OrderStatus::Completed->value) {
             $today = Carbon::today();
-            foreach ($order->orderItems as $orderItem) {
-                if ($orderItem->menu_item_id) {
-                    MenuItem::query()
-                        ->where('id', $orderItem->menu_item_id)
-                        ->whereDate('menu_date', $today)
-                        ->decrement('units_today', $orderItem->quantity);
+            DB::transaction(function () use ($order, $today): void {
+                foreach ($order->orderItems as $orderItem) {
+                    if ($orderItem->menu_item_id) {
+                        $menuItem = MenuItem::query()
+                            ->where('id', $orderItem->menu_item_id)
+                            ->whereDate('menu_date', $today)
+                            ->first();
+                        if ($menuItem) {
+                            MenuItemDailyStock::firstOrCreate(
+                                [
+                                    'menu_item_id' => $menuItem->id,
+                                    'menu_date' => $today,
+                                ],
+                                [
+                                    'units_set' => (int) $menuItem->units_today,
+                                    'units_sold' => 0,
+                                    'units_leftover' => (int) $menuItem->units_today,
+                                ]
+                            );
+                            MenuItemDailyStock::query()
+                                ->where('menu_item_id', $orderItem->menu_item_id)
+                                ->whereDate('menu_date', $today)
+                                ->increment('units_sold', $orderItem->quantity);
+                            MenuItem::query()
+                                ->where('id', $orderItem->menu_item_id)
+                                ->whereDate('menu_date', $today)
+                                ->decrement('units_today', $orderItem->quantity);
+                        }
+                    }
                 }
-            }
+            });
         }
 
         event(new OrderUpdated($order));

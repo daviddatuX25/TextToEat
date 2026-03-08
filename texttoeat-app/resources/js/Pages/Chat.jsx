@@ -324,7 +324,7 @@ export default function Chat({ webChatExternalId = '' }) {
                                 onClick={() => switchChannel(value)}
                                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                                     channel === value
-                                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400 border border-primary-200 dark:border-primary-500/30'
+                                        ? 'bg-surface-100 text-surface-700 dark:bg-surface-800/80 dark:text-surface-200 border border-surface-200 dark:border-surface-700'
                                         : 'bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-400 border border-transparent hover:bg-surface-200 dark:hover:bg-surface-600'
                                 }`}
                             >
@@ -381,7 +381,7 @@ export default function Chat({ webChatExternalId = '' }) {
                                     type="button"
                                     onClick={() => sendBody(opt.body)}
                                     disabled={sending || loading}
-                                    className="rounded-lg border-2 border-primary-200 dark:border-primary-600 bg-primary-50 dark:bg-primary-500/10 text-primary-800 dark:text-primary-200 px-3 py-2 text-sm font-medium hover:bg-primary-100 dark:hover:bg-primary-500/20 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                                    className="rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-800 dark:text-surface-200 px-3 py-2 text-sm font-medium hover:bg-surface-100 dark:hover:bg-surface-700 disabled:opacity-50 disabled:pointer-events-none transition-colors"
                                 >
                                     {opt.label}
                                 </button>

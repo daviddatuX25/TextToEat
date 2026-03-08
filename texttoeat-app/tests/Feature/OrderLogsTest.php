@@ -19,7 +19,7 @@ class OrderLogsTest extends TestCase
         $user = User::factory()->create();
         $order = Order::factory()->create([
             'status' => OrderStatus::Received,
-            'channel' => OrderChannel::Chatbot,
+            'channel' => OrderChannel::Sms,
         ]);
 
         ActionLog::create([

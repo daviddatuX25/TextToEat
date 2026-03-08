@@ -14,6 +14,7 @@ use App\Http\Controllers\OrderLogsController;
 use App\Http\Controllers\OrdersController;
 use App\Http\Controllers\ChatbotLogsController;
 use App\Http\Controllers\ConversationInboxController;
+use App\Http\Controllers\TrackOrderController;
 use App\Http\Controllers\PickupController;
 use App\Http\Controllers\PickupSlotsController;
 use App\Http\Controllers\AccountController;
@@ -43,9 +44,7 @@ Route::get('/checkout', [CheckoutController::class, 'index'])->name('checkout');
 Route::post('/checkout', [CheckoutController::class, 'store']);
 Route::get('/order-confirmation/{reference}', [CheckoutController::class, 'confirmation'])->name('order.confirmation');
 
-Route::get('/track', function () {
-    return Inertia::render('Track');
-});
+Route::get('/track', [TrackOrderController::class, 'show']);
 
 Route::get('/about', function () {
     return Inertia::render('About');

@@ -38,4 +38,16 @@ npm run dev          # or npm run dev:fresh if 5173 is busy
 ## Ports
 
 - **Vite dev:** 5173 (configurable via `VITE_PORT` in `compose.yaml` and `vite.config.js`).
-- **Laravel (Sail):** 80 by default (`APP_PORT` in `.env`).
+- **Laravel (Sail):** Use **http://localhost:${APP_PORT}** (e.g. **http://localhost:8000** when `APP_PORT=8000` in `.env`). The app listens on `0.0.0.0:80` inside the container; the host port is `APP_PORT`.
+
+## Low-CPU testing (no Vite in Docker)
+
+If Sail + Vite in Docker pushes CPU to 200–300%, run only the backend and use built assets:
+
+```bash
+./vendor/bin/sail up -d
+./vendor/bin/sail npm run build
+# Open http://localhost:8000 (or http://localhost:${APP_PORT})
+```
+
+No `sail npm run dev`. For HMR, run `npm run dev` on the host (from `texttoeat-app`) while Sail runs; the page will use `VITE_DEV_SERVER_URL` from `.env`.

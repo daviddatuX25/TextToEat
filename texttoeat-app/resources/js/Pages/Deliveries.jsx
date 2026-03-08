@@ -39,7 +39,7 @@ function DeliveryOrderCard({ order, isHighlighted = false }) {
     return (
         <div
             className={`rounded-2xl border-2 p-5 transition-all ${
-                isCompleted ? 'opacity-60 border-surface-200 dark:border-surface-700' : 'border-blue-300 dark:border-blue-500/40 bg-white dark:bg-surface-900 shadow-md hover:shadow-lg'
+                isCompleted ? 'opacity-60 border-surface-200 dark:border-surface-700' : 'border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 shadow-md hover:shadow-lg'
             } ${isHighlighted ? 'highlight-ring' : ''}`}
         >
             <div className="flex justify-between items-start gap-3 mb-3 flex-wrap">
@@ -48,7 +48,7 @@ function DeliveryOrderCard({ order, isHighlighted = false }) {
                     <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${isPaid ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'}`}>
                         {isPaid ? 'Paid' : 'Unpaid'}
                     </span>
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300 capitalize">
+                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-300 capitalize">
                         {status.replace('_', ' ')}
                     </span>
                 </div>
@@ -61,9 +61,9 @@ function DeliveryOrderCard({ order, isHighlighted = false }) {
                     {order.customer_phone}
                 </p>
             )}
-            <div className="mt-2 flex items-center gap-2 rounded-lg bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 px-3 py-2">
-                <MapPin className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-semibold text-blue-800 dark:text-blue-200">{deliveryPlace}</span>
+            <div className="mt-2 flex items-center gap-2 rounded-lg bg-surface-50/60 dark:bg-surface-900/40 border border-surface-200 dark:border-surface-700 px-3 py-2">
+                <MapPin className="h-4 w-4 shrink-0 text-primary-600 dark:text-primary-400" />
+                <span className="text-sm font-semibold text-primary-800 dark:text-primary-200">{deliveryPlace}</span>
             </div>
 
             {isCompleted ? (
@@ -116,7 +116,7 @@ function DeliveryOrderCard({ order, isHighlighted = false }) {
                     <button
                         type="button"
                         onClick={() => updateStatus('on_the_way')}
-                        className="w-full font-semibold py-2 rounded-xl border-2 border-blue-400 dark:border-blue-500/60 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 active:scale-[0.99]"
+                        className="w-full font-semibold py-2 rounded-xl border-2 border-primary-400 dark:border-primary-500/60 bg-primary-50 dark:bg-primary-500/10 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-500/20 active:scale-[0.99]"
                     >
                         Mark on the way
                     </button>
@@ -221,7 +221,7 @@ function ManageDeliveryAreasDialog({ deliveryAreas = [], open, onOpenChange }) {
                                         <button
                                             type="button"
                                             onClick={() => startEdit(area)}
-                                            className="inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg border border-blue-200 dark:border-blue-500/30 text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 text-sm font-medium"
+                                            className="inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg border border-surface-200 dark:border-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800 text-sm font-medium"
                                         >
                                             Edit
                                         </button>
@@ -456,14 +456,14 @@ export default function Deliveries({ orders = [], deliveryAreas = [], highlight 
                         <div className="flex flex-wrap items-center gap-3">
                             <Link
                                 href="/portal/orders"
-                                className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
+                                className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800 smooth-hover"
                             >
                                 ← Back to orders
                             </Link>
                             <button
                                 type="button"
                                 onClick={() => setManageOpen(true)}
-                                className="inline-flex items-center gap-2 rounded-xl border-2 border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 px-4 py-2 text-sm font-semibold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-colors"
+                                className="inline-flex items-center gap-2 rounded-xl border-2 border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 px-4 py-2 text-sm font-semibold text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
                             >
                                 <MapPin className="h-4 w-4" />
                                 Manage delivery areas
@@ -491,7 +491,7 @@ export default function Deliveries({ orders = [], deliveryAreas = [], highlight 
                             aria-pressed={viewMode === 'card'}
                             className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
                                 viewMode === 'card'
-                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400'
+                                    ? 'bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                     : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
                             }`}
                         >
@@ -505,7 +505,7 @@ export default function Deliveries({ orders = [], deliveryAreas = [], highlight 
                             aria-pressed={viewMode === 'table'}
                             className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
                                 viewMode === 'table'
-                                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-400'
+                                    ? 'bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                     : 'text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700'
                             }`}
                         >
@@ -563,7 +563,7 @@ export default function Deliveries({ orders = [], deliveryAreas = [], highlight 
                                                     {deliveryPlace}
                                                 </td>
                                                 <td className="py-2.5 px-3 whitespace-nowrap">
-                                                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300 text-xs font-semibold capitalize">
+                                                    <span className="px-2 py-0.5 rounded-full bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-300 text-xs font-semibold capitalize">
                                                         {status.replace('_', ' ')}
                                                     </span>
                                                 </td>

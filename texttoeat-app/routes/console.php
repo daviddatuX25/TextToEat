@@ -1,7 +1,11 @@
 <?php
 
+use App\Enums\OrderStatus;
 use App\Messenger\MessengerPayloads;
 use App\Models\MenuItem;
+use App\Models\MenuItemDailySnapshot;
+use App\Models\MenuItemDailyStock;
+use App\Models\OrderItem;
 use App\Models\OutboundSms;
 use App\Models\ChatbotSession;
 use App\Messenger\FacebookMessengerClient;
@@ -109,7 +113,7 @@ Artisan::command('menu:reset-today {--force : Run even outside morning window}',
         if ($todayByNameCategory->has($key)) {
             continue;
         }
-        MenuItem::create([
+        $newItem = MenuItem::create([
             'name' => $item->name,
             'price' => $item->price,
             'category' => $item->category,
@@ -118,8 +122,59 @@ Artisan::command('menu:reset-today {--force : Run even outside morning window}',
             'is_sold_out' => true,
             'menu_date' => $today,
         ]);
+        MenuItemDailyStock::create([
+            'menu_item_id' => $newItem->id,
+            'menu_date' => $today,
+            'units_set' => 0,
+            'units_sold' => 0,
+            'units_leftover' => 0,
+        ]);
         $rolloverCount++;
         $todayByNameCategory->put($key, (object) []);
+    }
+
+    // Snapshot today's stock before reset (Phase 1: safety net for analytics)
+    $todayItems = MenuItem::query()
+        ->whereDate('menu_date', $today)
+        ->get(['id', 'units_today']);
+    $soldByItem = OrderItem::query()
+        ->whereIn('menu_item_id', $todayItems->pluck('id'))
+        ->whereHas('order', fn ($q) => $q->where('status', OrderStatus::Completed)->whereDate('updated_at', $today))
+        ->selectRaw('menu_item_id, COALESCE(SUM(quantity), 0) as qty')
+        ->groupBy('menu_item_id')
+        ->pluck('qty', 'menu_item_id')
+        ->all();
+    foreach ($todayItems as $item) {
+        $leftover = (int) $item->units_today;
+        $sold = (int) ($soldByItem[$item->id] ?? 0);
+        $set = $leftover + $sold;
+        MenuItemDailySnapshot::upsert(
+            [
+                'menu_item_id' => $item->id,
+                'menu_date' => $today->toDateString(),
+                'units_set' => $set,
+                'units_sold' => $sold,
+                'units_leftover' => $leftover,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ],
+            ['menu_item_id', 'menu_date'],
+            ['units_set', 'units_sold', 'units_leftover', 'updated_at']
+        );
+    }
+
+    foreach ($todayItems as $item) {
+        MenuItemDailyStock::updateOrCreate(
+            [
+                'menu_item_id' => $item->id,
+                'menu_date' => $today,
+            ],
+            [
+                'units_set' => 0,
+                'units_sold' => 0,
+                'units_leftover' => 0,
+            ]
+        );
     }
 
     $resetCount = MenuItem::query()

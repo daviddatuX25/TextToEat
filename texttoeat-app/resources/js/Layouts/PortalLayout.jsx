@@ -15,8 +15,6 @@ import {
     MessageCircle,
     Settings,
     Users,
-    Sun,
-    Moon,
     Smartphone,
     Bot,
     User,
@@ -28,6 +26,7 @@ import { Toaster, toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
 import { Button } from '../components/ui/Button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/Collapsible';
+import ThemeToggle from '../components/ThemeToggle';
 
 const PORTAL_NAV_LINK_DASHBOARD = { type: 'link', href: '/portal', label: 'Dashboard', Icon: LayoutDashboard };
 const PORTAL_NAV_GROUP_ORDERS = {
@@ -88,7 +87,7 @@ function isGroupActive(items, pathname) {
 function NavLink({ href, label, Icon, pathname, onClick }) {
     const isActive = isPortalNavActive(href, pathname);
     const activeClass = isActive
-        ? 'text-primary-700 font-semibold dark:text-primary-300 bg-primary-100 dark:bg-primary-500/20'
+        ? 'text-surface-900 font-semibold dark:text-surface-100 bg-surface-200 dark:bg-surface-700'
         : 'text-surface-600 hover:text-primary-600 dark:text-surface-400 dark:hover:text-primary-400 hover:bg-surface-100 dark:hover:bg-surface-800';
     return (
         <Link
@@ -107,43 +106,6 @@ function NavLink({ href, label, Icon, pathname, onClick }) {
     );
 }
 
-function ThemeToggle() {
-    const [isDark, setIsDark] = useState(false);
-
-    useEffect(() => {
-        if (document.documentElement.classList.contains('dark')) {
-            setIsDark(true);
-        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            setIsDark(true);
-            document.documentElement.classList.add('dark');
-        }
-    }, []);
-
-    const toggleTheme = () => {
-        setIsDark((prev) => {
-            const next = !prev;
-            if (next) {
-                document.documentElement.classList.add('dark');
-                localStorage.setItem('theme', 'dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-                localStorage.setItem('theme', 'light');
-            }
-            return next;
-        });
-    };
-
-    return (
-        <button
-            onClick={toggleTheme}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-surface-500 smooth-hover hover:bg-surface-200 hover:text-surface-900 dark:hover:bg-surface-800 dark:hover:text-surface-50"
-            aria-label="Toggle theme"
-        >
-            {isDark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-        </button>
-    );
-}
-
 function NavGroup({ group, pathname, onNavClick }) {
     const { label, Icon, items } = group;
     const isActive = isGroupActive(items, pathname);
@@ -154,7 +116,7 @@ function NavGroup({ group, pathname, onNavClick }) {
     }, [isActive]);
     const open = userOpen;
     const activeTriggerClass = isActive
-        ? 'text-primary-700 font-semibold dark:text-primary-300 bg-primary-100 dark:bg-primary-500/20'
+        ? 'text-surface-900 font-semibold dark:text-surface-100 bg-surface-200 dark:bg-surface-700'
         : 'text-surface-600 hover:text-primary-600 dark:text-surface-400 dark:hover:text-primary-400 hover:bg-surface-100 dark:hover:bg-surface-800';
     return (
         <Collapsible open={open} onOpenChange={setUserOpen} className="group/collapsible">
@@ -232,7 +194,7 @@ function SidebarContent({ navEntries, pathname, onNavClick }) {
                     onClick={onNavClick}
                     className={`flex items-center gap-2 rounded-lg border-2 px-3 py-2 text-xs font-bold transition-colors ${
                         pathname === '/portal/account'
-                            ? 'border-primary-500 bg-primary-100 text-primary-700 dark:bg-primary-500/20 dark:text-primary-300'
+                            ? 'border-surface-500 bg-surface-200 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                             : 'border-surface-200 text-surface-600 hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800'
                     }`}
                 >
@@ -240,7 +202,7 @@ function SidebarContent({ navEntries, pathname, onNavClick }) {
                     Account
                 </Link>
                 <div className="flex items-center gap-2">
-                    <ThemeToggle />
+                    <ThemeToggle size={18} />
                     <button
                         type="button"
                         onClick={() => router.post('/logout')}

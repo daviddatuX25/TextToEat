@@ -14,7 +14,7 @@ export function StatCard({
 }) {
     const toneClasses = {
         default: 'border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40',
-        primary: 'border-primary-200 bg-primary-50/60 dark:border-primary-500/40 dark:bg-primary-500/10',
+        primary: 'border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40',
         success: 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-500/40 dark:bg-emerald-500/10',
         warning: 'border-amber-200 bg-amber-50/60 dark:border-amber-500/40 dark:bg-amber-500/10',
     };

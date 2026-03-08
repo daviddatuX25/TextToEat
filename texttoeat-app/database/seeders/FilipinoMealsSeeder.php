@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\MenuItem;
+use App\Models\MenuItemDailyStock;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 
@@ -160,6 +161,20 @@ class FilipinoMealsSeeder extends Seeder
                     'menu_date' => $meal['menu_date'],
                 ],
                 $meal
+            );
+        }
+
+        foreach (MenuItem::whereDate('menu_date', $today)->get() as $item) {
+            MenuItemDailyStock::updateOrCreate(
+                [
+                    'menu_item_id' => $item->id,
+                    'menu_date' => $today,
+                ],
+                [
+                    'units_set' => (int) $item->units_today,
+                    'units_sold' => 0,
+                    'units_leftover' => (int) $item->units_today,
+                ]
             );
         }
     }

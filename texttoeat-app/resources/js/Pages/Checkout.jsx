@@ -31,7 +31,7 @@ export default function Checkout({ cart = [], total = 0 }) {
     return (
         <AppLayout>
             <section className="flex flex-col gap-6">
-                <h1 className="text-5xl font-black leading-tight tracking-tight text-slate-900 dark:text-slate-100">
+                <h1 className="text-5xl font-black leading-tight tracking-tight text-surface-900 dark:text-surface-100">
                     Checkout
                 </h1>
 
@@ -39,7 +39,7 @@ export default function Checkout({ cart = [], total = 0 }) {
                     <div>
                         <SectionHeading>Order summary</SectionHeading>
                         <Card className="mb-4">
-                            <ul className="divide-y divide-slate-200 dark:divide-slate-800">
+                            <ul className="divide-y divide-surface-200 dark:divide-surface-800">
                                 {cart.map((line) => (
                                     <li key={line.menu_item_id} className="flex justify-between p-3 text-sm">
                                         <span>{line.name} × {line.quantity}</span>
@@ -47,7 +47,7 @@ export default function Checkout({ cart = [], total = 0 }) {
                                     </li>
                                 ))}
                             </ul>
-                            <div className="border-t border-slate-200 p-3 font-bold dark:border-slate-800">
+                            <div className="border-t border-surface-200 p-3 font-bold dark:border-surface-800">
                                 Total: ₱{Number(total).toFixed(2)}
                             </div>
                         </Card>

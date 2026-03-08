@@ -4,7 +4,7 @@ import { LayoutGrid, ArrowRight, Globe, MessageCircle, ShoppingBag, Truck, UserR
 import { toast } from 'sonner';
 
 const CHANNEL_BADGES = {
-    sms: { icon: MessageCircle, label: 'SMS', color: 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' },
+    sms: { icon: MessageCircle, label: 'SMS', color: 'bg-surface-200 text-surface-700 dark:bg-surface-700 dark:text-surface-300' },
     messenger: { icon: MessageCircle, label: 'Messenger', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300' },
     web: { icon: Globe, label: 'Online', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' },
     walkin: { icon: UserRound, label: 'Walk-in', color: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' },
@@ -151,7 +151,7 @@ export function OrderListRow({ order, isHighlighted = false }) {
                         {channel === 'web' ? 'Online' : badge.label}
                     </span>
                 )}
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${isDelivery ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : isWalkin ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' : 'bg-surface-200 text-surface-700 dark:bg-surface-600 dark:text-surface-300'}`}>
+                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${isDelivery ? 'bg-surface-200 text-surface-700 dark:bg-surface-700 dark:text-surface-300' : isWalkin ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' : 'bg-surface-200 text-surface-700 dark:bg-surface-600 dark:text-surface-300'}`}>
                     {typeLabel}
                 </span>
                 {isPaid && (
@@ -246,7 +246,7 @@ export function OrderListRow({ order, isHighlighted = false }) {
                     ) : <span className="w-8 shrink-0" aria-hidden />}
                     <div
                         className={`inline-flex h-8 items-center gap-1.5 px-3 rounded-lg border-2 shrink-0 ${
-                            isWalkin ? 'border-violet-300 dark:border-violet-500/60 bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300' : isDelivery ? 'border-blue-300 dark:border-blue-500/60 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300' : 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                            isWalkin ? 'border-violet-300 dark:border-violet-500/60 bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300' : isDelivery ? 'border-surface-300 dark:border-surface-600 bg-surface-50 dark:bg-surface-800/60 text-surface-700 dark:text-surface-300' : 'border-amber-300 dark:border-amber-500/60 bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300'
                         }`}
                     >
                         {isDelivery ? <Truck className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}

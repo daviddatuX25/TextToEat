@@ -45,6 +45,16 @@ export default function Account({ user = {} }) {
 
                 <div className="max-w-md rounded-2xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 p-6 shadow-sm">
                     <h2 className="text-lg font-bold text-surface-900 dark:text-white mb-4">Account details</h2>
+                    {user.role && (
+                        <div className="mb-4 pb-4 border-b border-surface-200 dark:border-surface-700">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-1">Your role</p>
+                            <p className="text-sm text-surface-700 dark:text-surface-300">
+                                {user.role === 'admin' || user.role === 'superadmin'
+                                    ? 'Administrator — full access to settings, user management, and all portal features.'
+                                    : 'Staff — access to orders, deliveries, pickup, walk-in, and conversations. Settings and user management are admin-only.'}
+                            </p>
+                        </div>
+                    )}
                     <form onSubmit={handleAccountSubmit} className="space-y-4 mb-8">
                         <label className="block">
                             <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Name (optional)</span>

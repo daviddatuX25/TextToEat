@@ -12,7 +12,7 @@ export default function Login() {
         <div className="flex min-h-screen items-center justify-center p-6">
             <Card className="w-full max-w-sm">
                 <CardHeader>
-                    <h1 className="text-center text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    <h1 className="text-center text-2xl font-bold text-surface-900 dark:text-surface-100">
                         Staff login
                     </h1>
                 </CardHeader>
@@ -48,7 +48,7 @@ export default function Login() {
                                 type="checkbox"
                                 checked={data.remember}
                                 onChange={(e) => setData('remember', e.target.checked)}
-                                className="rounded border-slate-200 dark:border-slate-700"
+                                className="rounded border-surface-200 dark:border-surface-700"
                             />
                             <label
                                 htmlFor="remember"

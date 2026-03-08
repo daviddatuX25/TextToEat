@@ -1,6 +1,7 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import ThemeToggle from '../components/ThemeToggle';
 
 function getPathname(url) {
     try {
@@ -18,45 +19,6 @@ function NavLink({ href, children, pathname, onClick }) {
         <Link href={href} onClick={onClick} className={`text-sm font-semibold transition-colors ${activeClass}`}>
             {children}
         </Link>
-    );
-}
-
-function ThemeToggle() {
-    const [isDark, setIsDark] = useState(false);
-
-    useEffect(() => {
-        // Check initial theme from document class or localStorage
-        if (document.documentElement.classList.contains('dark')) {
-            setIsDark(true);
-        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            setIsDark(true);
-            document.documentElement.classList.add('dark');
-        }
-    }, []);
-
-    const toggleTheme = () => {
-        setIsDark(!isDark);
-        if (!isDark) {
-            document.documentElement.classList.add('dark');
-            localStorage.setItem('theme', 'dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-            localStorage.setItem('theme', 'light');
-        }
-    };
-
-    return (
-        <button
-            onClick={toggleTheme}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-surface-500 smooth-hover hover:bg-surface-200 hover:text-surface-900 dark:hover:bg-surface-800 dark:hover:text-surface-50"
-            aria-label="Toggle theme"
-        >
-            {isDark ? (
-                <i className="ph ph-sun text-xl"></i>
-            ) : (
-                <i className="ph ph-moon text-xl"></i>
-            )}
-        </button>
     );
 }
 
@@ -111,6 +73,12 @@ export default function AppLayout({ children, showDashboard = true }) {
                         
                         {isStaff ? (
                             <div className="hidden md:flex items-center gap-4">
+                                <Link
+                                    href="/portal"
+                                    className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                                >
+                                    Go to portal
+                                </Link>
                                 <button
                                     type="button"
                                     onClick={() => router.post('/logout')}
@@ -118,14 +86,18 @@ export default function AppLayout({ children, showDashboard = true }) {
                                 >
                                     Log out
                                 </button>
-                                <div className="group flex cursor-pointer items-center gap-2">
+                                <Link
+                                    href="/portal/account"
+                                    className="group flex items-center gap-2 transition-opacity hover:opacity-90"
+                                    aria-label="Account"
+                                >
                                     <img
                                         src="https://ui-avatars.com/api/?name=Admin+Staff&background=ea580c&color=fff&rounded=true&bold=true"
                                         alt="Staff Account"
                                         className="h-9 w-9 rounded-full ring-2 ring-transparent transition-all group-hover:ring-primary-500"
                                     />
                                     <i className="ph-bold ph-caret-down text-sm text-surface-400 transition-colors group-hover:text-primary-500"></i>
-                                </div>
+                                </Link>
                             </div>
                         ) : (
                             <Link
@@ -174,13 +146,29 @@ export default function AppLayout({ children, showDashboard = true }) {
                         <span className="text-sm text-surface-500">Theme</span>
                     </div>
                     {isStaff ? (
-                        <button
-                            type="button"
-                            onClick={() => { setMobileOpen(false); router.post('/logout'); }}
-                            className="rounded-lg border-2 border-surface-200 px-3 py-2 text-sm font-bold text-surface-600 smooth-hover hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 text-left"
-                        >
-                            Log out
-                        </button>
+                        <>
+                            <Link
+                                href="/portal"
+                                onClick={() => setMobileOpen(false)}
+                                className="flex h-10 items-center justify-center rounded-lg bg-primary-600 px-4 text-sm font-bold text-white transition-opacity hover:opacity-90"
+                            >
+                                Go to portal
+                            </Link>
+                            <Link
+                                href="/portal/account"
+                                onClick={() => setMobileOpen(false)}
+                                className="rounded-lg border-2 border-surface-200 px-3 py-2 text-sm font-bold text-surface-600 smooth-hover hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 text-left"
+                            >
+                                Account
+                            </Link>
+                            <button
+                                type="button"
+                                onClick={() => { setMobileOpen(false); router.post('/logout'); }}
+                                className="rounded-lg border-2 border-surface-200 px-3 py-2 text-sm font-bold text-surface-600 smooth-hover hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 text-left"
+                            >
+                                Log out
+                            </button>
+                        </>
                     ) : (
                         <Link
                             href="/login"

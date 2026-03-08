@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Messenger\FacebookMessengerClient;
 use App\Models\OutboundMessenger;
 use App\Models\OutboundSms;
+use App\Services\Channels\FacebookMessengerSender;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Tests\TestCase;
 
 class OutboundMessagesPollingTest extends TestCase
@@ -69,5 +72,23 @@ class OutboundMessagesPollingTest extends TestCase
         $this->actingAs($admin)
             ->getJson('/api/chatbot/outbound-messages?channel=sms')
             ->assertStatus(422);
+    }
+
+    public function test_facebook_messenger_sender_creates_outbound_messenger_after_send(): void
+    {
+        $client = Mockery::mock(FacebookMessengerClient::class);
+        $client->shouldReceive('sendTextMessage')
+            ->once()
+            ->with('psid-456', 'Hello from staff');
+        $this->app->instance(FacebookMessengerClient::class, $client);
+
+        $sender = $this->app->make(FacebookMessengerSender::class);
+        $sender->send('psid-456', 'Hello from staff');
+
+        $this->assertDatabaseHas('outbound_messenger', [
+            'to' => 'psid-456',
+            'body' => 'Hello from staff',
+        ]);
+        $this->assertEquals(1, OutboundMessenger::where('to', 'psid-456')->count());
     }
 }

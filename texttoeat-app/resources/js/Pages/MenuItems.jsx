@@ -82,7 +82,7 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
                         <select
                             value={form.data.category}
                             onChange={(e) => form.setData('category', e.target.value)}
-                            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800"
+                            className="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-800"
                         >
                             {(categories || []).map((c) => (
                                 <option key={c} value={c}>{c}</option>
@@ -110,7 +110,7 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
                         <button
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+                            className="flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm"
                         >
                             <ImagePlus className="h-4 w-4" />
                             {form.data.image instanceof File ? form.data.image.name : 'Choose image'}
@@ -122,7 +122,7 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
                         )}
                     </div>
                     <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium">Cancel</button>
+                        <button type="button" onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-sm font-medium">Cancel</button>
                         <Button type="submit" disabled={form.processing}>Add</Button>
                     </div>
                 </form>
@@ -201,7 +201,7 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
                         <select
                             value={form.data.category}
                             onChange={(e) => form.setData('category', e.target.value)}
-                            className="w-full rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm bg-white dark:bg-slate-800"
+                            className="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-800"
                         >
                             {(categories || []).map((c) => (
                                 <option key={c} value={c}>{c}</option>
@@ -224,7 +224,7 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 text-sm"
+                                className="flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm"
                             >
                                 <ImagePlus className="h-4 w-4" />
                                 {form.data.image instanceof File ? form.data.image.name : 'Change photo'}
@@ -238,7 +238,7 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
                                             form.setData('remove_image', e.target.checked);
                                             if (e.target.checked) form.setData('image', null);
                                         }}
-                                        className="rounded border-slate-300"
+                                        className="rounded border-surface-300"
                                     />
                                     Remove photo
                                 </label>
@@ -251,7 +251,7 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
                         )}
                     </div>
                     <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-medium">Cancel</button>
+                        <button type="button" onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-sm font-medium">Cancel</button>
                         <Button type="submit" disabled={form.processing}>Save</Button>
                     </div>
                 </form>
@@ -260,10 +260,57 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
     );
 }
 
-function MenuItemCard({ item, onEdit }) {
+function EnableForTodayDialog({ item, open, onOpenChange }) {
+    const [units, setUnits] = useState(30);
+    const routerImpl = r();
+
+    useEffect(() => {
+        if (open && item) {
+            setUnits(Math.max(0, Number(item.units_today) || 30));
+        }
+    }, [open, item?.id]);
+
+    if (!item) return null;
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!routerImpl?.put) return;
+        routerImpl.put(`/portal/menu-items/${item.id}`, { is_sold_out: false, units_today: units }, { preserveScroll: true });
+        onOpenChange(false);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>Enable for today</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <p className="text-sm text-surface-600 dark:text-surface-400">
+                        Set the quantity for <strong>{item.name}</strong>.
+                    </p>
+                    <Input
+                        id="enable_units"
+                        label="Units for today"
+                        type="number"
+                        min="0"
+                        value={units}
+                        onChange={(e) => setUnits(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    />
+                    <div className="flex gap-2 justify-end">
+                        <button type="button" onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-sm font-medium">Cancel</button>
+                        <Button type="submit">Enable</Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function MenuItemCard({ item, onEdit, onEnableClick }) {
     const routerImpl = r();
     const units = Number(item.units_today ?? 0);
-    const virtual = Number(item.virtual_available ?? units);
+    const currentOrders = Number(item.current_orders ?? 0);
     const soldOut = !!item.is_sold_out;
 
     const setQuantity = (newVal) => {
@@ -274,7 +321,11 @@ function MenuItemCard({ item, onEdit }) {
 
     const toggleSoldOut = () => {
         if (!routerImpl?.put) return;
-        routerImpl.put(`/portal/menu-items/${item.id}`, { is_sold_out: !soldOut }, { preserveScroll: true });
+        if (soldOut) {
+            onEnableClick?.(item);
+        } else {
+            routerImpl.put(`/portal/menu-items/${item.id}`, { is_sold_out: true }, { preserveScroll: true });
+        }
     };
 
     const handleDelete = () => {
@@ -334,8 +385,8 @@ function MenuItemCard({ item, onEdit }) {
                         </div>
                     </div>
                     <div className="flex items-center justify-between text-surface-500 dark:text-surface-400">
-                        <span>Avail.</span>
-                        <span className="font-medium text-surface-700 dark:text-surface-300">{virtual}</span>
+                        <span>Current orders</span>
+                        <span className="font-medium text-surface-700 dark:text-surface-300">{currentOrders}</span>
                     </div>
                 </div>
 
@@ -349,13 +400,13 @@ function MenuItemCard({ item, onEdit }) {
                                 : 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
                         }`}
                     >
-                        {soldOut ? <PowerOff className="h-3 w-3" /> : <Power className="h-3 w-3" />}
-                        {soldOut ? 'On' : 'Off'}
+                        {soldOut ? <Power className="h-3 w-3" /> : <PowerOff className="h-3 w-3" />}
+                        {soldOut ? 'Enable' : 'Sold out'}
                     </button>
                     <button
                         type="button"
                         onClick={() => onEdit(item)}
-                        className="inline-flex items-center gap-1 rounded border border-slate-200 dark:border-slate-600 px-2 py-0.5 text-[10px] font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800"
+                        className="inline-flex items-center gap-1 rounded border border-surface-200 dark:border-surface-600 px-2 py-0.5 text-[10px] font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-800"
                     >
                         <Pencil className="h-3 w-3" />
                         Edit
@@ -377,6 +428,7 @@ function MenuItemCard({ item, onEdit }) {
 export default function MenuItems({ menuItems = [], categories = [], menuCategories = [], filterCategory = null }) {
     const [addOpen, setAddOpen] = useState(false);
     const [editItem, setEditItem] = useState(null);
+    const [enableItem, setEnableItem] = useState(null);
 
     const items = Array.isArray(menuItems) ? menuItems : menuItems?.data ?? [];
     const links = !Array.isArray(menuItems) && menuItems?.links ? menuItems.links : [];
@@ -441,6 +493,7 @@ export default function MenuItems({ menuItems = [], categories = [], menuCategor
                                     key={item.id}
                                     item={item}
                                     onEdit={setEditItem}
+                                    onEnableClick={setEnableItem}
                                 />
                             ))}
                         </div>
@@ -458,7 +511,7 @@ export default function MenuItems({ menuItems = [], categories = [], menuCategor
                                                 preserveScroll
                                                 className={`px-2.5 py-1 rounded-md border text-xs ${
                                                     link.active
-                                                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-500/20 dark:text-primary-200'
+                                                        ? 'border-surface-500 bg-surface-100 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
                                                         : 'border-surface-200 text-surface-600 hover:bg-surface-100 dark:border-surface-600 dark:text-surface-300 dark:hover:bg-surface-800'
                                                 }`}
                                                 dangerouslySetInnerHTML={{ __html: link.label }}
@@ -479,6 +532,7 @@ export default function MenuItems({ menuItems = [], categories = [], menuCategor
 
                 <AddMenuItemDialog open={addOpen} onOpenChange={setAddOpen} categories={categories} />
                 <EditMenuItemDialog item={editItem} open={Boolean(editItem)} onOpenChange={(open) => !open && setEditItem(null)} categories={categories} />
+                <EnableForTodayDialog item={enableItem} open={Boolean(enableItem)} onOpenChange={(open) => !open && setEnableItem(null)} />
             </section>
         </PortalLayout>
     );

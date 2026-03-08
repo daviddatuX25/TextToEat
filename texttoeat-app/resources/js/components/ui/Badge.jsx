@@ -4,7 +4,7 @@ const variantClasses = {
     success: 'bg-success/10 text-success',
     warning: 'bg-accent/10 text-accent',
     error: 'bg-destructive/10 text-destructive',
-    neutral: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    neutral: 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400',
     premium: 'bg-primary-600/95 text-white dark:bg-primary-500/95 dark:text-white',
 };
 
