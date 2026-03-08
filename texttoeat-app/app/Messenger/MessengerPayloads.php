@@ -5,8 +5,9 @@ namespace App\Messenger;
 /**
  * Messenger postback/quick_reply payload constants and mapping to FSM body.
  * Convention: CATEGORY_ACTION_ID (e.g. LANG_EN, MAIN_ORDER, CONFIRM_YES).
- * Used so that button/quick_reply payloads are normalized to the strings
- * the shared ChatbotFsm expects (e.g. "1", "yes", "done") before calling the webhook.
+ * Used so that button/quick_reply payloads are normalized to the canonical strings
+ * the shared ChatbotFsm expects. Use canonicals (e.g. "add", "view_cart", "edit", "pickup", "yes")
+ * not numbers — the layer only normalizes numbers for SMS/Web; Messenger sends these directly.
  */
 final class MessengerPayloads
 {
@@ -20,9 +21,14 @@ final class MessengerPayloads
     public const MAIN_LANGUAGE = 'MAIN_LANGUAGE';
     public const MAIN_SUPPORT = 'MAIN_SUPPORT';
 
+    public const CART_ADD = 'CART_ADD';
     public const CART_VIEW = 'CART_VIEW';
     public const CART_DONE = 'CART_DONE';
     public const CART_EDIT = 'CART_EDIT';
+
+    public const EDIT_CHANGE_QTY = 'EDIT_CHANGE_QTY';
+    public const EDIT_REMOVE = 'EDIT_REMOVE';
+    public const EDIT_BACK = 'EDIT_BACK';
 
     public const DELIVERY_PICKUP = 'DELIVERY_PICKUP';
     public const DELIVERY_DELIVERY = 'DELIVERY_DELIVERY';
@@ -33,25 +39,29 @@ final class MessengerPayloads
     public const TRACK_LIST = 'TRACK_LIST';
     public const TRACK_REF = 'TRACK_REF';
 
-    /** @var array<string, string> payload => FSM body */
+    /** @var array<string, string> payload => FSM body (canonical; numbers only for MENU_ITEM_n, DELIVERY_AREA_n) */
     private const TO_FSM_BODY = [
-        self::LANG_EN => '1',
-        self::LANG_TL => '2',
-        self::LANG_ILO => '3',
+        self::LANG_EN => 'en',
+        self::LANG_TL => 'tl',
+        self::LANG_ILO => 'ilo',
         self::MAIN_HOME => 'main',
-        self::MAIN_ORDER => '1',
-        self::MAIN_TRACK => '2',
-        self::MAIN_LANGUAGE => '3',
-        self::MAIN_SUPPORT => '4',
-        self::CART_VIEW => '2',
+        self::MAIN_ORDER => 'order',
+        self::MAIN_TRACK => 'track',
+        self::MAIN_LANGUAGE => 'language',
+        self::MAIN_SUPPORT => 'human_takeover',
+        self::CART_ADD => 'add',
+        self::CART_VIEW => 'view_cart',
         self::CART_DONE => 'done',
-        self::CART_EDIT => '3',
-        self::DELIVERY_PICKUP => '1',
-        self::DELIVERY_DELIVERY => '2',
+        self::CART_EDIT => 'edit',
+        self::EDIT_CHANGE_QTY => 'change_quantity',
+        self::EDIT_REMOVE => 'remove',
+        self::EDIT_BACK => 'back',
+        self::DELIVERY_PICKUP => 'pickup',
+        self::DELIVERY_DELIVERY => 'delivery',
         self::CONFIRM_YES => 'yes',
         self::CONFIRM_NO => 'no',
-        self::TRACK_LIST => '1',
-        self::TRACK_REF => '2',
+        self::TRACK_LIST => 'track_list',
+        self::TRACK_REF => 'track_ref',
     ];
 
     /**

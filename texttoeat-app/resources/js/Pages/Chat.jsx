@@ -13,6 +13,46 @@ function getCsrfToken() {
     return meta ? meta.getAttribute('content') : null;
 }
 
+/** State-aware canonical options for Simulate Messenger (buttons send these; core expects keywords, not numbers). */
+const MESSENGER_STATE_BUTTONS = {
+    language_selection: [
+        { label: 'English', body: 'en' },
+        { label: 'Tagalog', body: 'tl' },
+        { label: 'Ilocano', body: 'ilo' },
+    ],
+    main_menu: [
+        { label: 'Place order', body: 'order' },
+        { label: 'Track order', body: 'track' },
+        { label: 'Language', body: 'language' },
+        { label: 'Talk to staff', body: 'human_takeover' },
+    ],
+    track_choice: [
+        { label: 'List my orders', body: 'track_list' },
+        { label: 'Enter reference', body: 'track_ref' },
+    ],
+    delivery_choice: [
+        { label: 'Pickup', body: 'pickup' },
+        { label: 'Delivery', body: 'delivery' },
+    ],
+    delivery_area_choice: [],
+    confirm: [
+        { label: 'Yes, place order', body: 'yes' },
+        { label: 'No / Cancel', body: 'no' },
+    ],
+    item_selection: [
+        { label: 'Add item', body: 'add' },
+        { label: 'View cart', body: 'view_cart' },
+        { label: 'Edit', body: 'edit' },
+    ],
+    /** Buttons when in item_selection with item_selection_mode === 'edit_action' (change qty / remove / back). */
+    item_selection_edit_action: [
+        { label: 'Change quantity', body: 'change_quantity' },
+        { label: 'Remove item', body: 'remove' },
+        { label: 'Back', body: 'back' },
+    ],
+    menu: [],
+};
+
 export default function Chat({ webChatExternalId = '' }) {
     const [channel, setChannel] = useState('web');
     const [externalId, setExternalId] = useState(webChatExternalId || '');
@@ -21,6 +61,7 @@ export default function Chat({ webChatExternalId = '' }) {
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [error, setError] = useState(null);
+    const [chatState, setChatState] = useState(null);
     const messagesEndRef = useRef(null);
     const initFetched = useRef(false);
 
@@ -71,6 +112,9 @@ export default function Chat({ webChatExternalId = '' }) {
                 setMessages(
                     nonEmpty.map((text, i) => ({ role: 'bot', text, id: `init-${i}` }))
                 );
+                if (data.state && typeof data.state === 'object') {
+                    setChatState(data.state);
+                }
             })
             .catch((e) => {
                 setError(e.message || 'Failed to load chat');
@@ -150,6 +194,9 @@ export default function Chat({ webChatExternalId = '' }) {
                 return r.json();
             })
             .then((data) => {
+                if (data.state && typeof data.state === 'object') {
+                    setChatState(data.state);
+                }
                 const reply = data.reply ?? '';
                 const replies = data.replies ?? (reply ? [reply] : []);
                 const nonEmpty = replies.filter((t) => typeof t === 'string' && t.trim() !== '');
@@ -170,6 +217,26 @@ export default function Chat({ webChatExternalId = '' }) {
             .finally(() => setSending(false));
     };
 
+    const messengerButtons =
+        channel === 'messenger' && chatState?.current_state
+            ? (() => {
+                  const state = chatState.current_state;
+                  const mode = chatState.item_selection_mode;
+                  if (state === 'item_selection' && mode === 'edit_action') {
+                      return MESSENGER_STATE_BUTTONS.item_selection_edit_action ?? null;
+                  }
+                  if (state === 'item_selection' && mode !== 'cart_menu') {
+                      return null;
+                  }
+                  const base = MESSENGER_STATE_BUTTONS[state] ?? null;
+                  if (state === 'item_selection' && Array.isArray(base)) {
+                      const hasItems = (chatState.selected_items?.length ?? 0) >= 1;
+                      return hasItems ? [...base, { label: 'Done', body: 'done' }] : base;
+                  }
+                  return base;
+              })()
+            : null;
+
     const switchChannel = (newChannel) => {
         setChannel(newChannel);
         if (newChannel !== 'web' && !externalId) {
@@ -177,7 +244,62 @@ export default function Chat({ webChatExternalId = '' }) {
         }
         initFetched.current = false;
         setMessages([]);
+        setChatState(null);
         setLoading(true);
+    };
+
+    const sendBody = (body) => {
+        if (sending || loading) return;
+        if (!effectiveExternalId) {
+            setError('Set an external ID when simulating SMS/Messenger.');
+            return;
+        }
+        const label = messengerButtons?.find((b) => b.body === body)?.label ?? MESSENGER_STATE_BUTTONS[chatState?.current_state]?.find((b) => b.body === body)?.label ?? body;
+        setMessages((prev) => [...prev, { role: 'user', text: label, id: `u-${Date.now()}` }]);
+        setSending(true);
+        setError(null);
+        const csrf = getCsrfToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            ...(csrf && { 'X-CSRF-TOKEN': csrf }),
+        };
+        fetch('/api/chatbot/webhook', {
+            method: 'POST',
+            headers,
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                channel,
+                external_id: effectiveExternalId,
+                body,
+            }),
+        })
+            .then((r) => {
+                if (!r.ok) return r.json().then((j) => Promise.reject(new Error(j.message || `HTTP ${r.status}`)));
+                return r.json();
+            })
+            .then((data) => {
+                if (data.state && typeof data.state === 'object') {
+                    setChatState(data.state);
+                }
+                const reply = data.reply ?? '';
+                const replies = data.replies ?? (reply ? [reply] : []);
+                const nonEmpty = replies.filter((t) => typeof t === 'string' && t.trim() !== '');
+                if (nonEmpty.length > 0) {
+                    setMessages((prev) => [
+                        ...prev,
+                        ...nonEmpty.map((t, i) => ({ role: 'bot', text: t, id: `b-${Date.now()}-${i}` })),
+                    ]);
+                }
+            })
+            .catch((e) => {
+                setError(e.message || 'Send failed');
+                setMessages((prev) => [
+                    ...prev,
+                    { role: 'bot', text: `Error: ${e.message || 'Send failed'}`, id: `err-${Date.now()}` },
+                ]);
+            })
+            .finally(() => setSending(false));
     };
 
     return (
@@ -250,6 +372,22 @@ export default function Chat({ webChatExternalId = '' }) {
                         )}
                         <div ref={messagesEndRef} />
                     </div>
+
+                    {messengerButtons && messengerButtons.length > 0 && (
+                        <div className="px-3 pb-2 flex flex-wrap gap-2 border-t border-surface-200 dark:border-surface-700 pt-2">
+                            {messengerButtons.map((opt) => (
+                                <button
+                                    key={opt.body}
+                                    type="button"
+                                    onClick={() => sendBody(opt.body)}
+                                    disabled={sending || loading}
+                                    className="rounded-lg border-2 border-primary-200 dark:border-primary-600 bg-primary-50 dark:bg-primary-500/10 text-primary-800 dark:text-primary-200 px-3 py-2 text-sm font-medium hover:bg-primary-100 dark:hover:bg-primary-500/20 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     <form onSubmit={sendMessage} className="p-3 border-t border-surface-200 dark:border-surface-700 flex gap-2">
                         <input

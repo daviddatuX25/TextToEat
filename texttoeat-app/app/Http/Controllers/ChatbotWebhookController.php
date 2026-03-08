@@ -13,6 +13,8 @@ use App\Models\InboundMessage;
 use App\Models\MenuItem;
 use App\Models\OutboundMessenger;
 use App\Models\OutboundSms;
+use App\Services\ChatbotReplyResolver;
+use App\Services\ChatbotSmsNumberLayer;
 use App\Services\MenuItemStockService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,18 +32,32 @@ class ChatbotWebhookController extends Controller
         $session = ChatbotSession::where('channel', $channel)->where('external_id', $externalId)->first();
         $locale = $session?->language ?? 'en';
 
+        $resolver = app(ChatbotReplyResolver::class);
         if ($session === null) {
             $replies = [
-                __('chatbot.greeting', [], $locale),
-                __('chatbot.welcome', [], $locale),
+                $resolver->get('greeting', $locale),
+                $resolver->get('welcome', $locale),
             ];
+            if (\in_array($channel, ['web', 'sms'], true)) {
+                $formattedLanguage = app(ChatbotSmsNumberLayer::class)->formatChoiceStateReply('language_selection', $locale);
+                if ($formattedLanguage !== null) {
+                    $replies[] = $formattedLanguage;
+                }
+            }
             $state = ['current_state' => 'language_selection'];
         } else {
             $replies = [
-                __('chatbot.greeting', [], $locale),
-                __('chatbot.main_menu_prompt', [], $locale),
+                $resolver->get('greeting', $locale),
+                $resolver->get('main_menu_prompt', $locale),
             ];
             $state = $session->state ?? [];
+            // Web/SMS: show numbered options for main menu so user is not left with only "What would you like to do?"
+            if (\in_array($channel, ['web', 'sms'], true)) {
+                $formattedMainMenu = app(ChatbotSmsNumberLayer::class)->formatChoiceStateReply('main_menu', $locale);
+                if ($formattedMainMenu !== null) {
+                    $replies[1] = $formattedMainMenu;
+                }
+            }
         }
 
         return response()->json([
@@ -122,6 +138,15 @@ class ChatbotWebhookController extends Controller
             ]);
         }
 
+        // Translation layer (number → canonical) only for SMS/Web. Messenger sends canonical body from payload mapping.
+        if (\in_array($channel, ['sms', 'web'], true)) {
+            $layerContext = ['delivery_areas' => $deliveryAreas];
+            if ($currentState === 'item_selection' && isset($state['item_selection_mode'])) {
+                $layerContext['item_selection_mode'] = $state['item_selection_mode'];
+            }
+            $body = app(ChatbotSmsNumberLayer::class)->normalizeBodyForChoiceState($currentState, $body, $layerContext);
+        }
+
         $fsm = new ChatbotFsm();
         [$nextState, $reply, $statePayload] = $fsm->transition(
             $currentState,
@@ -154,9 +179,10 @@ class ChatbotWebhookController extends Controller
             $customerName = $newState['customer_name'] ?? 'Anonymous';
             // Block order creation when using simulator/system IDs; only real SMS phone or Messenger PSID may place orders
             $isSimulatorId = str_starts_with($externalId, 'sim_') || str_starts_with($externalId, 'web_');
+            $resolver = app(ChatbotReplyResolver::class);
             if ($isSimulatorId) {
                 $newState['current_state'] = 'confirm';
-                $reply = __('chatbot.use_real_phone_or_messenger', [], $locale);
+                $reply = $resolver->get('use_real_phone_or_messenger', $locale);
             } else {
                 try {
                     $orderService = app(ChatbotOrderService::class);
@@ -174,12 +200,12 @@ class ChatbotWebhookController extends Controller
                     $newState['last_order_cart_fingerprint'] = $orderService->cartFingerprint($selectedItems);
                     $newState['selected_items'] = [];
                     $newState['current_state'] = 'main_menu';
-                    $reply = __('chatbot.order_placed_reference', ['reference' => $reference], $locale)
+                    $reply = $resolver->get('order_placed_reference', $locale, ['reference' => $reference])
                         . "\n\n"
-                        . __('chatbot.main_menu_prompt', [], $locale);
+                        . $resolver->get('main_menu_prompt', $locale);
                 } catch (ChatbotInventoryException $e) {
                     $newState['current_state'] = 'confirm';
-                    $reply = __('chatbot.inventory_failure', [], $locale);
+                    $reply = $resolver->get('inventory_failure', $locale);
                 }
             }
         }
@@ -211,15 +237,48 @@ class ChatbotWebhookController extends Controller
             $replies = [$reply];
         }
         if ($currentState === 'welcome' && $nextState === 'language_selection' && count($replies) === 1) {
-            array_unshift($replies, __('chatbot.greeting', [], $locale));
+            array_unshift($replies, app(ChatbotReplyResolver::class)->get('greeting', $locale));
             $reply = implode("\n\n", $replies);
         }
 
-        return response()->json([
+        // Web, SMS, and (where applicable) Messenger: ensure choice-state replies include formatted options (numbering).
+        // delivery_choice on Messenger is button-only; delivery_area_choice and other choice states get numbering on all channels.
+        $effectiveState = $newState['current_state'] ?? $nextState;
+        $effectiveLocale = $newState['selected_language'] ?? $locale;
+        if ($effectiveState !== null) {
+            $smsLayer = app(ChatbotSmsNumberLayer::class);
+            $context = [
+                'channel' => $channel,
+                'delivery_areas' => \in_array($effectiveState, ['delivery_choice', 'delivery_area_choice'], true) ? $deliveryAreas : null,
+                'item_selection_mode' => $newState['item_selection_mode'] ?? null,
+            ];
+            if ($effectiveState === 'collect_name' && isset($newState['saved_customer_name'])) {
+                $context['saved_customer_name'] = $newState['saved_customer_name'];
+            }
+            $result = $smsLayer->ensureChoiceStateOptionsInReplies($replies, $effectiveState, $effectiveLocale, $context);
+            $replies = $result['replies'];
+            $reply = $result['reply'];
+        }
+
+        // Replace __CART_FOOTER__ and __EDIT_ACTION_OPTIONS__ placeholders with numbered options (SMS/Web only; Messenger never touches layer).
+        if (\in_array($channel, ['sms', 'web'], true)) {
+            $itemSelectionMode = $newState['item_selection_mode'] ?? null;
+            $reply = app(ChatbotSmsNumberLayer::class)->replacePlaceholdersInReply($reply, $effectiveLocale ?? $locale, $channel, $itemSelectionMode);
+            $replies = array_filter(explode("\n\n", $reply));
+            if ($replies === []) {
+                $replies = [$reply];
+            }
+        }
+
+        $payload = [
             'reply' => $reply,
             'replies' => $replies,
             'state' => $newState,
-        ]);
+        ];
+        if (in_array($newState['current_state'] ?? '', ['delivery_choice', 'delivery_area_choice'], true)) {
+            $payload['delivery_areas'] = $deliveryAreas;
+        }
+        return response()->json($payload);
     }
 
     public function outboundMessages(Request $request): JsonResponse

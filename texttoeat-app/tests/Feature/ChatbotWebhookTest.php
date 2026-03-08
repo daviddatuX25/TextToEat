@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\ChatbotSession;
 use App\Models\Conversation;
+use App\Models\DeliveryArea;
 use App\Models\MenuItem;
 use App\Models\Order;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,10 +26,11 @@ class ChatbotWebhookTest extends TestCase
             ->assertJsonStructure(['reply', 'state', 'replies'])
             ->assertJsonPath('state.current_state', 'language_selection');
         $replies = $response->json('replies');
-        $this->assertCount(2, $replies);
+        $this->assertGreaterThanOrEqual(2, count($replies));
         $this->assertStringContainsString('TextToEat', $replies[0]);
         $this->assertStringContainsString('language', strtolower($replies[1]));
-        $this->assertSame($replies[0] . "\n\n" . $replies[1], $response->json('reply'));
+        $this->assertSame(implode("\n\n", $replies), $response->json('reply'));
+        $this->assertStringContainsString('1. English', $response->json('reply'), 'SMS choice-state reply includes numbered options');
 
         $this->assertDatabaseHas('chatbot_sessions', [
             'channel' => 'sms',
@@ -56,8 +58,7 @@ class ChatbotWebhookTest extends TestCase
         $r1->assertStatus(200)
             ->assertJsonPath('state.current_state', 'main_menu')
             ->assertJsonPath('state.selected_language', 'en');
-        $this->assertStringContainsString('Place order', $r1->json('reply'));
-        $this->assertStringContainsString('Track order', $r1->json('reply'));
+        $this->assertStringContainsString('What would you like to do?', $r1->json('reply'));
 
         $response = $this->postJson('/api/chatbot/webhook', [
             'channel' => 'sms',
@@ -85,9 +86,12 @@ class ChatbotWebhookTest extends TestCase
         $response->assertStatus(200)
             ->assertJsonStructure(['replies', 'reply', 'state']);
         $replies = $response->json('replies');
-        $this->assertCount(2, $replies);
+        $this->assertGreaterThanOrEqual(2, count($replies));
         $this->assertStringContainsString('TextToEat', $replies[0]);
         $this->assertStringContainsString('language', strtolower($replies[1]));
+        if (count($replies) >= 3) {
+            $this->assertStringContainsString('1.', $replies[2], 'Web/SMS init includes formatted language options');
+        }
         $this->assertSame(implode("\n\n", $replies), $response->json('reply'));
     }
 
@@ -114,7 +118,7 @@ class ChatbotWebhookTest extends TestCase
         $replies = $response->json('replies');
         $this->assertCount(2, $replies);
         $this->assertStringContainsString('TextToEat', $replies[0]);
-        $this->assertStringContainsString('Place order', $replies[1]);
+        $this->assertStringContainsString('What would you like to do?', $replies[1]);
     }
 
     public function test_webhook_validates_required_fields(): void
@@ -1021,7 +1025,7 @@ class ChatbotWebhookTest extends TestCase
         $this->assertNotNull($replies);
         $this->assertCount(2, $replies);
         $this->assertStringContainsString('reference', strtolower($replies[0]));
-        $this->assertStringContainsString('Place order', $replies[1]);
+        $this->assertStringContainsString('What would you like to do?', $replies[1]);
         $this->assertSame($replies[0] . "\n\n" . $replies[1], $response->json('reply'));
         $ref = $response->json('state.last_order_reference');
         $this->assertNotEmpty($ref);
@@ -1164,14 +1168,16 @@ class ChatbotWebhookTest extends TestCase
         $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'status_user', 'body' => 'status']);
         $response->assertStatus(200);
         $replies = $response->json('replies');
-        $this->assertCount(2, $replies);
+        $this->assertGreaterThanOrEqual(2, count($replies));
         $reply = $response->json('reply');
-        $this->assertSame($replies[0] . "\n\n" . $replies[1], $reply);
+        $this->assertSame(implode("\n\n", $replies), $reply);
         // Order is received -> always show actual status (no gating)
-        $this->assertStringContainsString('received', strtolower($replies[0]));
+        $fullReplyForStatus = implode(' ', $replies);
+        $this->assertStringContainsString('received', strtolower($fullReplyForStatus));
         $ref = $response->json('state.last_order_reference');
         $this->assertNotEmpty($ref);
-        $this->assertStringContainsString('Place order', $replies[1]);
+        $fullReply = implode(' ', $replies);
+        $this->assertStringContainsString('What would you like to do?', $fullReply);
     }
 
     public function test_status_keyword_with_explicit_reference(): void
@@ -1193,11 +1199,10 @@ class ChatbotWebhookTest extends TestCase
         $response->assertStatus(200);
         $replies = $response->json('replies');
         $this->assertGreaterThanOrEqual(1, count($replies));
+        $fullReply = implode(' ', $replies);
         // Pickup + confirmed -> always show actual status
-        $this->assertStringContainsString('confirmed', strtolower($replies[0]));
-        if (count($replies) >= 2) {
-            $this->assertStringContainsString('Place order', $replies[1]);
-        }
+        $this->assertStringContainsString('confirmed', strtolower($fullReply));
+        $this->assertStringContainsString('What would you like to do?', $fullReply);
     }
 
     public function test_status_keyword_no_order_returns_none(): void
@@ -1207,9 +1212,10 @@ class ChatbotWebhookTest extends TestCase
         $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'status_none_user', 'body' => 'status']);
         $response->assertStatus(200);
         $replies = $response->json('replies');
-        $this->assertCount(2, $replies);
-        $this->assertStringContainsString('no order', strtolower($replies[0]));
-        $this->assertStringContainsString('Place order', $replies[1]);
+        $this->assertGreaterThanOrEqual(2, count($replies));
+        $fullReply = implode(' ', $replies);
+        $this->assertStringContainsString('no order', strtolower($fullReply));
+        $this->assertStringContainsString('What would you like to do?', $fullReply);
     }
 
     public function test_inventory_failure_when_item_sold_out(): void
@@ -1331,7 +1337,7 @@ class ChatbotWebhookTest extends TestCase
         $resp = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '1']);
         $resp->assertStatus(200);
         $this->assertStringContainsString('Item A', $resp->json('reply'));
-        $this->assertStringContainsString('1=Change quantity', $resp->json('reply'));
+        $this->assertStringContainsString('1. Change quantity', $resp->json('reply'));
 
         // Choose to change quantity
         $resp = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'change_user', 'body' => '1']);
@@ -1365,6 +1371,31 @@ class ChatbotWebhookTest extends TestCase
         $this->assertEmpty($resp->json('state.selected_items') ?? []);
     }
 
+    public function test_cart_invalid_input_shows_invalid_option_and_numbered_options(): void
+    {
+        MenuItem::create([
+            'name' => 'Item A',
+            'price' => 10.00,
+            'category' => 'main',
+            'units_today' => 5,
+            'is_sold_out' => false,
+            'menu_date' => now()->toDateString(),
+        ]);
+
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'invalid_cart_user', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'invalid_cart_user', 'body' => '1']); // language
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'invalid_cart_user', 'body' => '1']); // main menu -> menu
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'invalid_cart_user', 'body' => '1']); // add Item A
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'invalid_cart_user', 'body' => '1']); // qty 1
+        $resp = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'invalid_cart_user', 'body' => '5']); // invalid option in cart_menu
+
+        $resp->assertStatus(200)->assertJsonPath('state.current_state', 'item_selection');
+        $reply = $resp->json('reply');
+        $this->assertStringContainsString('Invalid option', $reply);
+        $this->assertStringContainsString('1. Add another item', $reply);
+        $this->assertStringContainsString('4. Confirm order', $reply);
+    }
+
     public function test_session_timeout_returns_to_main_menu(): void
     {
         $this->postJson('/api/chatbot/webhook', [
@@ -1394,24 +1425,29 @@ class ChatbotWebhookTest extends TestCase
     public function test_main_menu_option_2_asks_for_reference_when_none(): void
     {
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'mm2_user', 'body' => 'hi']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'mm2_user', 'body' => '1']);
-        $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'mm2_user', 'body' => '2']);
+        $rMenu = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'mm2_user', 'body' => 'en']);
+        $rMenu->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
+        $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'mm2_user', 'body' => 'track']);
         $response->assertStatus(200)->assertJsonPath('state.current_state', 'track_choice');
         $reply = $response->json('reply');
-        $this->assertTrue(str_contains(strtolower($reply), 'list') || str_contains(strtolower($reply), 'reference'), 'Reply should offer list or enter reference');
+        $this->assertTrue(
+            str_contains(strtolower($reply), 'choose') || str_contains(strtolower($reply), 'list') || str_contains(strtolower($reply), 'reference'),
+            'Reply should be track choice prompt (choose/list/reference)'
+        );
     }
 
     public function test_track_list_empty_returns_replies(): void
     {
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_empty_user', 'body' => 'hi']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_empty_user', 'body' => '1']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_empty_user', 'body' => '2']);
-        $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_empty_user', 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_empty_user', 'body' => 'en']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_empty_user', 'body' => 'track']);
+        $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_empty_user', 'body' => 'track_list']);
         $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
         $replies = $response->json('replies');
-        $this->assertCount(2, $replies);
-        $this->assertStringContainsString('no orders', strtolower($replies[0]));
-        $this->assertStringContainsString('Place order', $replies[1]);
+        $this->assertGreaterThanOrEqual(2, count($replies));
+        $fullReply = implode(' ', array_map('strtolower', $replies));
+        $this->assertStringContainsString('no orders', $fullReply);
+        $this->assertStringContainsString('what would you like to do?', $fullReply);
     }
 
     public function test_track_list_status_returns_replies(): void
@@ -1430,17 +1466,19 @@ class ChatbotWebhookTest extends TestCase
             'delivery_fee' => null,
         ]);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_list_user', 'body' => 'hi']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_list_user', 'body' => '1']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_list_user', 'body' => '2']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_list_user', 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_list_user', 'body' => 'en']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_list_user', 'body' => 'track']);
+        $rTrackList = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_list_user', 'body' => 'track_list']);
+        $rTrackList->assertStatus(200)->assertJsonPath('state.current_state', 'track_list');
         $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_list_user', 'body' => '1']);
         $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
         $replies = $response->json('replies');
-        $this->assertCount(2, $replies);
-        $this->assertStringContainsString('TRK123', $replies[0]);
-        $this->assertStringContainsString('Ready', $replies[0]);
-        $this->assertStringContainsString('a1', $replies[0]);
-        $this->assertStringContainsString('Place order', $replies[1]);
+        $this->assertGreaterThanOrEqual(2, count($replies));
+        $fullReply = implode(' ', $replies);
+        $this->assertStringContainsString('TRK123', $fullReply);
+        $this->assertStringContainsString('Ready', $fullReply);
+        $this->assertStringContainsString('a1', $fullReply);
+        $this->assertStringContainsString('What would you like to do?', $fullReply);
     }
 
     public function test_track_ref_status_returns_replies(): void
@@ -1459,16 +1497,18 @@ class ChatbotWebhookTest extends TestCase
             'delivery_fee' => null,
         ]);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_ref_user', 'body' => 'hi']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_ref_user', 'body' => '1']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_ref_user', 'body' => '2']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_ref_user', 'body' => '2']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_ref_user', 'body' => 'en']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_ref_user', 'body' => 'track']);
+        $rRef = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_ref_user', 'body' => 'track_ref']);
+        $rRef->assertStatus(200)->assertJsonPath('state.current_state', 'track_ref');
         $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'track_ref_user', 'body' => 'REF456']);
         $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
         $replies = $response->json('replies');
-        $this->assertCount(2, $replies);
-        $this->assertStringContainsString('REF456', $replies[0]);
-        $this->assertStringContainsString('Ready', $replies[0]);
-        $this->assertStringContainsString('Place order', $replies[1]);
+        $this->assertGreaterThanOrEqual(2, count($replies));
+        $fullReply = implode(' ', $replies);
+        $this->assertStringContainsString('REF456', $fullReply);
+        $this->assertStringContainsString('Ready', $fullReply);
+        $this->assertStringContainsString('What would you like to do?', $fullReply);
     }
 
     public function test_conditional_reply_delivery_on_the_way_returns_status(): void
@@ -1491,8 +1531,9 @@ class ChatbotWebhookTest extends TestCase
         $response->assertStatus(200);
         $replies = $response->json('replies');
         $this->assertGreaterThanOrEqual(1, count($replies));
-        $this->assertStringContainsString('DLV001', $replies[0]);
-        $this->assertStringContainsString('On the way', $replies[0]);
+        $fullReply = implode(' ', $replies);
+        $this->assertStringContainsString('DLV001', $fullReply);
+        $this->assertStringContainsString('On the way', $fullReply);
     }
 
     public function test_tracking_always_shows_actual_status_delivery_ready(): void
@@ -1515,8 +1556,9 @@ class ChatbotWebhookTest extends TestCase
         $response->assertStatus(200);
         $replies = $response->json('replies');
         $this->assertGreaterThanOrEqual(1, count($replies));
-        $this->assertStringContainsString('ready', strtolower($replies[0]));
-        $this->assertStringContainsString('DLV002', $replies[0]);
+        $fullReply = implode(' ', $replies);
+        $this->assertStringContainsString('ready', strtolower($fullReply));
+        $this->assertStringContainsString('DLV002', $fullReply);
     }
 
     public function test_tracking_always_shows_actual_status_pickup_ready_no_slot(): void
@@ -1540,8 +1582,9 @@ class ChatbotWebhookTest extends TestCase
         $response->assertStatus(200);
         $replies = $response->json('replies');
         $this->assertGreaterThanOrEqual(1, count($replies));
-        $this->assertStringContainsString('ready', strtolower($replies[0]));
-        $this->assertStringContainsString('PUP001', $replies[0]);
+        $fullReply = implode(' ', $replies);
+        $this->assertStringContainsString('ready', strtolower($fullReply));
+        $this->assertStringContainsString('PUP001', $fullReply);
     }
 
     public function test_main_menu_option_3_goes_to_language_selection(): void
@@ -1679,14 +1722,16 @@ class ChatbotWebhookTest extends TestCase
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'opl_user', 'body' => 'done']);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'opl_user', 'body' => 'Juan']);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'opl_user', 'body' => '2']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'opl_user', 'body' => '1']);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'opl_user', 'body' => 'yes']);
         $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'opl_user', 'body' => 'anything']);
         $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
-        $this->assertStringContainsString('Place order', $response->json('reply'));
+        $this->assertStringContainsString('What would you like to do?', $response->json('reply'));
     }
 
     public function test_delivery_option_2_stores_municipal_hall_free(): void
     {
+        DeliveryArea::create(['name' => 'Municipal Hall', 'is_free' => true, 'fee' => null, 'sort_order' => 0]);
         MenuItem::create([
             'name' => 'Lechon',
             'price' => 120.00,
@@ -1703,6 +1748,7 @@ class ChatbotWebhookTest extends TestCase
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'del2_user', 'body' => '4']);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'del2_user', 'body' => 'Maria']);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'del2_user', 'body' => '2']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'del2_user', 'body' => '1']);
         $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'del2_user', 'body' => 'yes']);
         $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
         $ref = $response->json('state.last_order_reference');
@@ -1741,6 +1787,11 @@ class ChatbotWebhookTest extends TestCase
             'menu_date' => now()->toDateString(),
         ]);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'en']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'order']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
@@ -1748,7 +1799,7 @@ class ChatbotWebhookTest extends TestCase
         $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
         $rDone = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'done']);
         $rDone->assertStatus(200)->assertJsonPath('state.current_state', 'delivery_choice');
-        $this->assertStringContainsString('delivery', strtolower($rDone->json('reply')));
+        $this->assertStringContainsString('receive', strtolower($rDone->json('reply')));
         $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
         $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'yes']);
         $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
@@ -1772,22 +1823,123 @@ class ChatbotWebhookTest extends TestCase
             'menu_date' => now()->toDateString(),
         ]);
         $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'hi']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'en']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'order']); // main_menu -> menu
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']); // item 1
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']); // qty 1
         $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'done']);
-        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']); // pickup
         $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'yes']);
-        $rMenu = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '2']);
-        $rMenu->assertStatus(200)->assertJsonPath('state.current_state', 'track_choice');
-        $rList = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => '1']);
+        $rMain = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'track']);
+        $rMain->assertStatus(200)->assertJsonPath('state.current_state', 'track_choice');
+        $rList = $this->postJson('/api/chatbot/webhook', ['channel' => 'messenger', 'external_id' => $psid, 'body' => 'track_list']);
         $rList->assertStatus(200);
         $reply = $rList->json('reply');
         $this->assertStringContainsString('recent orders', strtolower($reply));
         $ref = Order::where('channel', 'messenger')->where('external_id', $psid)->value('reference');
         $this->assertNotEmpty($ref);
         $this->assertStringContainsString($ref, $reply);
+    }
+
+    /** SMS/web: numeric "1" in language_selection is normalized to "en" and reaches main_menu. */
+    public function test_sms_number_normalization_language_then_main_menu(): void
+    {
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'norm_user', 'body' => 'hi']);
+        $r = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'norm_user', 'body' => '1']);
+        $r->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu')->assertJsonPath('state.selected_language', 'en');
+        // From main_menu, numeric "2" is normalized to "track" and reaches track_choice
+        $r2 = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'norm_user', 'body' => '2']);
+        $r2->assertStatus(200)->assertJsonPath('state.current_state', 'track_choice');
+    }
+
+    /** SMS/web: invalid number in choice state leaves body unchanged; FSM shows invalid and stays in main_menu. */
+    public function test_sms_invalid_number_in_choice_state_stays_in_main_menu(): void
+    {
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'inv_num_user', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'inv_num_user', 'body' => '1']);
+        $response = $this->postJson('/api/chatbot/webhook', ['channel' => 'sms', 'external_id' => 'inv_num_user', 'body' => '99']);
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
+        $replies = $response->json('replies');
+        $fullReply = implode(' ', $replies);
+        $this->assertStringContainsString('invalid', strtolower($fullReply));
+    }
+
+    /** Web: invalid input in main_menu reply includes numbered options so user sees choices. */
+    public function test_web_invalid_main_menu_includes_numbered_options(): void
+    {
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => 'web_inv_user', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => 'web_inv_user', 'body' => '1']);
+        $response = $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'web',
+            'external_id' => 'web_inv_user',
+            'body' => 'hello',
+        ]);
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'main_menu');
+        $reply = $response->json('reply');
+        $this->assertStringContainsString('Invalid option', $reply);
+        $this->assertStringContainsString('1. Place order', $reply);
+        $this->assertStringContainsString('2. Track order', $reply);
+    }
+
+    /** Main menu canonicals from config: order, track, language, human_takeover transition correctly. */
+    public function test_main_menu_canonicals_from_config_transition(): void
+    {
+        $uid = 'mm_canon_user';
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid, 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid, 'body' => '1']);
+
+        $rOrder = $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid, 'body' => 'order']);
+        $rOrder->assertStatus(200)->assertJsonPath('state.current_state', 'menu');
+
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid . '2', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid . '2', 'body' => '1']);
+        $rTrack = $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid . '2', 'body' => 'track']);
+        $rTrack->assertStatus(200)->assertJsonPath('state.current_state', 'track_choice');
+
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid . '3', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid . '3', 'body' => '1']);
+        $rLang = $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid . '3', 'body' => 'language']);
+        $rLang->assertStatus(200)->assertJsonPath('state.current_state', 'language_selection');
+
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid . '4', 'body' => 'hi']);
+        $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid . '4', 'body' => '1']);
+        $rHt = $this->postJson('/api/chatbot/webhook', ['channel' => 'web', 'external_id' => $uid . '4', 'body' => 'human_takeover']);
+        $rHt->assertStatus(200)->assertJsonPath('state.current_state', 'human_takeover');
+    }
+
+    /** SMS: first message (invalid input) lands in language_selection and reply includes numbered language options. */
+    public function test_sms_first_message_language_selection_includes_options(): void
+    {
+        $response = $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'sms_first_lang_user',
+            'body' => 'sdf',
+        ]);
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'language_selection');
+        $reply = $response->json('reply');
+        $this->assertStringContainsString('Welcome', $reply);
+        $this->assertStringContainsString('1. English', $reply);
+        $this->assertStringContainsString('2. Tagalog', $reply);
+        $this->assertStringContainsString('3. Ilocano', $reply);
+    }
+
+    /** SMS/Web: invalid language reply includes numbered options so user can retry. */
+    public function test_sms_invalid_language_reply_includes_options(): void
+    {
+        $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'sms_inv_lang_user',
+            'body' => 'hi',
+        ]);
+        $response = $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'sms_inv_lang_user',
+            'body' => 'xyz',
+        ]);
+        $response->assertStatus(200)->assertJsonPath('state.current_state', 'language_selection');
+        $reply = $response->json('reply');
+        $this->assertStringContainsString('Invalid', $reply);
+        $this->assertStringContainsString('1. English', $reply);
+        $this->assertStringContainsString('2. Tagalog', $reply);
     }
 }
