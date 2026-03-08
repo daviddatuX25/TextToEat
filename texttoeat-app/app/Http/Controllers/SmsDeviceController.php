@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\OutboundSms;
+use App\Models\Setting;
 use App\Models\SmsDevice;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -65,7 +66,7 @@ class SmsDeviceController extends Controller
             'deviceId' => $device->device_id,
             '_id' => $device->device_id,
             'name' => $device->name,
-            'heartbeatIntervalMinutes' => config('firebase.heartbeat_interval_minutes', 15),
+            'heartbeatIntervalMinutes' => (int) Setting::get('firebase.heartbeat_interval_minutes', config('firebase.heartbeat_interval_minutes', 15)),
         ]);
     }
 
@@ -125,7 +126,7 @@ class SmsDeviceController extends Controller
             'ok' => true,
             '_id' => $device->device_id,
             'name' => $device->name,
-            'heartbeatIntervalMinutes' => config('firebase.heartbeat_interval_minutes', 15),
+            'heartbeatIntervalMinutes' => (int) Setting::get('firebase.heartbeat_interval_minutes', config('firebase.heartbeat_interval_minutes', 15)),
         ]);
     }
 

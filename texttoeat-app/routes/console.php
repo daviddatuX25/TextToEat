@@ -8,6 +8,7 @@ use App\Models\MenuItemDailyStock;
 use App\Models\OrderItem;
 use App\Models\OutboundSms;
 use App\Models\ChatbotSession;
+use App\Models\Setting;
 use App\Messenger\FacebookMessengerClient;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -20,7 +21,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Artisan::command('sms:mark-old-pending-failed', function () {
-    $minutes = (int) config('firebase.pending_timeout_minutes', 10);
+    $minutes = (int) Setting::get('firebase.pending_timeout_minutes', config('firebase.pending_timeout_minutes', 10));
     $count = OutboundSms::pending()
         ->where('created_at', '<', now()->subMinutes($minutes))
         ->update([
@@ -33,7 +34,7 @@ Artisan::command('sms:mark-old-pending-failed', function () {
 Schedule::command('sms:mark-old-pending-failed')->everyTenMinutes();
 
 Artisan::command('chatbot:expire-takeover-sessions', function () {
-    $minutes = (int) config('chatbot.takeover_timeout_minutes', 60);
+    $minutes = (int) Setting::get('chatbot.takeover_timeout_minutes', config('chatbot.takeover_timeout_minutes', 60));
     if ($minutes <= 0) {
         $this->info('Takeover timeout minutes is <= 0; skipping.');
 
@@ -105,18 +106,18 @@ Artisan::command('menu:reset-today {--force : Run even outside morning window}',
     $todayByNameCategory = MenuItem::query()
         ->whereDate('menu_date', $today)
         ->get()
-        ->keyBy(fn ($i) => $i->name . '|' . $i->category);
+        ->keyBy(fn ($i) => $i->name . '|' . $i->category_id);
 
     $rolloverCount = 0;
     foreach ($yesterdayItems as $item) {
-        $key = $item->name . '|' . $item->category;
+        $key = $item->name . '|' . $item->category_id;
         if ($todayByNameCategory->has($key)) {
             continue;
         }
         $newItem = MenuItem::create([
             'name' => $item->name,
             'price' => $item->price,
-            'category' => $item->category,
+            'category_id' => $item->category_id,
             'image_url' => $item->image_url,
             'units_today' => 0,
             'is_sold_out' => true,

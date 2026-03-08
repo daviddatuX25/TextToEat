@@ -1,7 +1,12 @@
+export { AnimateOnScroll, StaggerScrollIn } from './AnimateOnScroll';
 export { Badge } from './Badge';
+export { PageHeader } from './PageHeader';
+export { PaginationLinks } from './PaginationLinks';
 export { TypewriterText } from './TypewriterText';
 export { Button } from './Button';
 export { Card, CardContent, CardHeader } from './Card';
 export { Input } from './Input';
 export { SectionHeading } from './SectionHeading';
 export { StatCard } from './StatCard';
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './Tooltip';
+export { InfoTooltip } from './InfoTooltip';

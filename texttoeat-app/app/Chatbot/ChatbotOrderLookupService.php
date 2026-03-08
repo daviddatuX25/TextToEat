@@ -49,7 +49,7 @@ class ChatbotOrderLookupService
     {
         return match ($status) {
             'received' => 'status_label_received',
-            'confirmed' => 'status_label_confirmed',
+            'preparing' => 'status_label_preparing',
             'ready' => 'status_label_ready',
             'on_the_way' => 'status_label_on_the_way',
             'completed' => 'status_label_completed',

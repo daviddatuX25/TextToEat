@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Http\Requests\StoreOrderRequest;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Setting;
 use App\Services\MenuItemStockService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,10 @@ class CheckoutController extends Controller
     ) {}
     public function index(): Response|RedirectResponse
     {
+        if (! Setting::get('channels.web_enabled', true)) {
+            return redirect()->route('web-unavailable');
+        }
+
         $cart = session('customer_cart', []);
 
         if (empty($cart)) {
@@ -42,6 +47,10 @@ class CheckoutController extends Controller
 
     public function store(StoreOrderRequest $request): RedirectResponse
     {
+        if (! Setting::get('channels.web_enabled', true)) {
+            return redirect()->route('web-unavailable');
+        }
+
         $cart = session('customer_cart', []);
 
         if (empty($cart)) {
@@ -96,6 +105,7 @@ class CheckoutController extends Controller
                     'order_id' => $order->id,
                     'menu_item_id' => $line['menu_item_id'],
                     'name' => $line['name'],
+                    'category_name' => $line['category'] ?? null,
                     'quantity' => (int) $line['quantity'],
                     'price' => (float) $line['price'],
                 ]);
@@ -106,7 +116,7 @@ class CheckoutController extends Controller
 
         $order = Order::where('reference', $reference)->first();
         if ($order) {
-            event(new OrderUpdated($order));
+            event(new OrderUpdated($order, true, false));
         }
 
         return redirect()->route('order.confirmation', ['reference' => $reference]);

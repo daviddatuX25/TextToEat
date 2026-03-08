@@ -2,6 +2,7 @@
 
 namespace App\Messenger;
 
+use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 
 class FacebookMessengerClient
@@ -14,7 +15,8 @@ class FacebookMessengerClient
 
     public function __construct()
     {
-        $this->pageAccessToken = (string) config('facebook.page_access_token', '');
+        $token = Setting::get('facebook.page_access_token');
+        $this->pageAccessToken = is_string($token) ? $token : (string) config('facebook.page_access_token', '');
         $this->graphBaseUrl = (string) config('facebook.graph_base_url', 'https://graph.facebook.com');
         $this->graphVersion = (string) config('facebook.graph_version', 'v18.0');
     }

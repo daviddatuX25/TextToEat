@@ -15,6 +15,19 @@
           } catch (e) {}
         })();
     </script>
+    <!-- Pre-paint portal font size (Settings page) -->
+    <script>
+        (function () {
+          try {
+            var size = localStorage.getItem('portalFontSize');
+            if (size === 'small' || size === 'medium' || size === 'large') {
+              document.documentElement.classList.add('portal-font-' + size);
+            } else {
+              document.documentElement.classList.add('portal-font-medium');
+            }
+          } catch (e) {}
+        })();
+    </script>
     <meta charset="utf-8">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="viewport" content="width=device-width, initial-scale=1">

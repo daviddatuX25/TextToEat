@@ -13,6 +13,7 @@ class MenuItemStockService
     /**
      * Virtual available (on the line) = units_set minus reserved (pending orders) minus units_sold.
      * Reads from menu_item_daily_stock; reserves computed from OrderItem.
+     * Only includes menu items where menu_date equals the app's current date (today); previous days are excluded.
      *
      * @param  array<int, int>  $menuItemIds  Optional. If empty, compute for all today's menu items.
      * @return array<int, int> Map of menu_item_id => virtual_available (>= 0)
@@ -58,15 +59,16 @@ class MenuItemStockService
 
         $pendingStatuses = [
             OrderStatus::Received->value,
-            OrderStatus::Confirmed->value,
+            OrderStatus::Preparing->value,
             OrderStatus::Ready->value,
             OrderStatus::OnTheWay->value,
         ];
 
         $reserved = OrderItem::query()
             ->whereIn('menu_item_id', $ids)
-            ->whereHas('order', function ($q) use ($pendingStatuses): void {
-                $q->whereIn('status', $pendingStatuses);
+            ->whereHas('order', function ($q) use ($pendingStatuses, $today): void {
+                $q->whereIn('status', $pendingStatuses)
+                    ->whereDate('created_at', $today);
             })
             ->groupBy('menu_item_id')
             ->selectRaw('menu_item_id, COALESCE(SUM(quantity), 0) as reserved')
@@ -120,15 +122,16 @@ class MenuItemStockService
 
         $pendingStatuses = [
             OrderStatus::Received->value,
-            OrderStatus::Confirmed->value,
+            OrderStatus::Preparing->value,
             OrderStatus::Ready->value,
             OrderStatus::OnTheWay->value,
         ];
 
         return OrderItem::query()
             ->whereIn('menu_item_id', $ids)
-            ->whereHas('order', function ($q) use ($pendingStatuses): void {
-                $q->whereIn('status', $pendingStatuses);
+            ->whereHas('order', function ($q) use ($pendingStatuses, $today): void {
+                $q->whereIn('status', $pendingStatuses)
+                    ->whereDate('created_at', $today);
             })
             ->groupBy('menu_item_id')
             ->selectRaw('menu_item_id, COALESCE(SUM(quantity), 0) as reserved')

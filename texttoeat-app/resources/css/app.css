@@ -125,9 +125,90 @@
     .proceed-blink {
         animation: proceedBlink 2s ease-in-out infinite;
     }
+
+    /* Scroll-in (Intersection Observer) — fade/slide when in view */
+    @media (prefers-reduced-motion: no-preference) {
+        .scroll-in {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .scroll-in.is-visible {
+            opacity: 1;
+            transform: none;
+        }
+        .scroll-in-left {
+            opacity: 0;
+            transform: translateX(-24px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .scroll-in-left.is-visible {
+            opacity: 1;
+            transform: none;
+        }
+        .scroll-in-right {
+            opacity: 0;
+            transform: translateX(24px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .scroll-in-right.is-visible {
+            opacity: 1;
+            transform: none;
+        }
+        /* Stagger: container has scroll-stagger-container + is-visible when in view; children have scroll-in + --stagger-index */
+        .scroll-in[style*="--stagger-index"] {
+            transition-delay: calc(var(--stagger-index, 0) * 80ms);
+        }
+        .scroll-stagger-container .scroll-in {
+            opacity: 0;
+            transform: translateY(24px);
+            transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        }
+        .scroll-stagger-container .scroll-in[style*="--stagger-index"] {
+            transition-delay: calc(var(--stagger-index, 0) * 80ms);
+        }
+        .scroll-stagger-container.is-visible .scroll-in {
+            opacity: 1;
+            transform: none;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .scroll-in,
+        .scroll-in-left,
+        .scroll-in-right {
+            opacity: 1;
+            transform: none;
+        }
+        .scroll-stagger-container .scroll-in {
+            opacity: 1;
+            transform: none;
+        }
+    }
 }
 
 /* Preserve original section heading styles if still used elsewhere */
 .section-heading {
     @apply mb-4 text-2xl font-bold;
 }
+
+/* Portal text size (Settings page): scale root font for portal pages */
+html.portal-font-small {
+    font-size: 87.5%;
+}
+html.portal-font-medium {
+    font-size: 100%;
+}
+html.portal-font-large {
+    font-size: 112.5%;
+}
+
+/* Reply Templates page — conversation-thread layout */
+.reply-flow-group { overflow: hidden; }
+.reply-flow-group.open .reply-flow-body { display: block; }
+.reply-flow-group:not(.open) .reply-flow-body { display: none; }
+.reply-flow-group.open .reply-flow-header { border-bottom-color: var(--color-border); }
+.reply-flow-group.open .reply-chevron { transform: rotate(90deg); }
+.reply-turn + .reply-turn::before { content: ''; display: block; width: 1px; height: 16px; background: var(--color-border); margin-left: 15px; }
+.reply-editable-field:focus-within { border-color: var(--color-surface-400); box-shadow: 0 0 0 3px rgba(0,0,0,0.04); }
+.reply-option-editor.open { display: block; }
+.reply-option-editor:not(.open) { display: none; }

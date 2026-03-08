@@ -57,4 +57,19 @@ class UsersController extends Controller
             'Password for ' . $user->username . ' reset to default (Password1!). Remind them to change it from Account.'
         );
     }
+
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        if ($request->user()->id === $user->id) {
+            return redirect()->back()->with('error', 'You cannot deactivate your own account.');
+        }
+
+        if ($user->isAdmin() && User::whereIn('role', ['admin', 'superadmin'])->count() <= 1) {
+            return redirect()->back()->with('error', 'Cannot deactivate the last admin.');
+        }
+
+        $user->delete();
+
+        return redirect()->back()->with('success', 'Account deactivated.');
+    }
 }

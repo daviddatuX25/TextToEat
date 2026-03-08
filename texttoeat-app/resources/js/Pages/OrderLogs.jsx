@@ -1,22 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, router } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
-import { TypewriterText } from '../components/ui';
+import { TypewriterText, PaginationLinks } from '../components/ui';
 import { LogFilterPanel } from '../components/logs/LogFilterPanel';
 import { OrderLogTableRow } from '../components/logs/OrderLogTableRow';
 import { OrderLogCard } from '../components/logs/OrderLogCard';
-import { LayoutGrid, List } from 'lucide-react';
+import { LayoutGrid, List, Search } from 'lucide-react';
 
 const ORDER_LOGS_VIEW_MODE_KEY = 'orderLogsViewMode';
+
+function buildLogsParams(filters, overrides = {}) {
+    return { ...filters, ...overrides };
+}
 
 export default function OrderLogs({ logs, filters = {}, meta = {} }) {
     const items = Array.isArray(logs) ? logs : logs?.data ?? [];
     const links = !Array.isArray(logs) && logs?.links ? logs.links : [];
+    const paginationMeta = meta?.pagination ?? null;
 
     const [viewMode, setViewMode] = useState(() => {
         if (typeof window === 'undefined') return 'card';
         return window.localStorage?.getItem(ORDER_LOGS_VIEW_MODE_KEY) || 'card';
     });
+    const [searchInput, setSearchInput] = useState(() => filters.search ?? '');
+
+    useEffect(() => {
+        setSearchInput((prev) => (filters.search ?? '') !== prev ? (filters.search ?? '') : prev);
+    }, [filters.search]);
 
     useEffect(() => {
         if (typeof window !== 'undefined' && viewMode) {
@@ -24,12 +34,20 @@ export default function OrderLogs({ logs, filters = {}, meta = {} }) {
         }
     }, [viewMode]);
 
-    const handleSubmit = (nextFilters) => {
-        router.get('/portal/logs/orders', nextFilters, {
+    const handleSubmit = useCallback((nextFilters) => {
+        router.get('/portal/logs/orders', buildLogsParams(filters, nextFilters), {
             preserveState: true,
             replace: true,
         });
-    };
+    }, [filters]);
+
+    const applySearch = useCallback(() => {
+        const q = searchInput.trim();
+        router.get('/portal/logs/orders', buildLogsParams(filters, { search: q || undefined, page: 1 }), {
+            preserveState: true,
+            replace: true,
+        });
+    }, [filters, searchInput]);
 
     return (
         <PortalLayout>
@@ -52,15 +70,39 @@ export default function OrderLogs({ logs, filters = {}, meta = {} }) {
                 </header>
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                    <LogFilterPanel
-                        context="orders"
-                        filters={filters}
-                        statusOptions={meta.statusOptions ?? []}
-                        channelOptions={meta.channelOptions ?? []}
-                        staffOptions={meta.staffOptions ?? []}
-                        showStaff
-                        onSubmit={handleSubmit}
-                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                        <form
+                            className="flex items-center gap-2 flex-1 min-w-[200px] max-w-sm"
+                            onSubmit={(e) => { e.preventDefault(); applySearch(); }}
+                        >
+                            <div className="relative flex-1 min-w-0">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 pointer-events-none" aria-hidden />
+                                <input
+                                    type="search"
+                                    value={searchInput}
+                                    onChange={(e) => setSearchInput(e.target.value)}
+                                    placeholder="Search (customer, reference)…"
+                                    className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 pl-9 pr-3 py-2 text-sm text-surface-800 dark:text-surface-200 placeholder:text-surface-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                    aria-label="Search order logs"
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                className="shrink-0 rounded-lg bg-primary-600 text-white text-sm font-semibold px-3 py-2 hover:bg-primary-700 transition-colors"
+                            >
+                                Search
+                            </button>
+                        </form>
+                        <LogFilterPanel
+                            context="orders"
+                            filters={filters}
+                            statusOptions={meta.statusOptions ?? []}
+                            channelOptions={meta.channelOptions ?? []}
+                            staffOptions={meta.staffOptions ?? []}
+                            showStaff
+                            onSubmit={handleSubmit}
+                        />
+                    </div>
                     <div
                         className="inline-flex rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 p-0.5"
                         role="group"
@@ -128,32 +170,7 @@ export default function OrderLogs({ logs, filters = {}, meta = {} }) {
                             </table>
                         </div>
                         <div className="px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-xs text-surface-500 dark:text-surface-400 flex flex-wrap items-center justify-between gap-2">
-                            <span>{items.length} log{items.length !== 1 ? 's' : ''}</span>
-                            {Array.isArray(links) && links.length > 1 && (
-                                <nav className="flex flex-wrap justify-end gap-1">
-                                    {links.map((link, index) =>
-                                        link.url ? (
-                                            <Link
-                                                key={index}
-                                                href={link.url}
-                                                preserveScroll
-                                                className={`px-2.5 py-1 rounded-md border text-xs ${
-                                                    link.active
-                                                        ? 'border-surface-500 bg-surface-100 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
-                                                        : 'border-transparent text-surface-600 hover:bg-surface-100 dark:text-surface-300 dark:hover:bg-surface-800'
-                                                }`}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
-                                        ) : (
-                                            <span
-                                                key={index}
-                                                className="px-2.5 py-1 rounded-md text-surface-400"
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
-                                        )
-                                    )}
-                                </nav>
-                            )}
+                            <PaginationLinks meta={paginationMeta} links={links} itemLabel="log" fallbackTotal={items.length} />
                         </div>
                     </div>
                 ) : (
@@ -166,32 +183,7 @@ export default function OrderLogs({ logs, filters = {}, meta = {} }) {
                             </div>
                         </div>
                         <div className="shrink-0 px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-800/80 text-xs text-surface-500 dark:text-surface-400 flex flex-wrap items-center justify-between gap-2">
-                            <span>{items.length} log{items.length !== 1 ? 's' : ''}</span>
-                            {Array.isArray(links) && links.length > 1 && (
-                                <nav className="flex flex-wrap justify-end gap-1">
-                                    {links.map((link, index) =>
-                                        link.url ? (
-                                            <Link
-                                                key={index}
-                                                href={link.url}
-                                                preserveScroll
-                                                className={`px-2.5 py-1 rounded-md border text-xs ${
-                                                    link.active
-                                                        ? 'border-surface-500 bg-surface-100 text-surface-800 dark:bg-surface-700 dark:text-surface-200'
-                                                        : 'border-transparent text-surface-600 hover:bg-surface-100 dark:text-surface-300 dark:hover:bg-surface-800'
-                                                }`}
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
-                                        ) : (
-                                            <span
-                                                key={index}
-                                                className="px-2.5 py-1 rounded-md text-surface-400"
-                                                dangerouslySetInnerHTML={{ __html: link.label }}
-                                            />
-                                        )
-                                    )}
-                                </nav>
-                            )}
+                            <PaginationLinks meta={paginationMeta} links={links} itemLabel="log" fallbackTotal={items.length} />
                         </div>
                     </div>
                 )}

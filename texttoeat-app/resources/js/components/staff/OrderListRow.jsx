@@ -2,11 +2,12 @@ import { router } from '@inertiajs/react';
 import { useState, useRef } from 'react';
 import { LayoutGrid, ArrowRight, Globe, MessageCircle, ShoppingBag, Truck, UserRound, X, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency } from '../../utils/formatNumber';
 
 const CHANNEL_BADGES = {
     sms: { icon: MessageCircle, label: 'SMS', color: 'bg-surface-200 text-surface-700 dark:bg-surface-700 dark:text-surface-300' },
     messenger: { icon: MessageCircle, label: 'Messenger', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300' },
-    web: { icon: Globe, label: 'Online', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' },
+    web: { icon: Globe, label: 'Web', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' },
     walkin: { icon: UserRound, label: 'Walk-in', color: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' },
 };
 
@@ -16,8 +17,8 @@ function getPrevStatus(order) {
     if (status === 'cancelled') return null;
     if (status === 'completed') return isDelivery ? 'on_the_way' : 'ready';
     if (status === 'on_the_way') return 'ready';
-    if (status === 'ready') return 'confirmed';
-    if (status === 'confirmed') return 'received';
+    if (status === 'ready') return 'preparing';
+    if (status === 'preparing') return 'received';
     return null;
 }
 
@@ -63,7 +64,7 @@ export function OrderListRow({ order, isHighlighted = false }) {
     };
 
     const isReceived = status === 'received';
-    const isConfirmed = status === 'confirmed';
+    const isPreparing = status === 'preparing';
     const isReady = status === 'ready';
     const isOnTheWay = status === 'on_the_way';
     const isDelivery = (order.delivery_type ?? '') === 'delivery';
@@ -148,7 +149,7 @@ export function OrderListRow({ order, isHighlighted = false }) {
                 {channel !== 'walkin' && (
                     <span className={`${badge.color} text-[10px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-1 uppercase shrink-0`}>
                         <Icon className="h-3 w-3" />
-                        {channel === 'web' ? 'Online' : badge.label}
+                        {badge.label}
                     </span>
                 )}
                 <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${isDelivery ? 'bg-surface-200 text-surface-700 dark:bg-surface-700 dark:text-surface-300' : isWalkin ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' : 'bg-surface-200 text-surface-700 dark:bg-surface-600 dark:text-surface-300'}`}>
@@ -164,15 +165,15 @@ export function OrderListRow({ order, isHighlighted = false }) {
 
             {/* Items + total (click to toggle pay when applicable) */}
             <div
-                role={isReceived || isConfirmed || isReady || isOnTheWay ? 'button' : undefined}
-                tabIndex={isReceived || isConfirmed || isReady || isOnTheWay ? 0 : undefined}
-                onClick={(e) => { if (isReceived || isConfirmed || isReady || isOnTheWay) { e.stopPropagation(); togglePayment(); } }}
+                role={isReceived || isPreparing || isReady || isOnTheWay ? 'button' : undefined}
+                tabIndex={isReceived || isPreparing || isReady || isOnTheWay ? 0 : undefined}
+                onClick={(e) => { if (isReceived || isPreparing || isReady || isOnTheWay) { e.stopPropagation(); togglePayment(); } }}
                 onKeyDown={(e) => {
-                    if (!(isReceived || isConfirmed || isReady || isOnTheWay)) return;
+                    if (!(isReceived || isPreparing || isReady || isOnTheWay)) return;
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); togglePayment(); }
                 }}
-                aria-label={isReceived || isConfirmed || isReady || isOnTheWay ? (isPaid ? 'Mark unpaid' : 'Mark paid') : undefined}
-                className={`rounded-lg border border-surface-200/60 dark:border-surface-700/60 p-2 space-y-1 ${(isReceived || isConfirmed || isReady || isOnTheWay) ? 'cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800/50' : ''}`}
+                aria-label={isReceived || isPreparing || isReady || isOnTheWay ? (isPaid ? 'Mark unpaid' : 'Mark paid') : undefined}
+                className={`rounded-lg border border-surface-200/60 dark:border-surface-700/60 p-2 space-y-1 ${(isReceived || isPreparing || isReady || isOnTheWay) ? 'cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800/50' : ''}`}
             >
                 {items.map((item, i) => (
                     <div key={i} className="flex justify-between items-center text-xs gap-2">
@@ -181,23 +182,23 @@ export function OrderListRow({ order, isHighlighted = false }) {
                             {item.name}
                         </span>
                         <span className={`shrink-0 font-medium tabular-nums ${isPaid ? 'line-through text-surface-500' : ''}`}>
-                            ₱{Number((item.price ?? 0) * (item.quantity ?? 0)).toFixed(2)}
+                            {formatCurrency(Number((item.price ?? 0) * (item.quantity ?? 0)))}
                         </span>
                     </div>
                 ))}
                 <div className="flex justify-between items-center pt-1.5 mt-1 border-t border-surface-200/60 dark:border-surface-700/60">
                     <span className="text-[10px] font-medium text-surface-500 uppercase">Total</span>
                     <span className={`font-bold text-sm tabular-nums ${isPaid ? 'line-through text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
-                        ₱{Number(order.total).toFixed(2)}
+                        {formatCurrency(Number(order.total))}
                     </span>
                 </div>
-                {(isReceived || isConfirmed || isReady || isOnTheWay) && (
+                {(isReceived || isPreparing || isReady || isOnTheWay) && (
                     <p className="text-[10px] text-center text-surface-500 mt-0.5">Tap to {isPaid ? 'mark unpaid' : 'mark paid'}</p>
                 )}
             </div>
 
             {/* Actions: advance or go */}
-            {(isReceived || isConfirmed) && (
+            {(isReceived || isPreparing) && (
                 <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-surface-200/50 dark:border-surface-700/50">
                     {prevStatus ? (
                         <button
@@ -212,14 +213,14 @@ export function OrderListRow({ order, isHighlighted = false }) {
                     {isReceived && (
                         <button
                             type="button"
-                            onClick={(e) => { e.stopPropagation(); updateStatus('confirmed'); }}
+                            onClick={(e) => { e.stopPropagation(); updateStatus('preparing'); }}
                             className="ml-auto inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700"
                         >
-                            Confirm
+                            Start preparing
                             <ArrowRight className="h-3.5 w-3.5" />
                         </button>
                     )}
-                    {isConfirmed && (
+                    {isPreparing && (
                         <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); updateStatus('ready'); }}

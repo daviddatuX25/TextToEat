@@ -17,6 +17,7 @@ class OrderItem extends Model
         'order_id',
         'menu_item_id',
         'name',
+        'category_name',
         'quantity',
         'price',
     ];

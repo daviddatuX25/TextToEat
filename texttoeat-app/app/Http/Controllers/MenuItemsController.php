@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreMenuItemRequest;
 use App\Http\Requests\UpdateMenuItemRequest;
+use App\Models\Category;
 use App\Models\MenuItem;
 use App\Models\MenuItemDailyStock;
+use App\Models\Setting;
 use App\Services\MenuItemImageService;
 use App\Services\MenuItemStockService;
 use Carbon\Carbon;
@@ -24,18 +26,22 @@ class MenuItemsController extends Controller
     public function index(Request $request): Response
     {
         $validated = $request->validate([
-            'category' => ['nullable', 'string', 'max:255'],
+            'category' => ['nullable', 'integer', 'exists:categories,id'],
         ]);
 
         $today = Carbon::today();
         $menuItems = MenuItem::query()
+            ->with('category')
             ->whereDate('menu_date', $today)
             ->when(
                 ! empty($validated['category']),
-                fn ($q) => $q->where('category', $validated['category'])
+                fn ($q) => $q->where('category_id', $validated['category'])
             )
-            ->orderBy('category')
-            ->orderBy('name')
+            ->join('categories', 'menu_items.category_id', '=', 'categories.id')
+            ->select('menu_items.*')
+            ->orderBy('categories.sort_order')
+            ->orderBy('categories.name')
+            ->orderBy('menu_items.name')
             ->paginate(20)
             ->withQueryString();
 
@@ -44,27 +50,50 @@ class MenuItemsController extends Controller
         $currentOrders = $this->stockService->getReservedForToday($ids);
 
         $menuItems = $menuItems->through(function ($item) use ($virtualAvailable, $currentOrders) {
+            $item->load('category');
             $arr = $item->toArray();
+            $arr['category'] = $item->category?->name;
             $arr['virtual_available'] = $virtualAvailable[$item->id] ?? (int) $item->units_today;
             $arr['current_orders'] = $currentOrders[$item->id] ?? 0;
 
             return $arr;
         });
 
+        $categories = Category::query()
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get(['id', 'name', 'sort_order'])
+            ->map(fn (Category $c) => ['id' => $c->id, 'name' => $c->name, 'sort_order' => $c->sort_order])
+            ->all();
+
         $menuCategories = MenuItem::query()
             ->whereDate('menu_date', $today)
-            ->distinct()
-            ->pluck('category')
+            ->with('category')
+            ->get()
+            ->pluck('category.name')
             ->filter()
+            ->unique()
             ->sort()
             ->values()
             ->all();
 
+        $totalMenuItems = MenuItem::query()->whereDate('menu_date', $today)->count();
+        $threshold = (int) Setting::get('menu.low_stock_threshold', 5);
+        $virtualAvailableAll = $this->stockService->getVirtualAvailableForToday([]);
+        $lowStockCount = 0;
+        foreach ($virtualAvailableAll as $available) {
+            if ($available < $threshold) {
+                $lowStockCount++;
+            }
+        }
+
         return Inertia::render('MenuItems', [
             'menuItems' => $menuItems,
-            'categories' => config('menu.categories', []),
+            'categories' => $categories,
             'menuCategories' => $menuCategories,
             'filterCategory' => $validated['category'] ?? null,
+            'totalMenuItems' => $totalMenuItems,
+            'lowStockCount' => $lowStockCount,
         ]);
     }
 

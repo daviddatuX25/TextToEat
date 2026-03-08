@@ -40,6 +40,10 @@ class Setting extends Model
         'textbee.webhook_secret' => 'TEXTBEE_WEBHOOK_SECRET',
         'firebase.credentials_path' => 'FIREBASE_CREDENTIALS',
         'firebase.device_token' => 'FCM_DEVICE_TOKEN',
+        'chatbot.takeover_timeout_minutes' => 'CHATBOT_TAKEOVER_TIMEOUT_MINUTES',
+        'chatbot.session_timeout_seconds' => 'CHATBOT_SESSION_TIMEOUT_SECONDS',
+        'firebase.pending_timeout_minutes' => 'SMS_PENDING_TIMEOUT_MINUTES',
+        'firebase.heartbeat_interval_minutes' => 'SMS_HEARTBEAT_INTERVAL_MINUTES',
     ];
 
     /**
@@ -134,7 +138,14 @@ class Setting extends Model
                 return false;
             }
         }
-        if ($key === 'menu.reset_morning_until_hour') {
+        if ($key === 'menu.reset_morning_until_hour' || $key === 'menu.low_stock_threshold') {
+            return (int) $value;
+        }
+        if ($key === 'menu.low_stock_badge_style') {
+            $v = (string) $value;
+            return in_array($v, ['count', 'one'], true) ? $v : 'count';
+        }
+        if (str_contains($key, 'timeout') || str_contains($key, 'heartbeat_interval_minutes')) {
             return (int) $value;
         }
         return $value;

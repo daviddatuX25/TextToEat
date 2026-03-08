@@ -20,5 +20,5 @@ export function CardHeader({ className, ...props }) {
 }
 
 export function CardContent({ className, ...props }) {
-    return <div className={clsx('p-5 pt-0', className)} {...props} />;
+    return <div className={clsx('p-5', className)} {...props} />;
 }

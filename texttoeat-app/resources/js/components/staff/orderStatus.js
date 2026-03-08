@@ -12,7 +12,7 @@ export function getPreviousStatus(order) {
         return isDelivery ? 'on_the_way' : 'ready';
     }
     if (status === 'on_the_way') return 'ready';
-    if (status === 'ready') return 'confirmed';
-    if (status === 'confirmed') return 'received';
+    if (status === 'ready') return 'preparing';
+    if (status === 'preparing') return 'received';
     return null;
 }

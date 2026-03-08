@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use App\Models\SmsDevice;
 use App\Models\SmsGatewaySetting;
 use App\Services\OutboundSmsService;
@@ -47,7 +48,43 @@ class SmsDevicesController extends Controller
         return Inertia::render('SmsDevices', [
             'devices' => $devices,
             'api_key_for_qr' => $apiKey !== null && $apiKey !== '' ? $apiKey : null,
+            'gateway_credentials_configured' => [
+                'textbee_api_url' => Setting::has('textbee.api_url'),
+                'textbee_webhook_secret' => Setting::has('textbee.webhook_secret'),
+                'firebase_credentials_path' => Setting::has('firebase.credentials_path'),
+                'firebase_device_token' => Setting::has('firebase.device_token'),
+            ],
         ]);
+    }
+
+    /**
+     * Update SMS/gateway credentials (Textbee, Firebase path, FCM token). Encrypted where applicable. Audit logged.
+     */
+    public function updateCredentials(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'textbee_api_url' => ['nullable', 'string', 'max:500'],
+            'textbee_webhook_secret' => ['nullable', 'string', 'max:255'],
+            'firebase_credentials_path' => ['nullable', 'string', 'max:500'],
+            'firebase_device_token' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $userId = $request->user()?->id;
+        $keyMap = [
+            'textbee_api_url' => 'textbee.api_url',
+            'textbee_webhook_secret' => 'textbee.webhook_secret',
+            'firebase_credentials_path' => 'firebase.credentials_path',
+            'firebase_device_token' => 'firebase.device_token',
+        ];
+        foreach ($validated as $inputKey => $value) {
+            $value = trim((string) $value);
+            if ($value !== '') {
+                Setting::set($keyMap[$inputKey], $value, $userId);
+            }
+        }
+
+        return redirect()->route('portal.sms-devices')
+            ->with('success', 'SMS gateway credentials updated.');
     }
 
     /**

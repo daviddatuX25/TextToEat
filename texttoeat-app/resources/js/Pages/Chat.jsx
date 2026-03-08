@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { Link } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
-import { MessageCircle, Send, Globe, Smartphone } from 'lucide-react';
+import { PageHeader } from '../components/ui';
+import { MessageCircle, Send, Globe, Smartphone, Settings } from 'lucide-react';
 
 const CHANNELS = [
     { value: 'web', label: 'Web chat', icon: Globe },
@@ -53,7 +55,10 @@ const MESSENGER_STATE_BUTTONS = {
     menu: [],
 };
 
-export default function Chat({ webChatExternalId = '' }) {
+export default function Chat({
+    webChatExternalId = '',
+    channelsEnabled = { web: true, sms: true, messenger: true },
+}) {
     const [channel, setChannel] = useState('web');
     const [externalId, setExternalId] = useState(webChatExternalId || '');
     const [messages, setMessages] = useState([]);
@@ -76,7 +81,14 @@ export default function Chat({ webChatExternalId = '' }) {
         scrollToBottom();
     }, [messages]);
 
+    const channelEnabled = channelsEnabled[channel] !== false;
+
     useEffect(() => {
+        if (!channelEnabled) {
+            setLoading(false);
+            setError(null);
+            return;
+        }
         // SMS conversations are user-initiated; skip init hook for sms.
         if (channel === 'sms') {
             setLoading(false);
@@ -121,11 +133,11 @@ export default function Chat({ webChatExternalId = '' }) {
                 setMessages([{ role: 'bot', text: 'Could not load chat. Check console.', id: 'err' }]);
             })
             .finally(() => setLoading(false));
-    }, [channel, effectiveExternalId, webChatExternalId]);
+    }, [channel, channelEnabled, effectiveExternalId, webChatExternalId]);
 
     // Poll for proactive outbound messages (SMS/Messenger sim)
     useEffect(() => {
-        if (channel !== 'sms' && channel !== 'messenger') return;
+        if (!channelEnabled || (channel !== 'sms' && channel !== 'messenger')) return;
         const id = (externalId || '').trim();
         if (!id) return;
 
@@ -156,7 +168,7 @@ export default function Chat({ webChatExternalId = '' }) {
         poll();
         const interval = setInterval(poll, 2500);
         return () => clearInterval(interval);
-    }, [channel, externalId]);
+    }, [channel, channelEnabled, externalId]);
 
     const sendMessage = (e) => {
         e.preventDefault();
@@ -218,7 +230,7 @@ export default function Chat({ webChatExternalId = '' }) {
     };
 
     const messengerButtons =
-        channel === 'messenger' && chatState?.current_state
+        channelEnabled && channel === 'messenger' && chatState?.current_state
             ? (() => {
                   const state = chatState.current_state;
                   const mode = chatState.item_selection_mode;
@@ -245,7 +257,8 @@ export default function Chat({ webChatExternalId = '' }) {
         initFetched.current = false;
         setMessages([]);
         setChatState(null);
-        setLoading(true);
+        setError(null);
+        setLoading(channelsEnabled[newChannel] !== false);
     };
 
     const sendBody = (body) => {
@@ -305,33 +318,35 @@ export default function Chat({ webChatExternalId = '' }) {
     return (
         <PortalLayout>
             <section className="flex flex-col gap-6 max-w-2xl mx-auto py-6">
-                <div>
-                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-surface-900 dark:text-white">
-                        Channel Simulator
-                    </h1>
-                    <p className="text-surface-600 dark:text-surface-400 mt-1">
-                        Simulate SMS or Messenger to test the chatbot flow. Use phone number (SMS) or PSID (Messenger).
-                    </p>
-                </div>
+                <PageHeader
+                    title="Channel Simulator"
+                    description="Simulate SMS or Messenger to test the chatbot flow. Use phone number (SMS) or PSID (Messenger)."
+                />
 
                 <div className="rounded-2xl border-2 border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 overflow-hidden flex flex-col min-h-[360px] max-h-[70vh]">
                     <div className="flex flex-wrap items-center gap-2 p-3 border-b border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50">
                         <span className="text-sm font-semibold text-surface-600 dark:text-surface-400">Simulate as:</span>
-                        {CHANNELS.map(({ value, label, icon: Icon }) => (
-                            <button
+                        {CHANNELS.map(({ value, label, icon: Icon }) => {
+                            const enabled = channelsEnabled[value] !== false;
+                            return (
+                                <button
                                 key={value}
                                 type="button"
                                 onClick={() => switchChannel(value)}
                                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                                    channel === value
+                                    !enabled
+                                        ? 'bg-surface-100 text-surface-400 dark:text-surface-500 border border-surface-200 dark:border-surface-700 cursor-default'
+                                        : channel === value
                                         ? 'bg-surface-100 text-surface-700 dark:bg-surface-800/80 dark:text-surface-200 border border-surface-200 dark:border-surface-700'
                                         : 'bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-400 border border-transparent hover:bg-surface-200 dark:hover:bg-surface-600'
                                 }`}
                             >
                                 <Icon className="h-4 w-4" />
                                 {label}
+                                {!enabled && <span className="text-xs font-normal opacity-80">(disabled)</span>}
                             </button>
-                        ))}
+                            );
+                        })}
                         {(channel === 'sms' || channel === 'messenger') && (
                             <input
                                 type="text"
@@ -343,14 +358,33 @@ export default function Chat({ webChatExternalId = '' }) {
                         )}
                     </div>
 
-                    {error && (
+                    {error && channelEnabled && (
                         <div className="px-4 py-2 bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 text-sm font-medium">
                             {error}
                         </div>
                     )}
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {loading ? (
+                        {!channelEnabled ? (
+                            <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
+                                <p className="text-surface-600 dark:text-surface-400 text-sm">
+                                    {channel === 'web' && 'Web chat'}
+                                    {channel === 'sms' && 'SMS'}
+                                    {channel === 'messenger' && 'Messenger'}
+                                    {' is currently disabled.'}
+                                </p>
+                                <p className="text-surface-500 dark:text-surface-500 text-sm">
+                                    You can enable it in Settings → Channels.
+                                </p>
+                                <Link
+                                    href="/portal/settings"
+                                    className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 transition-colors"
+                                >
+                                    <Settings className="h-4 w-4" />
+                                    Open Settings
+                                </Link>
+                            </div>
+                        ) : loading ? (
                             <p className="text-surface-500 dark:text-surface-400 text-sm">Loading…</p>
                         ) : (
                             messages.map((msg) => (
@@ -396,11 +430,11 @@ export default function Chat({ webChatExternalId = '' }) {
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Type a message…"
                             className="flex-1 rounded-xl border-2 border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                            disabled={sending || loading}
+                            disabled={sending || loading || !channelEnabled}
                         />
                         <button
                             type="submit"
-                            disabled={sending || loading || !input.trim()}
+                            disabled={sending || loading || !channelEnabled || !input.trim()}
                             className="inline-flex items-center justify-center h-11 w-11 rounded-xl bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-50 disabled:pointer-events-none transition-colors"
                             aria-label="Send"
                         >

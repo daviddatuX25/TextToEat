@@ -9,21 +9,27 @@ use App\Http\Controllers\DismissDailyGreetingController;
 use App\Http\Controllers\DeliveriesController;
 use App\Http\Controllers\DeliveryAreasController;
 use App\Http\Controllers\DiningMarkersController;
+use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\MenuItemsController;
+use App\Http\Controllers\MenuSettingsController;
 use App\Http\Controllers\OrderLogsController;
 use App\Http\Controllers\OrdersController;
+use App\Http\Controllers\PortalNavBadgesController;
 use App\Http\Controllers\ChatbotLogsController;
 use App\Http\Controllers\ConversationInboxController;
 use App\Http\Controllers\TrackOrderController;
 use App\Http\Controllers\PickupController;
 use App\Http\Controllers\PickupSlotsController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AnalyticsController;
+use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ChatbotRepliesController;
 use App\Http\Controllers\QuickOrdersController;
 use App\Http\Controllers\MessengerIntegrationController;
 use App\Http\Controllers\SmsDevicesController;
 use App\Http\Controllers\UsersController;
 use App\Http\Controllers\WalkinController;
+use App\Models\Setting;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -35,6 +41,7 @@ Route::get('/login', [LoginController::class, 'create'])->name('login')->middlew
 Route::post('/login', [LoginController::class, 'store'])->middleware('guest');
 Route::post('/logout', [LoginController::class, 'destroy'])->middleware('auth');
 
+Route::get('/web-unavailable', fn () => Inertia::render('WebOrderingUnavailable'))->name('web-unavailable');
 Route::get('/menu', [CustomerMenuController::class, 'index'])->name('menu');
 Route::post('/cart/add', [CustomerMenuController::class, 'addToCart']);
 Route::post('/cart/update', [CustomerMenuController::class, 'updateCart']);
@@ -67,23 +74,35 @@ Route::get('/delivery-areas', fn () => redirect('/portal/deliveries', 302));
 
 Route::prefix('portal')->middleware('auth')->group(function () {
     Route::post('/dismiss-daily-greeting', DismissDailyGreetingController::class)->name('portal.dismiss-daily-greeting');
+    Route::get('/nav-badges', PortalNavBadgesController::class)->name('portal.nav-badges');
     Route::get('/', [DashboardController::class, 'index'])->name('portal.dashboard');
+    Route::get('/analytics', [AnalyticsController::class, 'index'])->name('portal.analytics');
     Route::get('/orders', [OrdersController::class, 'index'])->name('portal.orders');
     Route::get('/orders/completed', [OrdersController::class, 'completedIndex'])->name('portal.orders.completed');
     Route::get('/deliveries', [DeliveriesController::class, 'index'])->name('portal.deliveries');
     Route::get('/pickup', [PickupController::class, 'index'])->name('portal.pickup');
     Route::get('/walkin', [WalkinController::class, 'index'])->name('portal.walkin');
+    Route::get('/categories', [CategoryController::class, 'index'])->name('portal.categories');
+    Route::post('/categories', [CategoryController::class, 'store']);
+    Route::put('/categories/{category}', [CategoryController::class, 'update']);
+    Route::delete('/categories/{category}', [CategoryController::class, 'destroy']);
     Route::get('/menu-items', [MenuItemsController::class, 'index'])->name('portal.menu-items');
+    Route::get('/menu-settings', [MenuSettingsController::class, 'index'])->name('portal.menu-settings')->middleware('admin');
+    Route::patch('/menu-settings', [MenuSettingsController::class, 'update'])->name('portal.menu-settings.update')->middleware('admin');
     Route::get('/logs/orders', [OrderLogsController::class, 'index'])->name('portal.logs.orders');
     Route::get('/logs/chatbot', [ChatbotLogsController::class, 'index'])->name('portal.logs.chatbot');
     Route::get('/inbox', [ConversationInboxController::class, 'index'])->name('portal.inbox');
     Route::get('/inbox/{session}', [ConversationInboxController::class, 'show'])->name('portal.inbox.show');
+    Route::get('/settings', [SettingsController::class, 'index'])->name('portal.settings')->middleware('admin');
+    Route::patch('/settings', [SettingsController::class, 'update'])->name('portal.settings.update')->middleware('admin');
     Route::get('/facebook-messenger', [MessengerIntegrationController::class, 'index'])->name('portal.facebook-messenger')->middleware('admin');
+    Route::put('/facebook-messenger/credentials', [MessengerIntegrationController::class, 'updateCredentials'])->name('portal.facebook-messenger.update-credentials')->middleware('admin');
     Route::post('/facebook-messenger/set-persistent-menu', [MessengerIntegrationController::class, 'setPersistentMenu'])->name('portal.facebook-messenger.set-persistent-menu')->middleware('admin');
     Route::get('/chatbot-replies', [ChatbotRepliesController::class, 'index'])->name('portal.chatbot-replies')->middleware('admin');
     Route::post('/chatbot-replies', [ChatbotRepliesController::class, 'store'])->name('portal.chatbot-replies.store')->middleware('admin');
     Route::delete('/chatbot-replies', [ChatbotRepliesController::class, 'destroy'])->name('portal.chatbot-replies.destroy')->middleware('admin');
     Route::get('/sms-devices', [SmsDevicesController::class, 'index'])->name('portal.sms-devices')->middleware('admin');
+    Route::put('/sms-devices/credentials', [SmsDevicesController::class, 'updateCredentials'])->name('portal.sms-devices.update-credentials')->middleware('admin');
     Route::post('/sms-devices/{deviceId}/heartbeat', [SmsDevicesController::class, 'heartbeat'])->name('portal.sms-devices.heartbeat')->middleware('admin');
     Route::patch('/sms-devices/{deviceId}', [SmsDevicesController::class, 'update'])->name('portal.sms-devices.update')->middleware('admin');
     Route::post('/inbox/sessions/{session}/reply', [ConversationInboxController::class, 'reply'])->name('portal.inbox.reply');
@@ -112,5 +131,15 @@ Route::prefix('portal')->middleware('auth')->group(function () {
     Route::get('/users', [UsersController::class, 'index'])->name('portal.users')->middleware('admin');
     Route::post('/users', [UsersController::class, 'store'])->middleware('admin');
     Route::post('/users/{user}/reset-password', [UsersController::class, 'resetPassword'])->name('portal.users.reset-password')->middleware('admin');
-    Route::get('/simulate', fn () => Inertia::render('Chat', ['webChatExternalId' => request()->session()->getId()]))->name('portal.simulate')->middleware('admin');
+    Route::delete('/users/{user}', [UsersController::class, 'destroy'])->name('portal.users.destroy')->middleware('admin');
+    Route::get('/simulate', function () {
+        return Inertia::render('Chat', [
+            'webChatExternalId' => request()->session()->getId(),
+            'channelsEnabled' => [
+                'web' => Setting::get('channels.web_enabled', true),
+                'sms' => Setting::get('channels.sms_enabled', true),
+                'messenger' => Setting::get('channels.messenger_enabled', true),
+            ],
+        ]);
+    })->name('portal.simulate')->middleware('admin');
 });

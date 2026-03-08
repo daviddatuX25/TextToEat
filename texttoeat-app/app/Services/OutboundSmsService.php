@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\OutboundSms;
+use App\Models\Setting;
 use App\Models\SmsDevice;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -152,7 +153,8 @@ class OutboundSmsService
         if ($device !== null) {
             return $device;
         }
-        $fallbackToken = config('firebase.device_token');
+        $fallbackToken = Setting::get('firebase.device_token');
+        $fallbackToken = is_string($fallbackToken) ? $fallbackToken : config('firebase.device_token');
         if ($fallbackToken !== null && $fallbackToken !== '') {
             $legacy = SmsDevice::where('device_token', $fallbackToken)->first();
             if ($legacy !== null) {
@@ -236,9 +238,10 @@ class OutboundSmsService
             return $this->messaging;
         }
 
-        $credentialsPath = config('firebase.credentials');
+        $credentialsPath = Setting::get('firebase.credentials_path');
+        $credentialsPath = is_string($credentialsPath) ? $credentialsPath : config('firebase.credentials');
         if ($credentialsPath === null || $credentialsPath === '') {
-            Log::warning('OutboundSmsService: FIREBASE_CREDENTIALS not set');
+            Log::warning('OutboundSmsService: FIREBASE_CREDENTIALS / firebase.credentials_path not set');
 
             return null;
         }

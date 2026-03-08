@@ -1,10 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, router, usePage, useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 import PortalLayout from '../Layouts/PortalLayout';
+import { PageHeader } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
 import { usePortalOrdersLive } from '../hooks/usePortalOrdersLive';
-import { UtensilsCrossed, Trash2, LayoutGrid, List } from 'lucide-react';
+import { getIncomingOrderToastMessage } from '../utils/orderIncomingToast';
+import { filterOrdersBySearch } from '../utils/filterOrdersBySearch';
+import { formatCurrency } from '../utils/formatNumber';
+import { UtensilsCrossed, Trash2, LayoutGrid, List, Search } from 'lucide-react';
 
 const routerOpts = () => ({
     preserveScroll: true,
@@ -78,7 +82,7 @@ function WalkinOrderCard({ order, orderMarkers, markerToOrder = {}, isHighlighte
                     <div className="text-xs text-surface-500 mt-1 flex items-center gap-2">
                         <span>{walkinTypeLabel}</span>
                         <span>{items.length ? `${items.length} item(s)` : ''}</span>
-                        <span className="font-semibold text-primary-600 dark:text-primary-400">₱{Number(order.total).toFixed(2)}</span>
+                        <span className="font-semibold text-primary-600 dark:text-primary-400">{formatCurrency(Number(order.total))}</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -112,13 +116,13 @@ function WalkinOrderCard({ order, orderMarkers, markerToOrder = {}, isHighlighte
                                 {item.name}
                             </span>
                             <span className={`font-bold shrink-0 ${isPaid ? 'line-through text-surface-500' : ''}`}>
-                                ₱{Number((item.price ?? 0) * (item.quantity ?? 0)).toFixed(2)}
+                                {formatCurrency(Number((item.price ?? 0) * (item.quantity ?? 0)))}
                             </span>
                         </div>
                     ))}
                     <div className="pt-2 mt-2 border-t border-surface-200 dark:border-surface-700 flex justify-between items-center">
                         <span className="text-xs text-surface-500 font-semibold uppercase">Total</span>
-                        <span className={`font-bold text-lg text-primary-600 dark:text-primary-400 ${isPaid ? 'line-through' : ''}`}>₱{Number(order.total).toFixed(2)}</span>
+                        <span className={`font-bold text-lg text-primary-600 dark:text-primary-400 ${isPaid ? 'line-through' : ''}`}>{formatCurrency(Number(order.total))}</span>
                     </div>
                 </div>
             )}
@@ -149,26 +153,51 @@ function WalkinOrderCard({ order, orderMarkers, markerToOrder = {}, isHighlighte
             </div>
 
             <Dialog open={markerOpen} onOpenChange={setMarkerOpen}>
-                <DialogContent className="max-w-sm">
+                <DialogContent className="max-w-sm w-full sm:max-w-sm">
                     <DialogHeader>
                         <DialogTitle>{hasMarker ? 'Change dining marker' : 'Assign dining marker'}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
-                        <label className="block">
-                            <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Marker</span>
-                            <select
-                                value={markerValue}
-                                onChange={(e) => setMarkerValue(e.target.value)}
-                                className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm font-medium text-surface-800 dark:text-surface-200"
+                        <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Marker</span>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setMarkerValue('')}
+                                className={`
+                                    rounded-xl border-2 py-2.5 px-3 text-sm font-semibold transition-colors
+                                    ${markerValue === ''
+                                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 dark:border-primary-500'
+                                        : 'border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-surface-300 dark:hover:border-surface-500'
+                                    }
+                                `}
                             >
-                                <option value="">—</option>
-                                {orderMarkers.map((m) => (
-                                    <option key={m} value={m} disabled={isMarkerTaken(m)}>
-                                        {m}{isMarkerTaken(m) ? ' (taken)' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
+                                —
+                            </button>
+                            {orderMarkers.map((m) => {
+                                const taken = isMarkerTaken(m);
+                                const selected = markerValue === m;
+                                return (
+                                    <button
+                                        key={m}
+                                        type="button"
+                                        onClick={() => !taken && setMarkerValue(m)}
+                                        disabled={taken}
+                                        className={`
+                                            rounded-xl border-2 py-2.5 px-3 text-sm font-semibold transition-colors
+                                            ${taken
+                                                ? 'border-surface-200 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500 cursor-not-allowed'
+                                                : selected
+                                                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 dark:border-primary-500'
+                                                    : 'border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-surface-300 dark:hover:border-surface-500'
+                                            }
+                                        `}
+                                        title={taken ? 'Taken' : undefined}
+                                    >
+                                        {m}{taken ? ' ✓' : ''}
+                                    </button>
+                                );
+                            })}
+                        </div>
                         <button type="button" onClick={saveMarker} className="w-full font-semibold py-2 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.99]">
                             {hasMarker ? 'Update' : 'Assign'}
                         </button>
@@ -187,7 +216,7 @@ function ManageMarkersDialog({ diningMarkersList = [], open, onOpenChange }) {
     };
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-md w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <UtensilsCrossed className="h-5 w-5" />
@@ -203,9 +232,9 @@ function ManageMarkersDialog({ diningMarkersList = [], open, onOpenChange }) {
                             No markers yet. Add one below.
                         </p>
                     ) : (
-                        <ul className="space-y-2">
+                        <div className="grid gap-2 sm:grid-cols-2">
                             {diningMarkersList.map((marker) => (
-                                <li key={marker.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 p-3">
+                                <div key={marker.id} className="flex items-center justify-between gap-3 rounded-xl border-2 border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 p-3">
                                     <span className="font-semibold text-surface-900 dark:text-white">{marker.value}</span>
                                     <button
                                         type="button"
@@ -216,9 +245,9 @@ function ManageMarkersDialog({ diningMarkersList = [], open, onOpenChange }) {
                                         <Trash2 className="h-4 w-4" />
                                         Delete
                                     </button>
-                                </li>
+                                </div>
                             ))}
-                        </ul>
+                        </div>
                     )}
                     <div className="border-t border-surface-200 dark:border-surface-700 pt-4">
                         <form onSubmit={addMarker} className="space-y-4">
@@ -256,8 +285,9 @@ const WALKIN_VIEW_MODE_KEY = 'walkinCounterViewMode';
 
 export default function WalkinCounter({ orders = [], orderMarkers = [], diningMarkersList = [], highlight }) {
     const { errors } = usePage().props;
-    usePortalOrdersLive();
+    usePortalOrdersLive({ getIncomingToastMessage: (p) => getIncomingOrderToastMessage('walkin', p) });
     const highlightRef = useRef(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [manageOpen, setManageOpen] = useState(false);
     const [viewMode, setViewMode] = useState(() => {
         if (typeof window === 'undefined') return 'card';
@@ -306,8 +336,13 @@ export default function WalkinCounter({ orders = [], orderMarkers = [], diningMa
         };
     }, [activeHighlight]);
 
+    const filteredOrders = useMemo(
+        () => filterOrdersBySearch(orders, searchQuery, { extraFields: ['order_marker'] }),
+        [orders, searchQuery]
+    );
+
     const markerToOrder = {};
-    orders.forEach((o) => {
+    filteredOrders.forEach((o) => {
         const m = o.order_marker ?? null;
         if (m) markerToOrder[m] = o;
     });
@@ -315,32 +350,42 @@ export default function WalkinCounter({ orders = [], orderMarkers = [], diningMa
     return (
         <PortalLayout>
             <section className="flex flex-col gap-5 animate-fade-in">
-                <header className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
+                <PageHeader
+                    title={
+                        <>
                             Walk-in <span className="bg-gradient-to-r from-primary-500 to-violet-400 bg-clip-text text-transparent">counter</span>
-                        </h1>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <Link
-                                href="/portal/orders"
-                                className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
-                            >
-                                ← Back to orders
-                            </Link>
-                            <button
-                                type="button"
-                                onClick={() => setManageOpen(true)}
-                                className="inline-flex items-center gap-2 rounded-xl border-2 border-violet-200 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-500/10 px-4 py-2 text-sm font-semibold text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/20 transition-colors"
-                            >
-                                <UtensilsCrossed className="h-4 w-4" />
-                                Manage dining markers
-                            </button>
+                        </>
+                    }
+                    description="Dine-in and takeout orders. Assign markers and manage orders."
+                >
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="relative flex-1 min-w-[160px] max-w-[240px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 pointer-events-none" aria-hidden />
+                            <input
+                                type="search"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search orders…"
+                                className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 pl-9 pr-3 py-2 text-sm text-surface-800 dark:text-surface-200 placeholder:text-surface-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                aria-label="Search walk-in orders"
+                            />
                         </div>
+                        <Link
+                            href="/portal/orders"
+                            className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
+                        >
+                            ← Back to orders
+                        </Link>
+                        <button
+                            type="button"
+                            onClick={() => setManageOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-xl border-2 border-violet-200 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-500/10 px-4 py-2 text-sm font-semibold text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-500/20 transition-colors"
+                        >
+                            <UtensilsCrossed className="h-4 w-4" />
+                            Manage dining markers
+                        </button>
                     </div>
-                    <p className="text-surface-500 dark:text-surface-400 text-sm">
-                        Dine-in and takeout orders. Assign markers and manage orders.
-                    </p>
-                </header>
+                </PageHeader>
 
                 {errors?.order_marker && (
                     <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm font-bold text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400">
@@ -394,6 +439,15 @@ export default function WalkinCounter({ orders = [], orderMarkers = [], diningMa
                             Walk-in (dine-in / takeout) orders will appear here. Switch to card view to assign markers and manage orders.
                         </p>
                     </div>
+                ) : filteredOrders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border-2 border-dashed border-surface-200 dark:border-surface-800">
+                        <Search className="h-12 w-12 text-surface-300 dark:text-surface-600 mb-4" />
+                        <h3 className="text-lg font-bold text-surface-700 dark:text-surface-300">No orders match your search</h3>
+                        <p className="text-surface-500 text-sm max-w-sm mt-2">Try a different search term or clear the search box.</p>
+                        <button type="button" onClick={() => setSearchQuery('')} className="mt-4 text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline">
+                            Clear search
+                        </button>
+                    </div>
                 ) : viewMode === 'table' ? (
                     <div className="rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 overflow-hidden">
                         <div className="overflow-x-auto max-h-[calc(100vh-18rem)] overflow-y-auto">
@@ -411,7 +465,7 @@ export default function WalkinCounter({ orders = [], orderMarkers = [], diningMa
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {orders.map((order) => {
+                                    {filteredOrders.map((order) => {
                                         const status = typeof order.status === 'string' ? order.status : order.status?.value ?? 'received';
                                         const isPaid = (typeof order.payment_status === 'string' ? order.payment_status : order.payment_status?.value ?? 'unpaid') === 'paid';
                                         const walkinTypeLabel = order.walkin_type === 'dine_in' ? 'Dine in' : order.walkin_type === 'takeout' ? 'Take out' : 'Walk-in';
@@ -444,15 +498,38 @@ export default function WalkinCounter({ orders = [], orderMarkers = [], diningMa
                                                     </span>
                                                 </td>
                                                 <td className="py-2.5 px-3 font-bold text-sm tabular-nums text-primary-600 dark:text-primary-400">
-                                                    ₱{Number(order.total).toFixed(2)}
+                                                    {formatCurrency(Number(order.total))}
                                                 </td>
                                                 <td className="py-2.5 px-3 whitespace-nowrap">
-                                                    <Link
-                                                        href={`/portal/orders?highlight=${order.id}`}
-                                                        className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline"
-                                                    >
-                                                        Go to Orders
-                                                    </Link>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        {status === 'ready' && (
+                                                            <button
+                                                                type="button"
+                                                                disabled={!isPaid}
+                                                                onClick={() => {
+                                                                    if (!isPaid) {
+                                                                        toast.error('Mark the order as paid before completing.');
+                                                                        return;
+                                                                    }
+                                                                    router.put(`/portal/orders/${order.id}`, { status: 'completed' }, routerOpts());
+                                                                }}
+                                                                title={!isPaid ? 'Mark as paid first' : undefined}
+                                                                className={`text-xs font-semibold py-1.5 px-2.5 rounded-lg ${
+                                                                    isPaid
+                                                                        ? 'bg-primary-600 text-white hover:bg-primary-700'
+                                                                        : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400 cursor-not-allowed'
+                                                                }`}
+                                                            >
+                                                                Mark completed
+                                                            </button>
+                                                        )}
+                                                        <Link
+                                                            href={`/portal/orders?highlight=${order.id}`}
+                                                            className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline"
+                                                        >
+                                                            Go to Orders
+                                                        </Link>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -461,14 +538,14 @@ export default function WalkinCounter({ orders = [], orderMarkers = [], diningMa
                             </table>
                         </div>
                         <div className="px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-xs text-surface-500 dark:text-surface-400">
-                            {orders.length} order{orders.length !== 1 ? 's' : ''}
+                            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
                         </div>
                     </div>
                 ) : (
                     <div className="flex flex-col min-h-0 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/30 dark:bg-surface-800/30 overflow-hidden">
                         <div className="flex-1 min-h-0 overflow-y-auto max-h-[calc(100vh-18rem)] p-3">
                             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                                {orders.map((order) => {
+                                {filteredOrders.map((order) => {
                                     const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
                                     return (
                                         <div key={order.id} ref={isHighlight ? highlightRef : null} className={isHighlight ? 'ring-2 ring-primary-500 ring-offset-2 rounded-2xl' : ''}>
@@ -479,7 +556,7 @@ export default function WalkinCounter({ orders = [], orderMarkers = [], diningMa
                             </div>
                         </div>
                         <div className="shrink-0 px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-800/80 text-xs text-surface-500 dark:text-surface-400">
-                            {orders.length} order{orders.length !== 1 ? 's' : ''}
+                            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
                         </div>
                     </div>
                 )}

@@ -26,10 +26,15 @@ class QuickOrdersController extends Controller
     {
         $today = Carbon::today();
         $menuItems = MenuItem::query()
+            ->with('category')
             ->whereDate('menu_date', $today)
-            ->orderBy('category')
-            ->orderBy('name')
-            ->get();
+            ->join('categories', 'menu_items.category_id', '=', 'categories.id')
+            ->select('menu_items.*')
+            ->orderBy('categories.sort_order')
+            ->orderBy('categories.name')
+            ->orderBy('menu_items.name')
+            ->get()
+            ->map(fn ($item) => array_merge($item->toArray(), ['category' => $item->category?->name ?? '']));
 
         $deliveryAreas = DeliveryArea::query()
             ->orderBy('sort_order')
@@ -80,8 +85,8 @@ class QuickOrdersController extends Controller
             'delivery_type' => ['required', 'string', 'in:pickup,delivery'],
             'delivery_place' => ['nullable', 'string', 'max:255'],
             'delivery_fee' => ['nullable', 'numeric', 'min:0'],
-            'pickup_slot' => ['nullable', 'string', 'max:255'],
-            'order_marker' => ['nullable', 'string', 'max:64'],
+            'pickup_slot' => ['nullable', 'string', 'max:' . PickupSlot::MAX_VALUE_LENGTH],
+            'order_marker' => ['nullable', 'string', 'max:' . DiningMarker::MAX_VALUE_LENGTH],
             'items' => ['required', 'array', 'min:1'],
             'items.*.menu_item_id' => ['required', 'integer', 'exists:menu_items,id'],
             'items.*.name' => ['required', 'string', 'max:255'],
@@ -127,16 +132,18 @@ class QuickOrdersController extends Controller
         ]);
 
         foreach ($items as $line) {
+            $menuItem = MenuItem::with('category')->find($line['menu_item_id']);
             OrderItem::create([
                 'order_id' => $order->id,
                 'menu_item_id' => (int) $line['menu_item_id'],
                 'name' => $line['name'],
+                'category_name' => $menuItem?->category?->name,
                 'quantity' => (int) $line['quantity'],
                 'price' => (float) $line['price'],
             ]);
         }
 
-        event(new OrderUpdated($order));
+        event(new OrderUpdated($order, true, false));
 
         return redirect()->route('portal.orders')->with('success', 'Order ' . $reference . ' created.');
     }

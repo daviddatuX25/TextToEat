@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Category;
 use App\Models\MenuItem;
 use App\Models\MenuItemDailyStock;
 use Carbon\Carbon;
@@ -155,12 +156,17 @@ class FilipinoMealsSeeder extends Seeder
         ];
 
         foreach ($meals as $meal) {
+            $categoryName = $meal['category'];
+            $category = Category::firstOrCreate(['name' => $categoryName], ['name' => $categoryName]);
+            $data = $meal;
+            unset($data['category']);
+            $data['category_id'] = $category->id;
             MenuItem::updateOrCreate(
                 [
                     'name' => $meal['name'],
                     'menu_date' => $meal['menu_date'],
                 ],
-                $meal
+                $data
             );
         }
 

@@ -1,11 +1,12 @@
 import { router, useForm } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import { Smartphone, RefreshCw, Battery, Wifi, HardDrive, QrCode } from 'lucide-react';
+import { Smartphone, RefreshCw, Battery, Wifi, HardDrive, QrCode, Key } from 'lucide-react';
 import { toast } from 'sonner';
 import QRCode from 'qrcode';
 import PortalLayout from '../Layouts/PortalLayout';
-import { Card, CardContent, CardHeader } from '../components/ui';
+import { Card, CardContent, CardHeader, PageHeader } from '../components/ui';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 
 function getCsrfToken() {
     const meta = document.querySelector('meta[name="csrf-token"]');
@@ -23,9 +24,19 @@ function formatRelativeTime(iso) {
     return d.toLocaleDateString();
 }
 
-export default function SmsDevices({ devices = [], api_key_for_qr = null }) {
+export default function SmsDevices({
+    devices = [],
+    api_key_for_qr = null,
+    gateway_credentials_configured = {},
+}) {
     const [heartbeatLoading, setHeartbeatLoading] = useState(null);
     const [qrDataUrl, setQrDataUrl] = useState('');
+    const credentialsForm = useForm({
+        textbee_api_url: '',
+        textbee_webhook_secret: '',
+        firebase_credentials_path: '',
+        firebase_device_token: '',
+    });
 
     useEffect(() => {
         if (api_key_for_qr) {
@@ -66,14 +77,74 @@ export default function SmsDevices({ devices = [], api_key_for_qr = null }) {
     return (
         <PortalLayout>
             <section className="flex flex-col gap-8 animate-fade-in pt-2 pb-12">
-                <header className="space-y-3">
-                    <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
-                        SMS devices
-                    </h1>
-                    <p className="text-surface-500 dark:text-surface-400 text-sm">
-                        Android devices that send and receive SMS via FCM. Use &quot;Refresh status&quot; to request battery and network info. Set a preferred SIM for outbound SMS when the device has multiple SIMs.
-                    </p>
-                </header>
+                <PageHeader
+                    title="SMS devices"
+                    description='Android devices that send and receive SMS via FCM. Use "Refresh status" to request battery and network info. Set a preferred SIM for outbound SMS when the device has multiple SIMs.'
+                />
+
+                <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
+                    <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-900/40 px-6 py-5">
+                        <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 inline-flex items-center gap-2">
+                            <Key className="h-4 w-4" />
+                            SMS gateway credentials
+                        </p>
+                    </CardHeader>
+                    <CardContent className="px-6 pt-7 pb-6 space-y-4 sm:px-8 sm:pt-8 sm:pb-8">
+                        <p className="text-sm text-surface-600 dark:text-surface-400">
+                            Enter your Textbee and Firebase settings below. Secrets are stored securely. For Firebase, enter the <strong>path</strong> to your service account JSON file (your developer can tell you where it is). Leave a field blank to keep the current value.
+                        </p>
+                        <form
+                            onSubmit={(e) => { e.preventDefault(); credentialsForm.put('/portal/sms-devices/credentials', { preserveScroll: true }); }}
+                            className="space-y-4 max-w-xl"
+                        >
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Textbee API URL</label>
+                                <Input
+                                    type="text"
+                                    value={credentialsForm.data.textbee_api_url}
+                                    onChange={(e) => credentialsForm.setData('textbee_api_url', e.target.value)}
+                                    placeholder={gateway_credentials_configured.textbee_api_url ? '•••••••• (configured)' : 'e.g. https://api.textbee.dev'}
+                                    className="font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Textbee webhook secret</label>
+                                <Input
+                                    type="password"
+                                    autoComplete="off"
+                                    value={credentialsForm.data.textbee_webhook_secret}
+                                    onChange={(e) => credentialsForm.setData('textbee_webhook_secret', e.target.value)}
+                                    placeholder={gateway_credentials_configured.textbee_webhook_secret ? '•••••••• (configured)' : 'For webhook signature verification'}
+                                    className="font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">Firebase credentials path</label>
+                                <Input
+                                    type="text"
+                                    value={credentialsForm.data.firebase_credentials_path}
+                                    onChange={(e) => credentialsForm.setData('firebase_credentials_path', e.target.value)}
+                                    placeholder={gateway_credentials_configured.firebase_credentials_path ? '•••••••• (configured)' : 'Path to service account JSON file'}
+                                    className="font-mono"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">FCM device token (optional)</label>
+                                <Input
+                                    type="password"
+                                    autoComplete="off"
+                                    value={credentialsForm.data.firebase_device_token}
+                                    onChange={(e) => credentialsForm.setData('firebase_device_token', e.target.value)}
+                                    placeholder={gateway_credentials_configured.firebase_device_token ? '•••••••• (configured)' : 'Fallback FCM token'}
+                                    className="font-mono"
+                                />
+                            </div>
+                            <Button type="submit" disabled={credentialsForm.processing}>
+                                {credentialsForm.processing ? 'Saving…' : 'Save credentials'}
+                            </Button>
+                        </form>
+                    </CardContent>
+                </Card>
 
                 <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                     <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-900/40 px-6 py-5">
@@ -84,10 +155,10 @@ export default function SmsDevices({ devices = [], api_key_for_qr = null }) {
                         <p className="text-xs text-surface-500 dark:text-surface-400 mt-3">
                             {api_key_for_qr
                                 ? 'Scan this QR code with the Android app. The code contains only your API key; the app will then register this device automatically.'
-                                : 'The app generates an API key after migration. If no QR appears, run: php artisan migrate. Optionally set SMS_DEVICE_API_KEY in .env to use your own key.'}
+                                : 'If no QR code appears, contact your developer to complete the setup.'}
                         </p>
                     </CardHeader>
-                    <CardContent className="p-6 sm:p-8 flex flex-col sm:flex-row items-start gap-6">
+                    <CardContent className="px-6 pt-7 pb-6 flex flex-col sm:flex-row items-start gap-6 sm:px-8 sm:pt-8 sm:pb-8">
                         {api_key_for_qr ? (
                             qrDataUrl ? (
                                 <div className="flex shrink-0 rounded-xl border-2 border-surface-200 dark:border-surface-600 bg-white p-2">
@@ -100,7 +171,7 @@ export default function SmsDevices({ devices = [], api_key_for_qr = null }) {
                             )
                         ) : (
                             <div className="w-[280px] h-[280px] rounded-xl border-2 border-dashed border-surface-200 dark:border-surface-600 flex items-center justify-center text-surface-500 dark:text-surface-400 text-sm text-center px-4">
-                                Loading… Run php artisan migrate if the QR does not appear. You can also set SMS_DEVICE_API_KEY in .env to override.
+                                Loading… If the QR code does not appear, contact your developer.
                             </div>
                         )}
                         <div className="text-sm text-surface-600 dark:text-surface-400 space-y-3">
@@ -205,7 +276,7 @@ function DeviceCard({ device, onHeartbeat, heartbeatLoading }) {
                 </Button>
                 )}
             </CardHeader>
-            <CardContent className="p-4 space-y-4">
+            <CardContent className="px-4 pt-5 pb-4 space-y-4">
                 {(device.brand || device.model || device.os) && (
                     <p className="text-sm text-surface-600 dark:text-surface-400">
                         {[device.brand, device.model, device.os].filter(Boolean).join(' · ')}

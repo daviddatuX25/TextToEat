@@ -35,7 +35,8 @@ class CompletedOrdersTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->component('CompletedOrders')
                 ->has('orders')
-                ->where('orders.0.customer_name', 'Alice Smith')
+                ->has('orders.data')
+                ->where('orders.data.0.customer_name', 'Alice Smith')
             );
     }
 }

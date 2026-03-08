@@ -1,10 +1,11 @@
 import { Link } from '@inertiajs/react';
 import { Truck, Store, UtensilsCrossed, ArrowRight } from 'lucide-react';
 import PortalLayout from '../Layouts/PortalLayout';
-import { Card, CardContent, CardHeader, SectionHeading, StatCard } from '../components/ui';
+import { Card, CardContent, CardHeader, PageHeader, SectionHeading, StatCard } from '../components/ui';
 import { usePortalRefresh } from '../hooks/usePortalRefresh';
 import TopItemsChart from '../components/dashboard/TopItemsChart';
 import RevenueChart from '../components/dashboard/RevenueChart';
+import { formatCurrency } from '../utils/formatNumber';
 
 export default function Dashboard({ metrics = {} }) {
     usePortalRefresh(true, 15000);
@@ -35,7 +36,7 @@ export default function Dashboard({ metrics = {} }) {
         active_pickup = 0,
         active_walkin = 0,
         pipeline_pending = 0,
-        pipeline_confirmed = 0,
+        pipeline_preparing = 0,
         pipeline_ready = 0,
         ready_delivery = legacyReadyDelivery,
         ready_pickup = legacyReadyPickup,
@@ -44,14 +45,8 @@ export default function Dashboard({ metrics = {} }) {
     const {
         by_fulfillment: analyticsByFulfillment = [],
         top_items: analyticsTopItems = [],
-        revenue_weekly: revenueWeekly = [],
-        revenue_monthly: revenueMonthly = [],
+        revenue_by_hour: revenueByHour = [],
     } = analytics || {};
-
-    const formatCurrency = (amount) => {
-        const value = Number.isFinite(amount) ? amount : 0;
-        return `₱${value.toFixed(2)}`;
-    };
 
     const ordersVsYesterday =
         orders_yesterday > 0
@@ -65,26 +60,22 @@ export default function Dashboard({ metrics = {} }) {
     return (
         <PortalLayout>
             <section className="flex flex-col gap-8 animate-fade-in">
-                <header className="space-y-3">
-                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-surface-900 dark:text-white">
-                        Dashboard
-                    </h1>
-                    <p className="text-sm md:text-base text-surface-600 dark:text-surface-400 max-w-2xl">
-                        Live operations and today&apos;s performance — data refreshes every 15s.
-                    </p>
-                </header>
+                <PageHeader
+                    title="Dashboard"
+                    description="Today's operations and performance — data refreshes every 15s."
+                />
 
-                {/* Grid: 3 columns, mixed 1- and 2-column spans */}
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
-                    {/* Row 1 — Today's sales (1 col) | Revenue chart (span 2) */}
-                    <Card className="rounded-2xl border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-900/40 overflow-hidden lg:row-span-1">
+                {/* Grid: Today's sales (wider min for revenue digits) | Revenue chart */}
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(22rem,28rem)_1fr] lg:gap-6">
+                    {/* Row 1 — Today's sales | Revenue chart */}
+                    <Card className="rounded-2xl border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-900/40 overflow-hidden lg:row-span-1 min-w-0">
                         <CardHeader className="border-b border-surface-200/80 dark:border-surface-700/80 pb-3">
                             <p className="text-sm font-bold text-surface-800 dark:text-surface-100">
                                 Today&apos;s sales
                             </p>
                         </CardHeader>
-                        <CardContent className="p-3 sm:p-4">
-                            <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        <CardContent className="px-4 pt-4 pb-4 sm:px-5 sm:pt-5 sm:pb-5">
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                 <StatCard
                                     label="Orders"
                                     value={orders_today}
@@ -109,9 +100,9 @@ export default function Dashboard({ metrics = {} }) {
                                     className="!p-3"
                                 />
                                 <StatCard
-                                    label="Active now"
+                                    label="In progress"
                                     value={active_orders_now}
-                                    helperText={active_orders_now === 0 ? 'None in progress' : `${active_orders_now} in progress`}
+                                    helperText="Pending + Preparing + Ready"
                                     className="!p-3"
                                 />
                                 <StatCard
@@ -131,28 +122,27 @@ export default function Dashboard({ metrics = {} }) {
                     </Card>
 
                     {/* Revenue by type: chart fills card (Walk-in, Delivery, Pickup) */}
-                    <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden lg:col-span-2 flex flex-col min-h-[360px]">
+                    <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden flex flex-col min-h-[360px] min-w-0">
                         <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 shrink-0">
                             <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">
                                 Revenue by type
                             </p>
                             <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
-                                Walk-in · Delivery · Pickup (completed orders).
+                                By hour today — Walk-in · Delivery · Pickup (completed orders).
                             </p>
                         </CardHeader>
-                        <CardContent className="p-4 flex-1 min-h-0 flex flex-col">
+                        <CardContent className="px-4 pt-5 pb-4 flex-1 min-h-0 flex flex-col">
                             <RevenueChart
-                                revenueWeekly={revenueWeekly}
-                                revenueMonthly={revenueMonthly}
+                                revenueByHour={revenueByHour}
                                 formatCurrency={formatCurrency}
                                 className="flex-1 min-h-[300px]"
                             />
                         </CardContent>
                     </Card>
 
-                    {/* Row 2 — Top items (span 2 when fulfillment exists, else 3) | Fulfillment (1) */}
+                    {/* Row 2 — Top items (1 col when fulfillment exists, else full width) | Fulfillment (1) */}
                     <Card
-                        className={`rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden ${Array.isArray(analyticsByFulfillment) && analyticsByFulfillment.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}
+                        className={`rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden ${Array.isArray(analyticsByFulfillment) && analyticsByFulfillment.length > 0 ? 'lg:col-span-1' : 'lg:col-span-2'}`}
                     >
                         <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40">
                             <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">
@@ -162,7 +152,7 @@ export default function Dashboard({ metrics = {} }) {
                                 By quantity sold.
                             </p>
                         </CardHeader>
-                        <CardContent className="p-0">
+                        <CardContent className="p-0 pt-4">
                             <div className="p-4 border-b border-surface-100 dark:border-surface-800 min-h-[200px]">
                                 <TopItemsChart data={analyticsTopItems} formatCurrency={formatCurrency} maxItems={5} />
                             </div>
@@ -220,7 +210,7 @@ export default function Dashboard({ metrics = {} }) {
                                         Delivery · Pickup · Walk-in
                                     </p>
                                 </CardHeader>
-                                <CardContent className="p-0">
+                                <CardContent className="p-0 pt-4">
                                     <table className="min-w-full text-left text-sm">
                                         <thead className="bg-surface-50 dark:bg-surface-900/60">
                                             <tr className="border-b border-surface-200 dark:border-surface-700">
@@ -261,8 +251,8 @@ export default function Dashboard({ metrics = {} }) {
                                     href="/portal/orders"
                                     className="group block rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 p-4 transition hover:border-surface-300 dark:hover:border-surface-600 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 >
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Confirmed</p>
-                                    <p className="mt-1 text-2xl font-extrabold text-surface-900 dark:text-white">{pipeline_confirmed}</p>
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Preparing</p>
+                                    <p className="mt-1 text-2xl font-extrabold text-surface-900 dark:text-white">{pipeline_preparing}</p>
                                     <p className="mt-0.5 text-xs text-surface-500 dark:text-surface-400">In kitchen</p>
                                 </Link>
                                 <Link
@@ -290,8 +280,8 @@ export default function Dashboard({ metrics = {} }) {
                                 href="/portal/orders"
                                 className="group block rounded-2xl border border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40 p-5 transition hover:border-surface-300 dark:hover:border-surface-600 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                             >
-                                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Confirmed</p>
-                                <p className="mt-1 text-3xl font-extrabold text-surface-900 dark:text-white">{pipeline_confirmed}</p>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Preparing</p>
+                                <p className="mt-1 text-3xl font-extrabold text-surface-900 dark:text-white">{pipeline_preparing}</p>
                                 <p className="mt-1 text-xs text-surface-500 dark:text-surface-400">In kitchen</p>
                                 <ArrowRight className="mt-2 h-4 w-4 text-primary-500 opacity-0 group-hover:opacity-100 transition" aria-hidden />
                             </Link>

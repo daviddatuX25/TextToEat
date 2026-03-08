@@ -52,7 +52,7 @@ return [
     'status_push_unpaid_delivery_total' => 'Mangyaring maghanda ng ₱:total para sa bayad sa delivery.',
     'status_push_unpaid_delivery_cash' => 'Mangyaring maghanda ng cash para sa bayad sa delivery.',
     'status_label_received' => 'Natanggap',
-    'status_label_confirmed' => 'Nakumpirma',
+    'status_label_preparing' => 'Inihahanda',
     'status_label_ready' => 'Handa na',
     'status_label_on_the_way' => 'Nasa daan',
     'status_label_completed' => 'Nakumpleto',

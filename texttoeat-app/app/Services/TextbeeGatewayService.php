@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Setting;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -13,7 +14,8 @@ class TextbeeGatewayService
 
     public function __construct()
     {
-        $this->baseUrl = rtrim((string) config('textbee.api_url', ''), '/');
+        $url = Setting::get('textbee.api_url');
+        $this->baseUrl = rtrim(is_string($url) ? $url : (string) config('textbee.api_url', ''), '/');
     }
 
     /**

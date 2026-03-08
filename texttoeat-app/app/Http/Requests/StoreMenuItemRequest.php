@@ -20,7 +20,7 @@ class StoreMenuItemRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'price' => ['required', 'numeric', 'min:0'],
-            'category' => ['required', 'string', Rule::in(config('menu.categories', []))],
+            'category_id' => ['required', 'integer', Rule::exists('categories', 'id')->whereNull('deleted_at')],
             'units_today' => ['required', 'integer', 'min:0'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,webp', 'max:2048'],
         ];

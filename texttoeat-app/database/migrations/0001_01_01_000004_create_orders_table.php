@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('reference')->unique();
             $table->string('channel'); // sms, messenger, web
-            $table->string('status'); // received, confirmed, ready, completed
+            $table->string('status'); // received, preparing, ready, on_the_way, completed, cancelled
             $table->string('customer_name');
             $table->string('customer_phone');
             $table->decimal('total', 10, 2);

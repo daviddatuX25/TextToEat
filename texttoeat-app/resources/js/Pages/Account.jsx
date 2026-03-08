@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useForm } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
+import { PageHeader } from '../components/ui';
 
 export default function Account({ user = {} }) {
     const accountForm = useForm({
@@ -34,14 +35,10 @@ export default function Account({ user = {} }) {
     return (
         <PortalLayout>
             <section className="flex flex-col gap-8 animate-fade-in">
-                <header className="space-y-4">
-                    <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight text-surface-900 dark:text-white">
-                        Account
-                    </h1>
-                    <p className="text-surface-600 dark:text-surface-400 text-sm max-w-xl">
-                        Update your name and username, or change your password.
-                    </p>
-                </header>
+                <PageHeader
+                    title="Account"
+                    description="Update your name and username, or change your password."
+                />
 
                 <div className="max-w-md rounded-2xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-900 p-6 shadow-sm">
                     <h2 className="text-lg font-bold text-surface-900 dark:text-white mb-4">Account details</h2>

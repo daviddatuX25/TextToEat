@@ -104,17 +104,19 @@ class ChatbotOrderService
                 'delivery_fee' => $deliveryFee,
             ]);
             foreach ($selectedItems as $line) {
+                $menuItem = \App\Models\MenuItem::with('category')->find($line['menu_item_id']);
                 OrderItem::create([
                     'order_id' => $order->id,
                     'menu_item_id' => $line['menu_item_id'],
                     'name' => $line['name'],
+                    'category_name' => $menuItem?->category?->name,
                     'quantity' => (int) $line['quantity'],
                     'price' => (float) $line['price'],
                 ]);
             }
         });
 
-        event(new OrderUpdated($order));
+        event(new OrderUpdated($order, true, false));
 
         return ['order' => $order, 'reference' => $reference];
     }

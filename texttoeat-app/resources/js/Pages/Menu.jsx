@@ -3,6 +3,7 @@ import { Link, router, usePage } from '@inertiajs/react';
 import AppLayout from '../Layouts/AppLayout';
 import { Button, Card, Badge } from '../components/ui';
 import { Search, Plus, Minus, ShoppingBag, Utensils, ChevronRight } from 'lucide-react';
+import { formatCurrency } from '../utils/formatNumber';
 
 const MAX_QUANTITY = 99;
 
@@ -152,7 +153,7 @@ export default function Menu({ menuItems = [], cart = [] }) {
                                             {item.name}
                                         </h3>
                                         <span className="font-bold text-primary-600 dark:text-primary-400 shrink-0">
-                                            ₱{Number(item.price).toFixed(2)}
+                                            {formatCurrency(Number(item.price))}
                                         </span>
                                     </div>
                                     {!soldOut && (
@@ -234,7 +235,7 @@ export default function Menu({ menuItems = [], cart = [] }) {
                                     {cart.reduce((s, l) => s + parseInt(l.quantity, 10), 0)} item(s)
                                 </p>
                                 <p className="text-sm text-surface-600 dark:text-surface-400">
-                                    Total: ₱{cartTotal.toFixed(2)}
+                                    Total: {formatCurrency(cartTotal)}
                                 </p>
                             </div>
                         </div>

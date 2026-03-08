@@ -21,11 +21,12 @@ class PortalSeedDataSeeder extends Seeder
 
     private function seedPickupSlots(): void
     {
-        $slots = [];
-        for ($i = 1; $i <= 30; $i++) {
-            $slots[] = 'P' . $i;
-        }
-        foreach ($slots as $i => $value) {
+        $count = config('seed.pickup_slots', 8);
+        for ($i = 0; $i < $count; $i++) {
+            $value = 'slot' . ($i + 1);
+            if (strlen($value) > PickupSlot::MAX_VALUE_LENGTH) {
+                continue;
+            }
             PickupSlot::firstOrCreate(
                 ['value' => $value],
                 ['sort_order' => $i]
@@ -35,11 +36,12 @@ class PortalSeedDataSeeder extends Seeder
 
     private function seedDiningMarkers(): void
     {
-        $markers = [];
-        for ($i = 1; $i <= 30; $i++) {
-            $markers[] = (string) $i;
-        }
-        foreach ($markers as $i => $value) {
+        $count = config('seed.dining_markers', 8);
+        for ($i = 0; $i < $count; $i++) {
+            $value = 'dine' . ($i + 1);
+            if (strlen($value) > DiningMarker::MAX_VALUE_LENGTH) {
+                continue;
+            }
             DiningMarker::firstOrCreate(
                 ['value' => $value],
                 ['sort_order' => $i]

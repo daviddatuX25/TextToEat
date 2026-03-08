@@ -51,7 +51,7 @@ class PickupController extends Controller
             'pickup_slot' => [
                 'nullable',
                 'string',
-                'max:64',
+                'max:' . PickupSlot::MAX_VALUE_LENGTH,
                 function (string $attribute, ?string $value, \Closure $fail) use ($order) {
                     if ($value === null || $value === '') {
                         return;
@@ -74,7 +74,7 @@ class PickupController extends Controller
         $slot = $validated['pickup_slot'] ?? null;
         $order->update(['pickup_slot' => $slot === '' ? null : $slot]);
 
-        event(new OrderUpdated($order));
+        event(new OrderUpdated($order, false, false));
 
         return redirect()->back()->with('success', $slot ? 'Pickup slot assigned.' : 'Pickup slot cleared.');
     }

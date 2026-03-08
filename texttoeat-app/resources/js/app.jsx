@@ -2,6 +2,7 @@ import './bootstrap';
 
 import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
+import { TooltipProvider } from './components/ui';
 
 if (typeof window !== 'undefined') {
     window.__inertia_router = router;
@@ -21,7 +22,11 @@ createInertiaApp({
     },
     setup({ el, App, props }) {
         const root = createRoot(el);
-        root.render(<App {...props} />);
+        root.render(
+            <TooltipProvider delayDuration={200} skipDelayDuration={300}>
+                <App {...props} />
+            </TooltipProvider>
+        );
     },
     progress: {
         color: '#4B5563',

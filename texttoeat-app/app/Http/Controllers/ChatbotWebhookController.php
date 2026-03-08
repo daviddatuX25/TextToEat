@@ -13,6 +13,7 @@ use App\Models\InboundMessage;
 use App\Models\MenuItem;
 use App\Models\OutboundMessenger;
 use App\Models\OutboundSms;
+use App\Models\Setting;
 use App\Services\ChatbotReplyResolver;
 use App\Services\ChatbotSmsNumberLayer;
 use App\Services\MenuItemStockService;
@@ -27,6 +28,20 @@ class ChatbotWebhookController extends Controller
         $externalId = $request->query('external_id');
         if (! is_string($channel) || $channel === '' || ! is_string($externalId) || $externalId === '') {
             return response()->json(['message' => 'channel and external_id are required'], 422);
+        }
+
+        $channelEnabled = match ($channel) {
+            'sms' => Setting::get('channels.sms_enabled', true),
+            'messenger' => Setting::get('channels.messenger_enabled', true),
+            'web' => Setting::get('channels.web_enabled', true),
+            default => true,
+        };
+        if (! $channelEnabled) {
+            return response()->json([
+                'replies' => ['This channel is temporarily unavailable. Please try again later.'],
+                'reply' => 'This channel is temporarily unavailable. Please try again later.',
+                'state' => [],
+            ], 503);
         }
 
         $session = ChatbotSession::where('channel', $channel)->where('external_id', $externalId)->first();
@@ -78,6 +93,19 @@ class ChatbotWebhookController extends Controller
         $externalId = $validated['external_id'];
         $body = $validated['body'];
 
+        $channelEnabled = match ($channel) {
+            'sms' => Setting::get('channels.sms_enabled', true),
+            'messenger' => Setting::get('channels.messenger_enabled', true),
+            'web' => Setting::get('channels.web_enabled', true),
+            default => true,
+        };
+        if (! $channelEnabled) {
+            return response()->json([
+                'reply' => 'This channel is temporarily unavailable. Please try again later or use another way to order.',
+                'state' => [],
+            ], 503);
+        }
+
         $session = ChatbotSession::where('channel', $channel)->where('external_id', $externalId)->first();
         $state = $session !== null ? $session->state ?? [] : [];
         $currentState = $state['current_state'] ?? 'welcome';
@@ -93,15 +121,19 @@ class ChatbotWebhookController extends Controller
             ]);
         }
 
-        $todayMenuItems = MenuItem::forToday()->get();
+        $todayMenuItems = MenuItem::forToday()->with('category')->get();
         $virtualAvailable = app(MenuItemStockService::class)->getVirtualAvailableForToday($todayMenuItems->pluck('id')->all());
-        $categoryOrder = array_flip(config('menu.categories', []));
         $menuItems = $todayMenuItems
-            ->sort(function ($a, $b) use ($categoryOrder) {
-                $ca = $categoryOrder[$a->category] ?? 999;
-                $cb = $categoryOrder[$b->category] ?? 999;
-                if ($ca !== $cb) {
-                    return $ca <=> $cb;
+            ->sort(function ($a, $b) {
+                $orderA = $a->category?->sort_order ?? 999;
+                $orderB = $b->category?->sort_order ?? 999;
+                if ($orderA !== $orderB) {
+                    return $orderA <=> $orderB;
+                }
+                $nameA = $a->category?->name ?? '';
+                $nameB = $b->category?->name ?? '';
+                if ($nameA !== $nameB) {
+                    return strcmp($nameA, $nameB);
                 }
                 return strcmp($a->name, $b->name);
             })
@@ -110,7 +142,7 @@ class ChatbotWebhookController extends Controller
                 'id' => $m->id,
                 'name' => $m->name,
                 'price' => (float) $m->price,
-                'category' => $m->category ?? '',
+                'category' => $m->category?->name ?? '',
                 'available' => (int) ($virtualAvailable[$m->id] ?? 0),
             ])
             ->all();

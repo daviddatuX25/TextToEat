@@ -3,8 +3,9 @@ import { Link, router, useForm } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
 import { Input } from '../components/ui/Input';
-import { Button, Card, CardContent, Badge } from '../components/ui';
+import { Button, Card, CardContent, Badge, PageHeader } from '../components/ui';
 import { Plus, Pencil, Trash2, Minus, ImagePlus, Utensils, Power, PowerOff } from 'lucide-react';
+import { formatCurrency } from '../utils/formatNumber';
 
 const ACCEPT_IMAGES = 'image/jpeg,image/png,image/webp';
 const r = () => router ?? window.__inertia_router;
@@ -13,7 +14,7 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
     const form = useForm({
         name: '',
         price: '',
-        category: categories[0] ?? 'Ulam',
+        category_id: categories[0]?.id ?? '',
         units_today: 30,
         image: null,
     });
@@ -80,12 +81,13 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
                     <div>
                         <label className="block text-sm font-bold text-foreground mb-2">Category</label>
                         <select
-                            value={form.data.category}
-                            onChange={(e) => form.setData('category', e.target.value)}
+                            value={form.data.category_id}
+                            onChange={(e) => form.setData('category_id', e.target.value ? Number(e.target.value) : '')}
                             className="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-800"
+                            required
                         >
                             {(categories || []).map((c) => (
-                                <option key={c} value={c}>{c}</option>
+                                <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                         </select>
                     </div>
@@ -134,7 +136,7 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
 function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
     const form = useForm({
         name: item?.name ?? '',
-        category: item?.category ?? (categories[0] ?? 'Ulam'),
+        category_id: item?.category_id ?? categories[0]?.id ?? '',
         image: null,
         remove_image: false,
     });
@@ -145,7 +147,7 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
         if (!open || !item) return;
         form.setData({
             name: item.name ?? '',
-            category: item.category ?? (categories[0] ?? 'Ulam'),
+            category_id: item.category_id ?? categories[0]?.id ?? '',
             image: null,
             remove_image: false,
         });
@@ -174,7 +176,9 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
         e.preventDefault();
         const routerImpl = r();
         if (!routerImpl?.post) return;
-        routerImpl.post(`/portal/menu-items/${item.id}`, { ...form.data, _method: 'PUT' }, {
+        const payload = { ...form.data, _method: 'PUT' };
+        if (payload.category_id !== '') payload.category_id = Number(payload.category_id);
+        routerImpl.post(`/portal/menu-items/${item.id}`, payload, {
             forceFormData: true,
             onSuccess: () => onOpenChange(false),
         });
@@ -199,12 +203,13 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
                     <div>
                         <label className="block text-sm font-bold text-foreground mb-2">Category</label>
                         <select
-                            value={form.data.category}
-                            onChange={(e) => form.setData('category', e.target.value)}
+                            value={form.data.category_id}
+                            onChange={(e) => form.setData('category_id', e.target.value ? Number(e.target.value) : '')}
                             className="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-800"
+                            required
                         >
                             {(categories || []).map((c) => (
-                                <option key={c} value={c}>{c}</option>
+                                <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                         </select>
                     </div>
@@ -260,6 +265,8 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
     );
 }
 
+const UNIT_PRESETS = [10, 20, 30, 50, 100];
+
 function EnableForTodayDialog({ item, open, onOpenChange }) {
     const [units, setUnits] = useState(30);
     const routerImpl = r();
@@ -281,7 +288,7 @@ function EnableForTodayDialog({ item, open, onOpenChange }) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-sm">
+            <DialogContent className="max-w-sm w-full sm:max-w-sm">
                 <DialogHeader>
                     <DialogTitle>Enable for today</DialogTitle>
                 </DialogHeader>
@@ -289,14 +296,37 @@ function EnableForTodayDialog({ item, open, onOpenChange }) {
                     <p className="text-sm text-surface-600 dark:text-surface-400">
                         Set the quantity for <strong>{item.name}</strong>.
                     </p>
-                    <Input
-                        id="enable_units"
-                        label="Units for today"
-                        type="number"
-                        min="0"
-                        value={units}
-                        onChange={(e) => setUnits(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                    />
+                    <div>
+                        <span className="text-sm font-medium text-surface-700 dark:text-surface-300">Units for today</span>
+                        <div className="mt-2 grid grid-cols-3 sm:grid-cols-5 gap-2">
+                            {UNIT_PRESETS.map((n) => (
+                                <button
+                                    key={n}
+                                    type="button"
+                                    onClick={() => setUnits(n)}
+                                    className={`
+                                        rounded-xl border-2 py-2.5 px-3 text-sm font-semibold transition-colors
+                                        ${units === n
+                                            ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 dark:border-primary-500'
+                                            : 'border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-surface-300 dark:hover:border-surface-500'
+                                        }
+                                    `}
+                                >
+                                    {n}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="mt-2">
+                            <Input
+                                id="enable_units"
+                                label="Custom amount"
+                                type="number"
+                                min="0"
+                                value={units}
+                                onChange={(e) => setUnits(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                            />
+                        </div>
+                    </div>
                     <div className="flex gap-2 justify-end">
                         <button type="button" onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-sm font-medium">Cancel</button>
                         <Button type="submit">Enable</Button>
@@ -357,7 +387,7 @@ function MenuItemCard({ item, onEdit, onEnableClick }) {
             <CardContent className="mt-2.5 p-2.5 flex flex-col flex-1">
                 <div className="flex justify-between items-start gap-1">
                     <h3 className="font-semibold text-sm text-surface-900 dark:text-surface-100 line-clamp-2 leading-tight">{item.name}</h3>
-                    <span className="font-semibold text-xs text-primary-600 dark:text-primary-400 shrink-0">₱{Number(item.price).toFixed(2)}</span>
+                    <span className="font-semibold text-xs text-primary-600 dark:text-primary-400 shrink-0">{formatCurrency(Number(item.price))}</span>
                 </div>
 
                 <div className="mt-1.5 space-y-1 text-xs">
@@ -425,7 +455,7 @@ function MenuItemCard({ item, onEdit, onEnableClick }) {
     );
 }
 
-export default function MenuItems({ menuItems = [], categories = [], menuCategories = [], filterCategory = null }) {
+export default function MenuItems({ menuItems = [], categories = [], menuCategories = [], filterCategory = null, totalMenuItems = 0, lowStockCount = 0 }) {
     const [addOpen, setAddOpen] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [enableItem, setEnableItem] = useState(null);
@@ -433,47 +463,52 @@ export default function MenuItems({ menuItems = [], categories = [], menuCategor
     const items = Array.isArray(menuItems) ? menuItems : menuItems?.data ?? [];
     const links = !Array.isArray(menuItems) && menuItems?.links ? menuItems.links : [];
     const total = !Array.isArray(menuItems) ? menuItems?.total ?? 0 : menuItems.length;
-    const categoryList = ['All', ...[...new Set([...(categories || []), ...(menuCategories || [])])].filter(Boolean).sort()];
+    const categoryList = [{ id: null, name: 'All' }, ...(categories || [])];
 
     const handleCategoryClick = (cat) => {
-        router.get('/portal/menu-items', cat === 'All' ? {} : { category: cat }, { preserveScroll: false });
+        router.get('/portal/menu-items', cat.id == null ? {} : { category: cat.id }, { preserveScroll: false });
     };
 
     const hasItems = total > 0;
-    const currentCategory = filterCategory ?? null;
+    const currentCategoryId = filterCategory ?? null;
+    const currentCategoryName = currentCategoryId != null ? (categories || []).find((c) => c.id === currentCategoryId)?.name : null;
 
     return (
         <PortalLayout>
             <section className="flex flex-col gap-4 animate-fade-in">
-                <header className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-surface-900 dark:text-white">
-                            Today&apos;s menu
-                        </h1>
-                        <p className="text-surface-600 dark:text-surface-400 text-xs mt-0.5">
-                            Adjust quantity and availability on each card.
-                        </p>
-                    </div>
+                <PageHeader
+                    title="Today's menu"
+                    description="Adjust quantity and availability on each card."
+                >
                     <Button onClick={() => setAddOpen(true)} className="gap-1.5 text-sm py-2 px-4">
                         <Plus className="h-4 w-4" />
                         Add item
                     </Button>
-                </header>
+                </PageHeader>
+
+                <p className="text-sm text-surface-600 dark:text-surface-400">
+                    {totalMenuItems} item{totalMenuItems !== 1 ? 's' : ''} on today&apos;s menu
+                    {lowStockCount > 0 && (
+                        <span className="ml-2 font-medium text-amber-600 dark:text-amber-400">
+                            · {lowStockCount} nearing low stock
+                        </span>
+                    )}
+                </p>
 
                 {categoryList.length > 1 && (
                     <div className="flex flex-wrap items-center gap-1.5">
                         {categoryList.map((cat) => (
                             <button
-                                key={cat}
+                                key={cat.id ?? 'all'}
                                 type="button"
                                 onClick={() => handleCategoryClick(cat)}
                                 className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                                    (cat === 'All' && !currentCategory) || (cat !== 'All' && currentCategory === cat)
+                                    (cat.id == null && !currentCategoryId) || (cat.id != null && currentCategoryId === cat.id)
                                         ? 'bg-primary-600 text-white dark:bg-primary-500'
                                         : 'bg-surface-100 text-surface-600 hover:bg-surface-200 dark:bg-surface-800 dark:text-surface-400 dark:hover:bg-surface-700'
                                 }`}
                             >
-                                {cat}
+                                {cat.name}
                             </button>
                         ))}
                     </div>
@@ -481,8 +516,8 @@ export default function MenuItems({ menuItems = [], categories = [], menuCategor
 
                 {!hasItems ? (
                     <div className="rounded-xl border-2 border-dashed border-surface-200 dark:border-surface-700 p-8 text-center text-sm text-surface-500 dark:text-surface-400">
-                        {currentCategory
-                            ? `No items in "${currentCategory}".`
+                        {currentCategoryName
+                            ? `No items in "${currentCategoryName}".`
                             : 'No menu items for today. Add one above.'}
                     </div>
                 ) : (

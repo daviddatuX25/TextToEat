@@ -9,5 +9,8 @@ class DiningMarker extends Model
 {
     use HasFactory;
 
+    /** Max length for value (e.g. dine10). Enforced in seeders and request validation. */
+    public const MAX_VALUE_LENGTH = 6;
+
     protected $fillable = ['value', 'sort_order'];
 }

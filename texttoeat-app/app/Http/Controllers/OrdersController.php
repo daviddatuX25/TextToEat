@@ -33,9 +33,13 @@ class OrdersController extends Controller
 
         $today = Carbon::today();
         $menuItems = MenuItem::query()
+            ->with('category')
             ->whereDate('menu_date', $today)
-            ->orderBy('category')
-            ->orderBy('name')
+            ->join('categories', 'menu_items.category_id', '=', 'categories.id')
+            ->select('menu_items.*')
+            ->orderBy('categories.sort_order')
+            ->orderBy('categories.name')
+            ->orderBy('menu_items.name')
             ->get();
 
         $deliveryAreas = DeliveryArea::query()
@@ -91,6 +95,7 @@ class OrdersController extends Controller
             'search' => ['sometimes', 'nullable', 'string', 'max:100'],
             'sort' => ['sometimes', 'string', 'in:created_at,updated_at,total,reference'],
             'direction' => ['sometimes', 'string', 'in:asc,desc'],
+            'page' => ['sometimes', 'integer', 'min:1'],
         ]);
 
         $query = Order::with('orderItems')
@@ -127,7 +132,8 @@ class OrdersController extends Controller
         $direction = $validated['direction'] ?? 'desc';
         $query->orderBy($sort, $direction);
 
-        $orders = $query->get();
+        $perPage = (int) min(50, max(10, $request->input('per_page', 20)));
+        $orders = $query->paginate($perPage)->withQueryString();
 
         $filters = [
             'status' => $statusFilter,
@@ -148,7 +154,7 @@ class OrdersController extends Controller
     public function update(Request $request, Order $order): RedirectResponse
     {
         $validated = $request->validate([
-            'status' => ['sometimes', 'string', 'in:received,confirmed,ready,on_the_way,completed,cancelled'],
+            'status' => ['sometimes', 'string', 'in:received,preparing,ready,on_the_way,completed,cancelled'],
             'payment_status' => ['sometimes', 'string', 'in:unpaid,paid'],
         ]);
 
@@ -202,7 +208,9 @@ class OrdersController extends Controller
             });
         }
 
-        event(new OrderUpdated($order));
+        $statusChanged = $originalStatus !== $order->status;
+        $paymentStatusChanged = $originalPaymentStatus !== $order->payment_status;
+        event(new OrderUpdated($order, $statusChanged, $paymentStatusChanged));
 
         if (
             ($originalStatus !== $order->status)

@@ -11,6 +11,7 @@ use App\Models\DeliveryArea;
 use App\Models\InboundMessage;
 use App\Models\MenuItem;
 use App\Models\Order;
+use App\Models\Setting;
 use App\Messenger\FacebookMessengerClient;
 use App\Services\MenuItemStockService;
 use Illuminate\Http\JsonResponse;
@@ -39,7 +40,8 @@ class FacebookMessengerWebhookController extends Controller
             return response()->json(['error' => 'Missing verification parameters'], 400);
         }
 
-        $expectedToken = (string) config('facebook.verify_token', '');
+        $expectedToken = Setting::get('facebook.verify_token');
+        $expectedToken = is_string($expectedToken) ? $expectedToken : (string) config('facebook.verify_token', '');
         if ($mode === 'subscribe' && $token === $expectedToken && $expectedToken !== '') {
             return response($challenge, 200)->header('Content-Type', 'text/plain');
         }
@@ -51,6 +53,10 @@ class FacebookMessengerWebhookController extends Controller
     {
         if (! $this->isValidSignature($request)) {
             return response()->json(['error' => 'Invalid signature'], 403);
+        }
+
+        if (! Setting::get('channels.messenger_enabled', true)) {
+            return response()->json(['status' => 'ok']);
         }
 
         $payload = $request->all();
@@ -245,16 +251,20 @@ class FacebookMessengerWebhookController extends Controller
      */
     private function loadMenuItems(): array
     {
-        $todayMenuItems = MenuItem::forToday()->get();
+        $todayMenuItems = MenuItem::forToday()->with('category')->get();
         $virtualAvailable = app(MenuItemStockService::class)->getVirtualAvailableForToday($todayMenuItems->pluck('id')->all());
-        $categoryOrder = array_flip(config('menu.categories', []));
 
         return $todayMenuItems
-            ->sort(function ($a, $b) use ($categoryOrder) {
-                $ca = $categoryOrder[$a->category] ?? 999;
-                $cb = $categoryOrder[$b->category] ?? 999;
-                if ($ca !== $cb) {
-                    return $ca <=> $cb;
+            ->sort(function ($a, $b) {
+                $orderA = $a->category?->sort_order ?? 999;
+                $orderB = $b->category?->sort_order ?? 999;
+                if ($orderA !== $orderB) {
+                    return $orderA <=> $orderB;
+                }
+                $nameA = $a->category?->name ?? '';
+                $nameB = $b->category?->name ?? '';
+                if ($nameA !== $nameB) {
+                    return strcmp($nameA, $nameB);
                 }
                 return strcmp($a->name, $b->name);
             })
@@ -263,7 +273,7 @@ class FacebookMessengerWebhookController extends Controller
                 'id' => $m->id,
                 'name' => $m->name,
                 'price' => (float) $m->price,
-                'category' => $m->category ?? '',
+                'category' => $m->category?->name ?? '',
                 'available' => (int) ($virtualAvailable[$m->id] ?? 0),
             ])
             ->all();
@@ -295,7 +305,8 @@ class FacebookMessengerWebhookController extends Controller
             return false;
         }
 
-        $appSecret = (string) config('facebook.app_secret', '');
+        $appSecret = Setting::get('facebook.app_secret');
+        $appSecret = is_string($appSecret) ? $appSecret : (string) config('facebook.app_secret', '');
         if ($appSecret === '') {
             return false;
         }

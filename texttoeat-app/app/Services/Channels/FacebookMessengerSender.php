@@ -5,6 +5,7 @@ namespace App\Services\Channels;
 use App\Contracts\MessengerSenderInterface;
 use App\Messenger\FacebookMessengerClient;
 use App\Models\OutboundMessenger;
+use App\Models\Setting;
 
 class FacebookMessengerSender implements MessengerSenderInterface
 {
@@ -14,6 +15,10 @@ class FacebookMessengerSender implements MessengerSenderInterface
 
     public function send(string $recipientId, string $text): void
     {
+        if (! Setting::get('channels.messenger_enabled', true)) {
+            return;
+        }
+
         $this->client->sendTextMessage($recipientId, $text);
 
         OutboundMessenger::create([

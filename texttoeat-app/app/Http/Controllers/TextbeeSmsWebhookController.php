@@ -6,6 +6,7 @@ use App\Contracts\SmsSenderInterface;
 use App\Events\ConversationUpdated;
 use App\Models\ChatbotSession;
 use App\Models\InboundMessage;
+use App\Models\Setting;
 use App\Services\ChatbotSmsNumberLayer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -140,7 +141,10 @@ class TextbeeSmsWebhookController extends Controller
 
     private function hasWebhookSecret(): bool
     {
-        return (string) config('textbee.webhook_secret', '') !== '';
+        $secret = Setting::get('textbee.webhook_secret');
+        $secret = is_string($secret) ? $secret : (string) config('textbee.webhook_secret', '');
+
+        return $secret !== '';
     }
 
     private function isValidSignature(Request $request): bool
@@ -150,7 +154,8 @@ class TextbeeSmsWebhookController extends Controller
             return false;
         }
 
-        $secret = (string) config('textbee.webhook_secret', '');
+        $secret = Setting::get('textbee.webhook_secret');
+        $secret = is_string($secret) ? $secret : (string) config('textbee.webhook_secret', '');
         if ($secret === '') {
             return false;
         }

@@ -11,7 +11,7 @@ class DiningMarkersController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'value' => ['required', 'string', 'max:64', 'unique:dining_markers,value'],
+            'value' => ['required', 'string', 'max:' . DiningMarker::MAX_VALUE_LENGTH, 'unique:dining_markers,value'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
         $validated['sort_order'] = $validated['sort_order'] ?? 0;
@@ -23,7 +23,7 @@ class DiningMarkersController extends Controller
     public function update(Request $request, DiningMarker $diningMarker): RedirectResponse
     {
         $validated = $request->validate([
-            'value' => ['required', 'string', 'max:64', 'unique:dining_markers,value,' . $diningMarker->id],
+            'value' => ['required', 'string', 'max:' . DiningMarker::MAX_VALUE_LENGTH, 'unique:dining_markers,value,' . $diningMarker->id],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
         $diningMarker->update($validated);

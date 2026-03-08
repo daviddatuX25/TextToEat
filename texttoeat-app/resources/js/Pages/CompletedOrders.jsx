@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link, router } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
+import { TypewriterText, PaginationLinks } from '../components/ui';
 import { OrderListRow } from '../components/staff/OrderListRow';
 import { CompletedOrderTableRow } from '../components/staff/CompletedOrderTableRow';
 import { LayoutGrid, List, ChevronDown, Search, X, Filter } from 'lucide-react';
@@ -14,7 +15,7 @@ const STATUS_OPTIONS = [
 const CHANNEL_OPTIONS = [
     { value: 'sms', label: 'SMS' },
     { value: 'messenger', label: 'Messenger' },
-    { value: 'web', label: 'Online' },
+    { value: 'web', label: 'Web' },
     { value: 'walkin', label: 'Walk-in' },
 ];
 const SORT_OPTIONS = [
@@ -25,9 +26,21 @@ const SORT_OPTIONS = [
 ];
 
 export default function CompletedOrders({
-    orders = [],
+    orders: ordersProp = [],
     filters: initialFilters = {},
 }) {
+    const ordersPaginated = ordersProp?.data != null ? ordersProp : null;
+    const orders = ordersPaginated ? ordersPaginated.data : (Array.isArray(ordersProp) ? ordersProp : []);
+    // Laravel paginator exposes last_page, from, to, total at root (no nested "meta")
+    const meta = ordersPaginated
+        ? {
+            from: ordersPaginated.from,
+            to: ordersPaginated.to,
+            total: ordersPaginated.total,
+            last_page: ordersPaginated.last_page,
+        }
+        : null;
+    const links = ordersPaginated?.links ?? null;
     const [viewMode, setViewMode] = useState(() => {
         if (typeof window === 'undefined') return 'card';
         return window.localStorage?.getItem(COMPLETED_VIEW_MODE_KEY) || 'card';
@@ -63,7 +76,7 @@ export default function CompletedOrders({
     }, [viewMode]);
 
     const applyFilters = useCallback(() => {
-        const params = {};
+        const params = { page: 1 };
         if (localFilters.status && localFilters.status !== 'all') params.status = localFilters.status;
         if (localFilters.channel?.length) params.channel = localFilters.channel;
         if (localFilters.date_from) params.date_from = localFilters.date_from;
@@ -107,7 +120,7 @@ export default function CompletedOrders({
     return (
         <PortalLayout>
             <section className="flex flex-col gap-5 animate-fade-in">
-                <header className="space-y-4">
+                <header className="space-y-3">
                     <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-primary-50 px-3 py-1.5 text-sm font-semibold tracking-wide text-primary-600 dark:border-primary-500/20 dark:bg-primary-500/10 dark:text-primary-400">
                         <i className="ph-bold ph-check-circle"></i>
                         Completed &amp; cancelled
@@ -123,6 +136,9 @@ export default function CompletedOrders({
                             ← Back to orders
                         </Link>
                     </div>
+                    <p className="text-surface-500 dark:text-surface-400 text-sm">
+                        <TypewriterText text="View and search completed or cancelled orders." />
+                    </p>
                 </header>
 
                 {/* Filters + view toggle */}
@@ -339,8 +355,8 @@ export default function CompletedOrders({
                                 </tbody>
                             </table>
                         </div>
-                        <div className="px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-xs text-surface-500 dark:text-surface-400">
-                            {orders.length} order{orders.length !== 1 ? 's' : ''}
+                        <div className="px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-xs text-surface-500 dark:text-surface-400 flex items-center justify-between flex-wrap gap-2">
+                            <PaginationLinks meta={meta} links={links} itemLabel="order" fallbackTotal={!meta ? orders.length : undefined} />
                         </div>
                     </div>
                 ) : (
@@ -352,8 +368,8 @@ export default function CompletedOrders({
                                 ))}
                             </div>
                         </div>
-                        <div className="shrink-0 px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-800/80 text-xs text-surface-500 dark:text-surface-400">
-                            {orders.length} order{orders.length !== 1 ? 's' : ''}
+                        <div className="shrink-0 px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-800/80 text-xs text-surface-500 dark:text-surface-400 flex items-center justify-between flex-wrap gap-2">
+                            <PaginationLinks meta={meta} links={links} itemLabel="order" fallbackTotal={!meta ? orders.length : undefined} />
                         </div>
                     </div>
                 )}

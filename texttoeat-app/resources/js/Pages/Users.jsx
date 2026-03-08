@@ -1,10 +1,12 @@
 import { Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import PortalLayout from '../Layouts/PortalLayout';
+import { PageHeader } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
 
 export default function Users({ users = [] }) {
     const [addOpen, setAddOpen] = useState(false);
+    const [deleteUser, setDeleteUser] = useState(null);
     const form = useForm({
         username: '',
         name: '',
@@ -26,27 +28,34 @@ export default function Users({ users = [] }) {
         router.post(`/portal/users/${user.id}/reset-password`, {}, { preserveScroll: true });
     };
 
+    const confirmDeleteAccount = (user) => {
+        setDeleteUser(user);
+    };
+
+    const submitDeleteAccount = () => {
+        if (!deleteUser) return;
+        router.delete(`/portal/users/${deleteUser.id}`, {
+            preserveScroll: true,
+            onSuccess: () => setDeleteUser(null),
+        });
+    };
+
     return (
         <PortalLayout>
             <section className="flex flex-col gap-8 animate-fade-in">
-                <header className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
-                            Manage users
-                        </h1>
-                        <button
-                            type="button"
-                            onClick={() => { form.reset(); setAddOpen(true); }}
-                            className="inline-flex items-center gap-2 rounded-xl border-2 border-primary-500 bg-primary-600 text-white px-4 py-2 text-sm font-semibold hover:bg-primary-700 transition-colors"
-                        >
-                            <i className="ph-bold ph-plus"></i>
-                            Add user
-                        </button>
-                    </div>
-                    <p className="text-surface-500 dark:text-surface-400 text-xs">
-                        <strong>Role:</strong> <span className="font-medium text-surface-600 dark:text-surface-300">Admin</span> — full access to settings and user management. <span className="font-medium text-surface-600 dark:text-surface-300">Staff</span> — orders, deliveries, pickup, walk-in, and conversations only.
-                    </p>
-                </header>
+                <PageHeader
+                    title="Manage users"
+                    description="Role: Admin — full access to settings and user management. Staff — orders, deliveries, pickup, walk-in, and conversations only."
+                >
+                    <button
+                        type="button"
+                        onClick={() => { form.reset(); setAddOpen(true); }}
+                        className="inline-flex items-center gap-2 rounded-xl border-2 border-primary-500 bg-primary-600 text-white px-4 py-2 text-sm font-semibold hover:bg-primary-700 transition-colors"
+                    >
+                        <i className="ph-bold ph-plus"></i>
+                        Add user
+                    </button>
+                </PageHeader>
 
                 {users.length === 0 ? (
                     <div className="rounded-2xl border-2 border-dashed border-surface-200 dark:border-surface-700 p-8 text-center text-surface-500">
@@ -74,13 +83,22 @@ export default function Users({ users = [] }) {
                                             </span>
                                         </td>
                                         <td className="px-4 py-3 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={() => resetPassword(user)}
-                                                className="text-primary-600 dark:text-primary-400 font-semibold text-sm hover:underline"
-                                            >
-                                                Reset password
-                                            </button>
+                                            <div className="flex items-center justify-end gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => resetPassword(user)}
+                                                    className="text-primary-600 dark:text-primary-400 font-semibold text-sm hover:underline"
+                                                >
+                                                    Reset password
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => confirmDeleteAccount(user)}
+                                                    className="text-red-600 dark:text-red-400 font-semibold text-sm hover:underline"
+                                                >
+                                                    Deactivate account
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -163,6 +181,37 @@ export default function Users({ users = [] }) {
                             </button>
                         </div>
                     </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!deleteUser} onOpenChange={(open) => !open && setDeleteUser(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Deactivate account</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-surface-600 dark:text-surface-400">
+                        {deleteUser && (
+                            <>
+                                Deactivate <strong>{deleteUser.name || deleteUser.username}</strong>? They will no longer be able to sign in. You can restore the account later from the database if needed.
+                            </>
+                        )}
+                    </p>
+                    <div className="flex gap-2 pt-4">
+                        <button
+                            type="button"
+                            onClick={() => setDeleteUser(null)}
+                            className="flex-1 py-2 rounded-xl border border-surface-200 dark:border-surface-600 text-surface-700 dark:text-surface-300 font-medium text-sm"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={submitDeleteAccount}
+                            className="flex-1 py-2 rounded-xl bg-red-600 text-white font-semibold text-sm hover:bg-red-700"
+                        >
+                            Deactivate
+                        </button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </PortalLayout>

@@ -1374,7 +1374,7 @@ class ChatbotFsm
                 $lastCategory = $category;
             }
             $num = $n + 1;
-            $price = number_format((float) $item['price'], 2);
+            $price = number_format((float) $item['price'], 2, '.', ',');
             $lines[] = "{$num}. {$item['name']} - {$price}";
         }
         $lines[] = $this->r('menu_footer', $locale);
@@ -1423,13 +1423,13 @@ class ChatbotFsm
             $sub = $q * $price;
             $total += $sub;
             $num = $index + 1;
-            $subtotal = number_format($sub, 2);
+            $subtotal = number_format($sub, 2, '.', ',');
             $line = $q === 1
                 ? $this->r('cart_line_one', $locale, ['name' => $item['name'], 'subtotal' => $subtotal])
                 : $this->r('cart_line', $locale, ['name' => $item['name'], 'count' => $q, 'subtotal' => $subtotal]);
             $lines[] = "{$num}. {$line}";
         }
-        $lines[] = $this->r('cart_total', $locale, ['total' => number_format($total, 2)]);
+        $lines[] = $this->r('cart_total', $locale, ['total' => number_format($total, 2, '.', ',')]);
         $showFooter = $includeFooter && $channel !== 'messenger';
         if ($showFooter) {
             $lines[] = '__CART_FOOTER__';

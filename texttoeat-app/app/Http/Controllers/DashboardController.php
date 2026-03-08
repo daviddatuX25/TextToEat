@@ -24,8 +24,8 @@ class DashboardController extends Controller
         $ordersToday = (clone $ordersTodayQuery)->count();
 
         $completedTodayQuery = Order::query()
-            ->where('status', OrderStatus::Completed)
-            ->whereDate('updated_at', $today);
+            ->whereDate('created_at', $today)
+            ->where('status', OrderStatus::Completed);
 
         $completedToday = (clone $completedTodayQuery)->count();
 
@@ -40,60 +40,20 @@ class DashboardController extends Controller
             : 0.0;
 
         $cancelledToday = Order::query()
+            ->whereDate('created_at', $today)
             ->where('status', OrderStatus::Cancelled)
-            ->whereDate('updated_at', $today)
             ->count();
 
         $yesterday = Carbon::yesterday();
         $ordersYesterday = Order::query()->whereDate('created_at', $yesterday)->count();
         $revenueYesterday = (float) Order::query()
+            ->whereDate('created_at', $yesterday)
             ->where('status', OrderStatus::Completed)
-            ->whereDate('updated_at', $yesterday)
             ->sum('total') ?: 0.0;
 
-        // Last 7 days daily snapshots for interactive day picker (newest first: today, yesterday, ...)
-        $dailyOverviews = [];
-        for ($i = 0; $i < 7; $i++) {
-            $date = Carbon::today()->subDays($i);
-            $prevDate = Carbon::today()->subDays($i + 1);
-            $dayOrders = Order::query()->whereDate('created_at', $date)->count();
-            $dayCompleted = Order::query()
-                ->where('status', OrderStatus::Completed)
-                ->whereDate('updated_at', $date)
-                ->count();
-            $dayRevenue = (float) Order::query()
-                ->where('status', OrderStatus::Completed)
-                ->whereDate('updated_at', $date)
-                ->sum('total') ?: 0.0;
-            $dayCancelled = Order::query()
-                ->where('status', OrderStatus::Cancelled)
-                ->whereDate('updated_at', $date)
-                ->count();
-            $dayAvgOrderValue = $dayCompleted > 0 ? $dayRevenue / $dayCompleted : 0.0;
-            $dayCompletionRate = $dayOrders > 0 ? round(($dayCompleted / $dayOrders) * 100, 1) : 0.0;
-            $prevOrders = Order::query()->whereDate('created_at', $prevDate)->count();
-            $prevRevenue = (float) Order::query()
-                ->where('status', OrderStatus::Completed)
-                ->whereDate('updated_at', $prevDate)
-                ->sum('total') ?: 0.0;
-            $dailyOverviews[] = [
-                'date' => $date->toDateString(),
-                'label' => $i === 0 ? 'Today' : ($i === 1 ? 'Yesterday' : $date->format('D, M j')),
-                'orders' => $dayOrders,
-                'completed' => $dayCompleted,
-                'revenue' => $dayRevenue,
-                'cancelled' => $dayCancelled,
-                'avg_order_value' => $dayAvgOrderValue,
-                'completion_rate' => $dayCompletionRate,
-                'prev_date' => $prevDate->toDateString(),
-                'prev_label' => $i === 0 ? 'Yesterday' : ($i === 1 ? '2 days ago' : $prevDate->format('D, M j')),
-                'prev_orders' => $prevOrders,
-                'prev_revenue' => $prevRevenue,
-            ];
-        }
-
-        // Real-time operations metrics (right now)
+        // Real-time operations metrics (today's orders only)
         $activeOrdersQuery = Order::query()
+            ->whereDate('created_at', $today)
             ->whereNotIn('status', [OrderStatus::Completed, OrderStatus::Cancelled]);
 
         $activeOrdersNow = (clone $activeOrdersQuery)->count();
@@ -111,23 +71,28 @@ class DashboardController extends Controller
             ->count();
 
         $pipelinePending = Order::query()
+            ->whereDate('created_at', $today)
             ->where('status', OrderStatus::Received)
             ->count();
 
-        $pipelineConfirmed = Order::query()
-            ->where('status', OrderStatus::Confirmed)
+        $pipelinePreparing = Order::query()
+            ->whereDate('created_at', $today)
+            ->where('status', OrderStatus::Preparing)
             ->count();
 
         $pipelineReady = Order::query()
+            ->whereDate('created_at', $today)
             ->whereIn('status', [OrderStatus::Ready, OrderStatus::OnTheWay])
             ->count();
 
         $readyDelivery = Order::query()
+            ->whereDate('created_at', $today)
             ->where('delivery_type', 'delivery')
             ->where('status', OrderStatus::Ready)
             ->count();
 
         $readyPickup = Order::query()
+            ->whereDate('created_at', $today)
             ->where('delivery_type', 'pickup')
             ->where('status', OrderStatus::Ready)
             ->count();
@@ -212,53 +177,28 @@ class DashboardController extends Controller
             'revenue_today' => $walkinRevenueToday,
         ];
 
-        // Revenue by fulfillment: weekly (last 7 days) and monthly (last 6 months) for chart
-        $revenueWeekly = [];
-        for ($i = 0; $i < 7; $i++) {
-            $date = Carbon::today()->subDays(6 - $i);
-            $dayStart = $date->copy()->startOfDay();
-            $dayEnd = $date->copy()->endOfDay();
-            $revenueWeekly[] = [
-                'date' => $date->toDateString(),
-                'label' => $date->format('D'),
+        // Revenue by hour of the day (today only) for chart
+        $revenueByHour = [];
+        for ($hour = 0; $hour < 24; $hour++) {
+            $hourStart = $today->copy()->setHour($hour)->setMinute(0)->setSecond(0);
+            $hourEnd = $today->copy()->setHour($hour)->setMinute(59)->setSecond(59);
+            $revenueByHour[] = [
+                'hour' => $hour,
+                'label' => $hour === 0 ? '12am' : ($hour < 12 ? "{$hour}am" : ($hour === 12 ? '12pm' : ($hour - 12) . 'pm')),
                 'walkin' => (float) Order::query()
                     ->where('channel', OrderChannel::WalkIn)
                     ->where('status', OrderStatus::Completed)
-                    ->whereBetween('updated_at', [$dayStart, $dayEnd])
+                    ->whereBetween('updated_at', [$hourStart, $hourEnd])
                     ->sum('total'),
                 'delivery' => (float) Order::query()
                     ->where('delivery_type', 'delivery')
                     ->where('status', OrderStatus::Completed)
-                    ->whereBetween('updated_at', [$dayStart, $dayEnd])
+                    ->whereBetween('updated_at', [$hourStart, $hourEnd])
                     ->sum('total'),
                 'pickup' => (float) Order::query()
                     ->where('delivery_type', 'pickup')
                     ->where('status', OrderStatus::Completed)
-                    ->whereBetween('updated_at', [$dayStart, $dayEnd])
-                    ->sum('total'),
-            ];
-        }
-        $revenueMonthly = [];
-        for ($i = 0; $i < 6; $i++) {
-            $month = Carbon::today()->subMonths(5 - $i)->startOfMonth();
-            $monthEnd = $month->copy()->endOfMonth();
-            $revenueMonthly[] = [
-                'month' => $month->format('Y-m'),
-                'label' => $month->format('M'),
-                'walkin' => (float) Order::query()
-                    ->where('channel', OrderChannel::WalkIn)
-                    ->where('status', OrderStatus::Completed)
-                    ->whereBetween('updated_at', [$month, $monthEnd])
-                    ->sum('total'),
-                'delivery' => (float) Order::query()
-                    ->where('delivery_type', 'delivery')
-                    ->where('status', OrderStatus::Completed)
-                    ->whereBetween('updated_at', [$month, $monthEnd])
-                    ->sum('total'),
-                'pickup' => (float) Order::query()
-                    ->where('delivery_type', 'pickup')
-                    ->where('status', OrderStatus::Completed)
-                    ->whereBetween('updated_at', [$month, $monthEnd])
+                    ->whereBetween('updated_at', [$hourStart, $hourEnd])
                     ->sum('total'),
             ];
         }
@@ -298,14 +238,13 @@ class DashboardController extends Controller
                     'orders_yesterday' => $ordersYesterday,
                     'revenue_yesterday' => $revenueYesterday,
                 ],
-                'daily_overviews' => $dailyOverviews,
                 'realtime' => [
                     'active_orders_now' => $activeOrdersNow,
                     'active_delivery' => $activeDelivery,
                     'active_pickup' => $activePickup,
                     'active_walkin' => $activeWalkin,
                     'pipeline_pending' => $pipelinePending,
-                    'pipeline_confirmed' => $pipelineConfirmed,
+                    'pipeline_preparing' => $pipelinePreparing,
                     'pipeline_ready' => $pipelineReady,
                     'ready_delivery' => $readyDelivery,
                     'ready_pickup' => $readyPickup,
@@ -314,8 +253,7 @@ class DashboardController extends Controller
                     'by_channel' => $byChannel,
                     'by_fulfillment' => $byFulfillment,
                     'top_items' => $topItems,
-                    'revenue_weekly' => $revenueWeekly,
-                    'revenue_monthly' => $revenueMonthly,
+                    'revenue_by_hour' => $revenueByHour,
                 ],
 
                 // Backwards-compatible top-level keys (used by older dashboard layout).

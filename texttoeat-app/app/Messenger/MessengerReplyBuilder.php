@@ -110,7 +110,7 @@ class MessengerReplyBuilder
                     $elements = [];
                     foreach (array_slice($menuItems, 0, 10) as $idx => $item) {
                         $oneBased = $idx + 1;
-                        $price = number_format((float) ($item['price'] ?? 0), 2);
+                        $price = number_format((float) ($item['price'] ?? 0), 2, '.', ',');
                         $elements[] = [
                             'title' => mb_substr((string) ($item['name'] ?? ''), 0, 80),
                             'subtitle' => '₱' . $price,

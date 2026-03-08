@@ -1,10 +1,14 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, router, usePage, useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 import PortalLayout from '../Layouts/PortalLayout';
+import { PageHeader } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
 import { usePortalOrdersLive } from '../hooks/usePortalOrdersLive';
-import { LayoutGrid, Trash2, List } from 'lucide-react';
+import { getIncomingOrderToastMessage } from '../utils/orderIncomingToast';
+import { filterOrdersBySearch } from '../utils/filterOrdersBySearch';
+import { formatCurrency } from '../utils/formatNumber';
+import { LayoutGrid, Trash2, List, Search } from 'lucide-react';
 
 const routerOpts = () => ({
     preserveScroll: true,
@@ -76,7 +80,7 @@ function PickupOrderCard({ order, pickupSlots, slotToOrder = {}, isHighlighted =
                     <span className="text-surface-500 text-sm ml-2">({order.customer_name ?? 'Walk-in'})</span>
                     <div className="text-xs text-surface-500 mt-1 flex items-center gap-2">
                         <span>{items.length ? `${items.length} item(s)` : ''}</span>
-                        <span className="font-semibold text-primary-600 dark:text-primary-400">₱{Number(order.total).toFixed(2)}</span>
+                        <span className="font-semibold text-primary-600 dark:text-primary-400">{formatCurrency(Number(order.total))}</span>
                     </div>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap">
@@ -110,13 +114,13 @@ function PickupOrderCard({ order, pickupSlots, slotToOrder = {}, isHighlighted =
                                 {item.name}
                             </span>
                             <span className={`font-bold shrink-0 ${isPaid ? 'line-through text-surface-500' : ''}`}>
-                                ₱{Number((item.price ?? 0) * (item.quantity ?? 0)).toFixed(2)}
+                                {formatCurrency(Number((item.price ?? 0) * (item.quantity ?? 0)))}
                             </span>
                         </div>
                     ))}
                     <div className="pt-2 mt-2 border-t border-surface-200 dark:border-surface-700 flex justify-between items-center">
                         <span className="text-xs text-surface-500 font-semibold uppercase">Total</span>
-                        <span className={`font-bold text-lg text-primary-600 dark:text-primary-400 ${isPaid ? 'line-through' : ''}`}>₱{Number(order.total).toFixed(2)}</span>
+                        <span className={`font-bold text-lg text-primary-600 dark:text-primary-400 ${isPaid ? 'line-through' : ''}`}>{formatCurrency(Number(order.total))}</span>
                     </div>
                 </div>
             )}
@@ -147,26 +151,51 @@ function PickupOrderCard({ order, pickupSlots, slotToOrder = {}, isHighlighted =
             </div>
 
             <Dialog open={slotOpen} onOpenChange={setSlotOpen}>
-                <DialogContent className="max-w-sm">
+                <DialogContent className="max-w-sm w-full sm:max-w-sm">
                     <DialogHeader>
                         <DialogTitle>{hasSlot ? 'Change pickup slot' : 'Assign pickup slot'}</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-4">
-                        <label className="block">
-                            <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Slot</span>
-                            <select
-                                value={slotValue}
-                                onChange={(e) => setSlotValue(e.target.value)}
-                                className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm font-medium text-surface-800 dark:text-surface-200"
+                        <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Slot</span>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setSlotValue('')}
+                                className={`
+                                    rounded-xl border-2 py-2.5 px-3 text-sm font-semibold transition-colors
+                                    ${slotValue === ''
+                                        ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 dark:border-primary-500'
+                                        : 'border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-surface-300 dark:hover:border-surface-500'
+                                    }
+                                `}
                             >
-                                <option value="">—</option>
-                                {pickupSlots.map((s) => (
-                                    <option key={s} value={s} disabled={isSlotTaken(s)}>
-                                        {s}{isSlotTaken(s) ? ' (taken)' : ''}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
+                                —
+                            </button>
+                            {pickupSlots.map((s) => {
+                                const taken = isSlotTaken(s);
+                                const selected = slotValue === s;
+                                return (
+                                    <button
+                                        key={s}
+                                        type="button"
+                                        onClick={() => !taken && setSlotValue(s)}
+                                        disabled={taken}
+                                        className={`
+                                            rounded-xl border-2 py-2.5 px-3 text-sm font-semibold transition-colors
+                                            ${taken
+                                                ? 'border-surface-200 dark:border-surface-600 bg-surface-100 dark:bg-surface-800 text-surface-400 dark:text-surface-500 cursor-not-allowed'
+                                                : selected
+                                                    ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 dark:border-primary-500'
+                                                    : 'border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-surface-300 dark:hover:border-surface-500'
+                                            }
+                                        `}
+                                        title={taken ? 'Taken' : undefined}
+                                    >
+                                        {s}{taken ? ' ✓' : ''}
+                                    </button>
+                                );
+                            })}
+                        </div>
                         <button type="button" onClick={saveSlot} className="w-full font-semibold py-2 rounded-xl bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.99]">
                             {hasSlot ? 'Update' : 'Assign'}
                         </button>
@@ -185,7 +214,7 @@ function ManageSlotsDialog({ pickupSlotsList = [], open, onOpenChange }) {
     };
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-md w-full sm:max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <LayoutGrid className="h-5 w-5" />
@@ -201,24 +230,22 @@ function ManageSlotsDialog({ pickupSlotsList = [], open, onOpenChange }) {
                             No slots yet. Add one below.
                         </p>
                     ) : (
-                        <ul className="space-y-2">
+                        <div className="grid gap-2 sm:grid-cols-2">
                             {pickupSlotsList.map((slot) => (
-                                <li key={slot.id} className="flex items-center justify-between gap-3 rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 p-3">
+                                <div key={slot.id} className="flex items-center justify-between gap-3 rounded-xl border-2 border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 p-3">
                                     <span className="font-semibold text-surface-900 dark:text-white">{slot.value}</span>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => window.confirm(`Remove slot "${slot.value}"?`) && router.delete(`/portal/pickup-slots/${slot.id}`)}
-                                            className="inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-sm font-medium"
-                                            aria-label="Delete"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                            Delete
-                                        </button>
-                                    </div>
-                                </li>
+                                    <button
+                                        type="button"
+                                        onClick={() => window.confirm(`Remove slot "${slot.value}"?`) && router.delete(`/portal/pickup-slots/${slot.id}`)}
+                                        className="inline-flex items-center gap-1.5 py-1.5 px-2.5 rounded-lg border border-red-200 dark:border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 text-sm font-medium"
+                                        aria-label="Delete"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        Delete
+                                    </button>
+                                </div>
                             ))}
-                        </ul>
+                        </div>
                     )}
                     <div className="border-t border-surface-200 dark:border-surface-700 pt-4">
                         <form onSubmit={addSlot} className="space-y-4">
@@ -256,8 +283,9 @@ const PICKUP_VIEW_MODE_KEY = 'pickupCounterViewMode';
 
 export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlotsList = [], highlight }) {
     const { errors } = usePage().props;
-    usePortalOrdersLive();
+    usePortalOrdersLive({ getIncomingToastMessage: (p) => getIncomingOrderToastMessage('pickup', p) });
     const highlightRef = useRef(null);
+    const [searchQuery, setSearchQuery] = useState('');
     const [manageOpen, setManageOpen] = useState(false);
     const [viewMode, setViewMode] = useState(() => {
         if (typeof window === 'undefined') return 'card';
@@ -306,8 +334,13 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
         };
     }, [activeHighlight]);
 
+    const filteredOrders = useMemo(
+        () => filterOrdersBySearch(orders, searchQuery, { extraFields: ['pickup_slot'] }),
+        [orders, searchQuery]
+    );
+
     const slotToOrder = {};
-    orders.forEach((o) => {
+    filteredOrders.forEach((o) => {
         const s = o.pickup_slot ?? null;
         if (s) slotToOrder[s] = o;
     });
@@ -315,35 +348,45 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
     return (
         <PortalLayout>
             <section className="flex flex-col gap-5 animate-fade-in">
-                <header className="space-y-3">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
+                <PageHeader
+                    title={
+                        <>
                             Pickup <span className="bg-gradient-to-r from-primary-500 to-orange-400 bg-clip-text text-transparent">counter</span>
-                        </h1>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <Link
-                                href="/portal/orders"
-                                className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
-                            >
-                                ← Back to orders
-                            </Link>
-                            <button
-                                type="button"
-                                onClick={() => setManageOpen(true)}
-                                className="inline-flex items-center gap-2 rounded-xl border-2 border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
-                            >
-                                <LayoutGrid className="h-4 w-4" />
-                                Manage slots
-                            </button>
-                            <Link href="/portal/orders/completed" className="text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline py-2">
-                                Completed orders →
-                            </Link>
+                        </>
+                    }
+                    description="Assign pickup slots and manage orders for customer pickup."
+                >
+                    <div className="flex flex-wrap items-center gap-3">
+                        <div className="relative flex-1 min-w-[160px] max-w-[240px]">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-surface-400 pointer-events-none" aria-hidden />
+                            <input
+                                type="search"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                placeholder="Search orders…"
+                                className="w-full rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 pl-9 pr-3 py-2 text-sm text-surface-800 dark:text-surface-200 placeholder:text-surface-400 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                                aria-label="Search pickup orders"
+                            />
                         </div>
+                        <Link
+                            href="/portal/orders"
+                            className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
+                        >
+                            ← Back to orders
+                        </Link>
+                        <button
+                            type="button"
+                            onClick={() => setManageOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-xl border-2 border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                            Manage slots
+                        </button>
+                        <Link href="/portal/orders/completed" className="text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline py-2">
+                            Completed orders
+                        </Link>
                     </div>
-                    <p className="text-surface-500 dark:text-surface-400 text-sm">
-                        Assign pickup slots and manage orders for customer pickup.
-                    </p>
-                </header>
+                </PageHeader>
 
                 {errors?.pickup_slot && (
                     <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm font-bold text-red-700 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-400">
@@ -397,6 +440,15 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
                             Pickup orders will appear here. Switch to card view to assign slots and manage orders.
                         </p>
                     </div>
+                ) : filteredOrders.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border-2 border-dashed border-surface-200 dark:border-surface-800">
+                        <Search className="h-12 w-12 text-surface-300 dark:text-surface-600 mb-4" />
+                        <h3 className="text-lg font-bold text-surface-700 dark:text-surface-300">No orders match your search</h3>
+                        <p className="text-surface-500 text-sm max-w-sm mt-2">Try a different search term or clear the search box.</p>
+                        <button type="button" onClick={() => setSearchQuery('')} className="mt-4 text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline">
+                            Clear search
+                        </button>
+                    </div>
                 ) : viewMode === 'table' ? (
                     <div className="rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 overflow-hidden">
                         <div className="overflow-x-auto max-h-[calc(100vh-18rem)] overflow-y-auto">
@@ -413,7 +465,7 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {orders.map((order) => {
+                                    {filteredOrders.map((order) => {
                                         const status = typeof order.status === 'string' ? order.status : order.status?.value ?? 'received';
                                         const isPaid = (typeof order.payment_status === 'string' ? order.payment_status : order.payment_status?.value ?? 'unpaid') === 'paid';
                                         const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
@@ -442,15 +494,38 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
                                                     </span>
                                                 </td>
                                                 <td className="py-2.5 px-3 font-bold text-sm tabular-nums text-primary-600 dark:text-primary-400">
-                                                    ₱{Number(order.total).toFixed(2)}
+                                                    {formatCurrency(Number(order.total))}
                                                 </td>
                                                 <td className="py-2.5 px-3 whitespace-nowrap">
-                                                    <Link
-                                                        href={`/portal/orders?highlight=${order.id}`}
-                                                        className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline"
-                                                    >
-                                                        Go to Orders
-                                                    </Link>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        {status === 'ready' && (
+                                                            <button
+                                                                type="button"
+                                                                disabled={!isPaid}
+                                                                onClick={() => {
+                                                                    if (!isPaid) {
+                                                                        toast.error('Mark the order as paid before completing.');
+                                                                        return;
+                                                                    }
+                                                                    router.put(`/portal/orders/${order.id}`, { status: 'completed' }, routerOpts());
+                                                                }}
+                                                                title={!isPaid ? 'Mark as paid first' : undefined}
+                                                                className={`text-xs font-semibold py-1.5 px-2.5 rounded-lg ${
+                                                                    isPaid
+                                                                        ? 'bg-primary-600 text-white hover:bg-primary-700'
+                                                                        : 'bg-surface-200 text-surface-500 dark:bg-surface-700 dark:text-surface-400 cursor-not-allowed'
+                                                                }`}
+                                                            >
+                                                                Complete
+                                                            </button>
+                                                        )}
+                                                        <Link
+                                                            href={`/portal/orders?highlight=${order.id}`}
+                                                            className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline"
+                                                        >
+                                                            Go to Orders
+                                                        </Link>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
@@ -459,14 +534,14 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
                             </table>
                         </div>
                         <div className="px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-xs text-surface-500 dark:text-surface-400">
-                            {orders.length} order{orders.length !== 1 ? 's' : ''}
+                            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
                         </div>
                     </div>
                 ) : (
                     <div className="flex flex-col min-h-0 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50/30 dark:bg-surface-800/30 overflow-hidden">
                         <div className="flex-1 min-h-0 overflow-y-auto max-h-[calc(100vh-18rem)] p-3">
                             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                                {orders.map((order) => {
+                                {filteredOrders.map((order) => {
                                     const isHighlight = activeHighlight != null && String(order.id) === String(activeHighlight);
                                     return (
                                         <div key={order.id} ref={isHighlight ? highlightRef : null} className={isHighlight ? 'ring-2 ring-primary-500 ring-offset-2 rounded-2xl' : ''}>
@@ -477,7 +552,7 @@ export default function PickupCounter({ orders = [], pickupSlots = [], pickupSlo
                             </div>
                         </div>
                         <div className="shrink-0 px-3 py-2 border-t border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-800/80 text-xs text-surface-500 dark:text-surface-400">
-                            {orders.length} order{orders.length !== 1 ? 's' : ''}
+                            {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
                         </div>
                     </div>
                 )}

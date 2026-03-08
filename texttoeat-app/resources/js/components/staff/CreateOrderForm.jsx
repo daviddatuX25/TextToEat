@@ -4,6 +4,7 @@ import { router, usePage } from '@inertiajs/react';
 import { Input, Button, Card } from '../ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/Dialog';
 import { Plus, Minus, Utensils, ChevronUp, X } from 'lucide-react';
+import { formatCurrency } from '../../utils/formatNumber';
 
 const filterLabelClass = 'block text-xs font-semibold text-surface-600 dark:text-surface-400 mb-1.5';
 const filterSelectClass =
@@ -37,7 +38,17 @@ function CreateOrderForm({
     const [fulfillment, setFulfillment] = useState('walkin');
     const [orderMarker, setOrderMarker] = useState('');
     const [pickupSlot, setPickupSlot] = useState('');
-    const [deliveryPlace, setDeliveryPlace] = useState(DELIVERY_PLACES[0]?.value ?? '');
+    const deliveryOptions = useMemo(
+        () =>
+            deliveryAreas.length > 0
+                ? deliveryAreas.map((a) => ({
+                      value: a.name,
+                      label: a.is_free ? `${a.name} (free)` : a.fee != null && a.fee !== '' ? `${a.name} (${formatCurrency(Number(a.fee))})` : `${a.name} (fee on delivery)`,
+                  }))
+                : DELIVERY_PLACES,
+        [deliveryAreas]
+    );
+    const [deliveryPlace, setDeliveryPlace] = useState('');
     const [cart, setCart] = useState([]);
     const [mobileFormOpen, setMobileFormOpen] = useState(false);
     const [touched, setTouched] = useState({});
@@ -48,6 +59,12 @@ function CreateOrderForm({
     useEffect(() => {
         if (standalonePage) setMounted(true);
     }, [standalonePage]);
+
+    useEffect(() => {
+        if (fulfillment === 'delivery' && deliveryOptions.length > 0 && (deliveryPlace === '' || !deliveryOptions.some((o) => o.value === deliveryPlace))) {
+            setDeliveryPlace(deliveryOptions[0].value);
+        }
+    }, [fulfillment, deliveryOptions, deliveryPlace]);
 
     const adjustQty = useCallback((menuItemId, delta) => {
         setCart((prev) => {
@@ -72,15 +89,17 @@ function CreateOrderForm({
         adjustQty(item.id, 1);
     }, [adjustQty]);
 
+    const categoryName = (m) => (typeof m.category === 'string' ? m.category : m.category?.name) ?? '';
+
     const categories = useMemo(() => {
-        const cats = [...new Set((menuItems || []).map((m) => m.category).filter(Boolean))].sort();
+        const cats = [...new Set((menuItems || []).map(categoryName).filter(Boolean))].sort();
         return ['All', ...cats];
     }, [menuItems]);
 
     const [categoryFilter, setCategoryFilter] = useState('All');
     const filteredItems = useMemo(() => {
         if (categoryFilter === 'All' || !categoryFilter) return menuItems || [];
-        return (menuItems || []).filter((m) => m.category === categoryFilter);
+        return (menuItems || []).filter((m) => categoryName(m) === categoryFilter);
     }, [menuItems, categoryFilter]);
 
     const total = cart.reduce((sum, line) => sum + Number(line.price) * Number(line.quantity), 0);
@@ -142,7 +161,7 @@ function CreateOrderForm({
                 setCustomerPhone('');
                 setOrderMarker('');
                 setPickupSlot('');
-                setDeliveryPlace(DELIVERY_PLACES[0]?.value ?? '');
+                setDeliveryPlace(deliveryOptions[0]?.value ?? '');
                 setCart([]);
                 setTouched({});
                 if (standalonePage) setMobileFormOpen(false);
@@ -206,9 +225,9 @@ function CreateOrderForm({
                                         <Utensils className="h-12 w-12 text-surface-300 dark:text-surface-600" />
                                     </div>
                                 )}
-                                {item.category && (
+                                {categoryName(item) && (
                                     <span className="absolute top-2 left-2 inline-flex items-center max-w-[calc(100%-1rem)] rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide bg-primary-500/90 text-white shadow-sm truncate">
-                                        {item.category}
+                                        {categoryName(item)}
                                     </span>
                                 )}
                             </div>
@@ -218,7 +237,7 @@ function CreateOrderForm({
                                         {item.name}
                                     </h3>
                                     <span className="font-bold text-sm text-primary-600 dark:text-primary-400 shrink-0 tabular-nums">
-                                        ₱{Number(item.price).toFixed(2)}
+                                        {formatCurrency(Number(item.price))}
                                     </span>
                                 </div>
                                 <div className="mt-3 flex items-center gap-2 flex-wrap">
@@ -263,7 +282,7 @@ function CreateOrderForm({
             </div>
             {cart.length > 0 && (
                 <p className="mt-2 text-sm font-semibold text-primary-600 dark:text-primary-400 shrink-0">
-                    Total: ₱{total.toFixed(2)}
+                    Total: {formatCurrency(total)}
                 </p>
             )}
         </div>
@@ -391,22 +410,30 @@ function CreateOrderForm({
                 {/* Delivery area */}
                 {fulfillment === 'delivery' && (
                     <div className="mt-4">
-                        <label htmlFor="create-order-delivery-place" className={filterLabelClass}>
-                            Delivery area
-                        </label>
-                        <select
-                            id="create-order-delivery-place"
-                            value={deliveryPlace}
-                            onChange={(e) => setDeliveryPlace(e.target.value)}
-                            className={filterSelectClass}
-                            aria-label="Delivery area"
-                        >
-                            {DELIVERY_PLACES.map((opt) => (
-                                <option key={opt.value} value={opt.value}>
-                                    {opt.label}
-                                </option>
-                            ))}
-                        </select>
+                        <p className={filterLabelClass}>Delivery area</p>
+                        <div className="flex flex-wrap gap-2">
+                            {deliveryOptions.map((opt) => {
+                                const selected = deliveryPlace === opt.value;
+                                return (
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        onClick={() => setDeliveryPlace(opt.value)}
+                                        className={`
+                                            rounded-xl border-2 py-2 px-3 text-sm font-semibold transition-colors text-left
+                                            ${selected
+                                                ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-950 dark:text-primary-300 dark:border-primary-500'
+                                                : 'border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-800 text-surface-700 dark:text-surface-300 hover:border-surface-300 dark:hover:border-surface-500'
+                                            }
+                                        `}
+                                        aria-pressed={selected}
+                                        aria-label={opt.label}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
             </div>
@@ -450,7 +477,7 @@ function CreateOrderForm({
                                     {cart.length === 0 ? 'Add items to continue' : (
                                         <>
                                             <span className="block text-white/90 text-xs font-medium">Proceed to checkout</span>
-                                            <span className="block text-sm mt-0.5">{cart.length} item{cart.length !== 1 ? 's' : ''} · ₱{total.toFixed(2)}</span>
+                                            <span className="block text-sm mt-0.5">{cart.length} item{cart.length !== 1 ? 's' : ''} · {formatCurrency(total)}</span>
                                         </>
                                     )}
                                 </span>

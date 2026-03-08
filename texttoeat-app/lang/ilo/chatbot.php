@@ -52,7 +52,7 @@ return [
     'status_push_unpaid_delivery_total' => 'Pangngaasi agsagana iti ₱:total para iti bayad iti delivery.',
     'status_push_unpaid_delivery_cash' => 'Pangngaasi agsagana iti cash para iti bayad iti delivery.',
     'status_label_received' => 'Naawat',
-    'status_label_confirmed' => 'Nakumpirma',
+    'status_label_preparing' => 'Agpreparar',
     'status_label_ready' => 'Sagana',
     'status_label_on_the_way' => 'Iti dalan',
     'status_label_completed' => 'Nalpasen',

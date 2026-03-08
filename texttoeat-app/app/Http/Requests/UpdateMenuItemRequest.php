@@ -20,7 +20,7 @@ class UpdateMenuItemRequest extends FormRequest
         return [
             'name' => ['sometimes', 'string', 'max:255'],
             'price' => ['sometimes', 'numeric', 'min:0'],
-            'category' => ['sometimes', 'string', Rule::in(config('menu.categories', []))],
+            'category_id' => ['sometimes', 'integer', Rule::exists('categories', 'id')->whereNull('deleted_at')],
             'units_today' => ['sometimes', 'integer', 'min:0'],
             'is_sold_out' => ['sometimes', 'boolean'],
             'image' => ['nullable', 'image', 'mimes:jpeg,png,webp', 'max:2048'],

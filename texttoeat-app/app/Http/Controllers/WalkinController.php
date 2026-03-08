@@ -49,7 +49,7 @@ class WalkinController extends Controller
             'order_marker' => [
                 'nullable',
                 'string',
-                'max:64',
+                'max:' . DiningMarker::MAX_VALUE_LENGTH,
                 function (string $attribute, ?string $value, \Closure $fail) {
                     if ($value !== null && $value !== '' && ! DiningMarker::where('value', $value)->exists()) {
                         $fail('The selected dining marker is invalid.');
@@ -61,7 +61,7 @@ class WalkinController extends Controller
         $marker = $validated['order_marker'] ?? null;
         $order->update(['order_marker' => $marker === '' ? null : $marker]);
 
-        event(new OrderUpdated($order));
+        event(new OrderUpdated($order, false, false));
 
         return redirect()->back()->with('success', $marker ? 'Dining marker assigned.' : 'Dining marker cleared.');
     }

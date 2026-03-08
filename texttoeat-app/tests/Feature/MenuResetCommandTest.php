@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Category;
 use App\Models\MenuItem;
 use App\Models\MenuItemDailySnapshot;
 use Carbon\Carbon;
@@ -14,10 +15,13 @@ class MenuResetCommandTest extends TestCase
 {
     use RefreshDatabase;
 
+    private ?Category $ulamCategory = null;
+
     protected function setUp(): void
     {
         parent::setUp();
         Carbon::setTestNow(Carbon::parse('2025-03-08 06:00:00'));
+        $this->ulamCategory = Category::firstOrCreate(['name' => 'Ulam'], ['name' => 'Ulam']);
     }
 
     protected function tearDown(): void
@@ -33,7 +37,7 @@ class MenuResetCommandTest extends TestCase
         MenuItem::create([
             'name' => 'Chicken Adobo',
             'price' => 125.00,
-            'category' => 'Ulam',
+            'category_id' => $this->ulamCategory->id,
             'image_url' => null,
             'units_today' => 10,
             'is_sold_out' => false,
@@ -43,7 +47,7 @@ class MenuResetCommandTest extends TestCase
         MenuItem::create([
             'name' => 'Pork Sinigang',
             'price' => 135.00,
-            'category' => 'Ulam',
+            'category_id' => $this->ulamCategory->id,
             'image_url' => null,
             'units_today' => 5,
             'is_sold_out' => false,
@@ -76,7 +80,7 @@ class MenuResetCommandTest extends TestCase
         MenuItem::create([
             'name' => 'Lechon',
             'price' => 185.00,
-            'category' => 'Ulam',
+            'category_id' => $this->ulamCategory->id,
             'image_url' => null,
             'units_today' => 20,
             'is_sold_out' => false,
@@ -98,7 +102,7 @@ class MenuResetCommandTest extends TestCase
         MenuItem::create([
             'name' => 'Adobo',
             'price' => 100,
-            'category' => 'Ulam',
+            'category_id' => $this->ulamCategory->id,
             'menu_date' => $yesterday,
         ]);
 
@@ -120,7 +124,7 @@ class MenuResetCommandTest extends TestCase
         MenuItem::create([
             'name' => 'Test',
             'price' => 50,
-            'category' => 'Ulam',
+            'category_id' => $this->ulamCategory->id,
             'menu_date' => $yesterday,
         ]);
 
@@ -136,7 +140,7 @@ class MenuResetCommandTest extends TestCase
         $item = MenuItem::create([
             'name' => 'Caldereta',
             'price' => 150.00,
-            'category' => 'Ulam',
+            'category_id' => $this->ulamCategory->id,
             'image_url' => null,
             'units_today' => 20,
             'is_sold_out' => false,

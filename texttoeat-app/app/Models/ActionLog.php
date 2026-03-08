@@ -79,6 +79,7 @@ class ActionLog extends Model
         $dateTo = $filters['date_to'] ?? null;
         $customer = $filters['customer'] ?? null;
         $orderReference = $filters['order_reference'] ?? null;
+        $search = $filters['search'] ?? null;
         $statuses = $filters['status'] ?? null;
         $channels = $filters['channel'] ?? null;
         $staffId = $filters['staff_id'] ?? null;
@@ -92,6 +93,15 @@ class ActionLog extends Model
             })
             ->when($staffId, function (Builder $q, int $id): void {
                 $q->where('user_id', $id);
+            })
+            ->when($search, function (Builder $q, string $value): void {
+                $q->whereHas('order', function (Builder $orderQuery) use ($value): void {
+                    DatabaseDialect::addCaseInsensitiveLikeOr(
+                        $orderQuery,
+                        ['customer_name', 'customer_phone', 'reference'],
+                        '%' . $value . '%'
+                    );
+                });
             })
             ->when($customer, function (Builder $q, string $value): void {
                 $q->whereHas('order', function (Builder $orderQuery) use ($value): void {

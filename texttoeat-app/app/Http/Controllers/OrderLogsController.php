@@ -20,6 +20,7 @@ class OrderLogsController extends Controller
             'date_to' => ['nullable', 'date'],
             'customer' => ['nullable', 'string', 'max:255'],
             'order_reference' => ['nullable', 'string', 'max:255'],
+            'search' => ['nullable', 'string', 'max:100'],
             'status' => ['nullable', 'array'],
             'status.*' => ['string', Rule::in(array_map(
                 static fn (OrderStatus $status): string => $status->value,
@@ -38,6 +39,7 @@ class OrderLogsController extends Controller
             'date_to' => $validated['date_to'] ?? null,
             'customer' => $validated['customer'] ?? null,
             'order_reference' => $validated['order_reference'] ?? null,
+            'search' => isset($validated['search']) && trim($validated['search']) !== '' ? trim($validated['search']) : null,
             'status' => $validated['status'] ?? [],
             'channel' => $validated['channel'] ?? [],
             'staff_id' => $validated['staff_id'] ?? null,
@@ -116,6 +118,12 @@ class OrderLogsController extends Controller
                 'statusOptions' => $statusOptions,
                 'channelOptions' => $channelOptions,
                 'staffOptions' => $staffOptions,
+                'pagination' => [
+                    'from' => $logs->firstItem(),
+                    'to' => $logs->lastItem(),
+                    'total' => $logs->total(),
+                    'last_page' => $logs->lastPage(),
+                ],
             ],
         ]);
     }

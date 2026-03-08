@@ -11,7 +11,7 @@ class PickupSlotsController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'value' => ['required', 'string', 'max:64', 'unique:pickup_slots,value'],
+            'value' => ['required', 'string', 'max:' . PickupSlot::MAX_VALUE_LENGTH, 'unique:pickup_slots,value'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
         $validated['sort_order'] = $validated['sort_order'] ?? 0;
@@ -23,7 +23,7 @@ class PickupSlotsController extends Controller
     public function update(Request $request, PickupSlot $pickupSlot): RedirectResponse
     {
         $validated = $request->validate([
-            'value' => ['required', 'string', 'max:64', 'unique:pickup_slots,value,' . $pickupSlot->id],
+            'value' => ['required', 'string', 'max:' . PickupSlot::MAX_VALUE_LENGTH, 'unique:pickup_slots,value,' . $pickupSlot->id],
             'sort_order' => ['nullable', 'integer', 'min:0'],
         ]);
         $pickupSlot->update($validated);

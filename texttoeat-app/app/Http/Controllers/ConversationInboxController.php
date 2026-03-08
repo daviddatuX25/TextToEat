@@ -6,6 +6,7 @@ use App\Events\ConversationUpdated;
 use App\Models\ActionLog;
 use App\Models\ChatbotSession;
 use App\Models\InboundMessage;
+use App\Models\Setting;
 use App\Contracts\MessengerSenderInterface;
 use App\Contracts\SmsSenderInterface;
 use App\Models\OutboundMessenger;
@@ -172,7 +173,7 @@ class ConversationInboxController extends Controller
             'meta' => [
                 'statusOptions' => $statusOptions,
                 'channelOptions' => $channelOptions,
-                'takeoverTimeoutMinutes' => (int) config('chatbot.takeover_timeout_minutes', 60),
+                'takeoverTimeoutMinutes' => (int) Setting::get('chatbot.takeover_timeout_minutes', config('chatbot.takeover_timeout_minutes', 60)),
             ],
         ]);
     }
@@ -268,7 +269,7 @@ class ConversationInboxController extends Controller
             'outbound_sms' => $outboundSms,
             'thread' => $thread,
             'meta' => [
-                'takeoverTimeoutMinutes' => (int) config('chatbot.takeover_timeout_minutes', 60),
+                'takeoverTimeoutMinutes' => (int) Setting::get('chatbot.takeover_timeout_minutes', config('chatbot.takeover_timeout_minutes', 60)),
             ],
         ]);
     }

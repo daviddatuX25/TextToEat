@@ -2,33 +2,21 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
-     * Seed the application's database.
+     * Seed the application database.
+     *
+     * Default: production data only (1 admin, 2 staff, pickup slots, dining
+     * markers, delivery areas, categories, menu). Counts come from config/seed.php.
+     *
+     * For demo (production + analytics, orders, action logs):
+     *   php artisan db:seed --class=DemoSeeder
      */
     public function run(): void
     {
-        // Seeded accounts (password for both: Password1!)
-        User::updateOrCreate(
-            ['username' => 'staff'],
-            ['name' => 'Staff', 'email' => 'staff@avelinalacasandile-eat.top', 'password' => Hash::make('Password1!'), 'role' => 'staff']
-        );
-
-        User::updateOrCreate(
-            ['username' => 'admin'],
-            ['name' => 'Admin', 'email' => 'admin@avelinalacasandile-eat.top', 'password' => Hash::make('Password1!'), 'role' => 'admin']
-        );
-
-        $this->call(BootstrapAdminSeeder::class);
-        $this->call(PortalSeedDataSeeder::class);
-        $this->call(FilipinoMealsSeeder::class);
+        $this->call(ProductionSeeder::class);
     }
 }

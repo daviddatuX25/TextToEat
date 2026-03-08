@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MenuItem;
+use App\Models\Setting;
 use App\Services\MenuItemStockService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -16,18 +17,28 @@ class CustomerMenuController extends Controller
         private MenuItemStockService $stockService
     ) {}
 
-    public function index(): Response
+    public function index(): Response|RedirectResponse
     {
+        if (! Setting::get('channels.web_enabled', true)) {
+            return redirect()->route('web-unavailable');
+        }
+
         $today = Carbon::today();
         $menuItems = MenuItem::query()
+            ->with('category')
             ->whereDate('menu_date', $today)
-            ->orderBy('category')
-            ->orderBy('name')
+            ->join('categories', 'menu_items.category_id', '=', 'categories.id')
+            ->select('menu_items.*')
+            ->orderBy('categories.sort_order')
+            ->orderBy('categories.name')
+            ->orderBy('menu_items.name')
             ->get();
 
         $virtualAvailable = $this->stockService->getVirtualAvailableForTodayAll();
         $menuItemsArray = $menuItems->map(function ($item) use ($virtualAvailable) {
+            $item->load('category');
             $arr = $item->toArray();
+            $arr['category'] = $item->category?->name ?? '';
             $arr['available'] = $virtualAvailable[$item->id] ?? (int) $item->units_today;
             return $arr;
         })->values()->all();
@@ -42,12 +53,16 @@ class CustomerMenuController extends Controller
 
     public function addToCart(Request $request): RedirectResponse
     {
+        if (! Setting::get('channels.web_enabled', true)) {
+            return redirect()->route('web-unavailable');
+        }
+
         $validated = $request->validate([
             'menu_item_id' => ['required', 'integer', 'exists:menu_items,id'],
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        $menuItem = MenuItem::findOrFail($validated['menu_item_id']);
+        $menuItem = MenuItem::with('category')->findOrFail($validated['menu_item_id']);
         $today = Carbon::today();
 
         if (! $menuItem->menu_date->isSameDay($today)) {
@@ -63,6 +78,9 @@ class CustomerMenuController extends Controller
         foreach ($cart as $i => $line) {
             if ((int) $line['menu_item_id'] === (int) $menuItem->id) {
                 $cart[$i]['quantity'] = $line['quantity'] + $validated['quantity'];
+                if (! isset($cart[$i]['category'])) {
+                    $cart[$i]['category'] = $menuItem->category?->name ?? '';
+                }
                 $found = true;
                 break;
             }
@@ -73,6 +91,7 @@ class CustomerMenuController extends Controller
                 'name' => $menuItem->name,
                 'price' => (string) $menuItem->price,
                 'quantity' => $validated['quantity'],
+                'category' => $menuItem->category?->name ?? '',
             ];
         }
 
@@ -83,6 +102,10 @@ class CustomerMenuController extends Controller
 
     public function updateCart(Request $request): RedirectResponse
     {
+        if (! Setting::get('channels.web_enabled', true)) {
+            return redirect()->route('web-unavailable');
+        }
+
         $validated = $request->validate([
             'menu_item_id' => ['required', 'integer'],
             'quantity' => ['required', 'integer', 'min:0'],
@@ -107,6 +130,10 @@ class CustomerMenuController extends Controller
 
     public function removeFromCart(Request $request): RedirectResponse
     {
+        if (! Setting::get('channels.web_enabled', true)) {
+            return redirect()->route('web-unavailable');
+        }
+
         $validated = $request->validate([
             'menu_item_id' => ['required', 'integer'],
         ]);

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Category;
 use App\Models\ChatbotSession;
 use App\Models\Conversation;
 use App\Models\DeliveryArea;
@@ -13,6 +14,14 @@ use Tests\TestCase;
 class ChatbotWebhookTest extends TestCase
 {
     use RefreshDatabase;
+
+    private ?Category $mainCategory = null;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->mainCategory = Category::firstOrCreate(['name' => 'main'], ['name' => 'main']);
+    }
 
     public function test_webhook_creates_session_and_returns_welcome_reply(): void
     {
@@ -135,7 +144,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Sinigang',
             'price' => 85.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 10,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -199,7 +208,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Adobo',
             'price' => 75.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -247,7 +256,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Lechon',
             'price' => 120.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 3,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -435,7 +444,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Adobo',
             'price' => 75.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -668,7 +677,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Adobo',
             'price' => 75.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -705,7 +714,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Sinigang',
             'price' => 85.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 10,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -742,7 +751,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Lechon',
             'price' => 120.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 3,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -834,7 +843,7 @@ class ChatbotWebhookTest extends TestCase
         $item = MenuItem::create([
             'name' => 'Sinigang',
             'price' => 85.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 10,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -967,7 +976,7 @@ class ChatbotWebhookTest extends TestCase
         $item = MenuItem::create([
             'name' => 'Sinigang',
             'price' => 85.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 10,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1044,7 +1053,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Adobo',
             'price' => 75.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1107,7 +1116,7 @@ class ChatbotWebhookTest extends TestCase
         $item = MenuItem::create([
             'name' => 'Lechon',
             'price' => 120.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 10,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1151,7 +1160,7 @@ class ChatbotWebhookTest extends TestCase
         $item = MenuItem::create([
             'name' => 'Sinigang',
             'price' => 85.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 10,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1185,7 +1194,7 @@ class ChatbotWebhookTest extends TestCase
         Order::create([
             'reference' => 'ABC123XY',
             'channel' => 'web',
-            'status' => 'confirmed',
+            'status' => 'preparing',
             'customer_name' => '',
             'customer_phone' => '',
             'total' => 50.00,
@@ -1200,8 +1209,8 @@ class ChatbotWebhookTest extends TestCase
         $replies = $response->json('replies');
         $this->assertGreaterThanOrEqual(1, count($replies));
         $fullReply = implode(' ', $replies);
-        // Pickup + confirmed -> always show actual status
-        $this->assertStringContainsString('confirmed', strtolower($fullReply));
+        // Pickup + preparing -> always show actual status
+        $this->assertStringContainsString('preparing', strtolower($fullReply));
         $this->assertStringContainsString('What would you like to do?', $fullReply);
     }
 
@@ -1223,7 +1232,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Rare Dish',
             'price' => 50.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 0,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1251,7 +1260,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Pancit',
             'price' => 80.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1289,7 +1298,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Item A',
             'price' => 10.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1319,7 +1328,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Item A',
             'price' => 10.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1353,7 +1362,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Item B',
             'price' => 15.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1376,7 +1385,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Item A',
             'price' => 10.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1683,7 +1692,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Adobo',
             'price' => 75.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1709,7 +1718,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Sinigang',
             'price' => 85.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 10,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1735,7 +1744,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Lechon',
             'price' => 120.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1763,7 +1772,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Adobo',
             'price' => 75.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 5,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1781,7 +1790,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Pancit',
             'price' => 65.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 10,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),
@@ -1817,7 +1826,7 @@ class ChatbotWebhookTest extends TestCase
         MenuItem::create([
             'name' => 'Lumpia',
             'price' => 55.00,
-            'category' => 'main',
+            'category_id' => $this->mainCategory->id,
             'units_today' => 10,
             'is_sold_out' => false,
             'menu_date' => now()->toDateString(),

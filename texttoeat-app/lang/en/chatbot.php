@@ -52,7 +52,7 @@ return [
     'status_push_unpaid_delivery_total' => 'Please have ₱:total ready for payment on delivery.',
     'status_push_unpaid_delivery_cash' => 'Please have cash ready for payment on delivery.',
     'status_label_received' => 'Received',
-    'status_label_confirmed' => 'Confirmed',
+    'status_label_preparing' => 'Preparing',
     'status_label_ready' => 'Ready',
     'status_label_on_the_way' => 'On the way',
     'status_label_completed' => 'Completed',

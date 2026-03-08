@@ -1,7 +1,8 @@
 import { Link, router } from '@inertiajs/react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePortalConversationsLive } from '../hooks/usePortalConversationsLive';
 import PortalLayout from '../Layouts/PortalLayout';
+import { TypewriterText } from '../components/ui';
 
 function ModeBadge({ mode }) {
     if (mode === 'staff_only') {
@@ -81,6 +82,17 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
         router.post(`/portal/inbox/sessions/${session.id}/resolve`, {}, { onFinish: () => setResolving(false) });
     };
 
+    const handleReplyKeyDown = useCallback(
+        (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                const trimmed = message.trim();
+                if (trimmed && !sending) submitReply(e);
+            }
+        },
+        [message, sending]
+    );
+
     return (
         <PortalLayout>
             <section className="flex flex-col gap-6 animate-fade-in">
@@ -97,7 +109,7 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
                     </Link>
                 </div>
 
-                <header className="space-y-2">
+                <header className="space-y-3">
                     <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
                         {session?.saved_customer_name || session?.external_id}
                     </h1>
@@ -115,8 +127,10 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
                         )}
                     </div>
                     {session?.mode !== 'bot' && (
-                        <p className="text-surface-600 dark:text-surface-400 text-sm">
-                            Takeover expires after {takeoverTimeoutMinutes} minutes of no activity and returns to bot mode.
+                        <p className="text-surface-500 dark:text-surface-400 text-sm">
+                            <TypewriterText
+                                text={`Takeover expires after ${takeoverTimeoutMinutes} minutes of no activity and returns to bot mode.`}
+                            />
                         </p>
                     )}
                 </header>
@@ -136,7 +150,11 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
                 )}
 
                 {session?.mode !== 'bot' && (
-                <div className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-900/60 p-4 flex flex-col gap-3">
+                <div
+                    className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-900/60 p-4 flex flex-col gap-3"
+                    role="region"
+                    aria-label="Takeover controls"
+                >
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <div className="text-sm font-bold text-surface-800 dark:text-surface-100">
                             Automated responses
@@ -175,15 +193,23 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
                     )}
 
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-surface-200 dark:border-surface-700">
-                        <div className="text-sm font-bold text-surface-800 dark:text-surface-100">Mark solved</div>
-                        <button
-                            type="button"
-                            disabled={resolving}
-                            onClick={markSolved}
-                            className="rounded-lg px-3 py-1.5 text-sm font-semibold border border-primary-500 bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50"
-                        >
-                            Return to bot
-                        </button>
+                        <div className="text-sm font-bold text-surface-800 dark:text-surface-100">Quick actions</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Link
+                                href="/portal/quick-orders"
+                                className="rounded-lg px-3 py-1.5 text-sm font-semibold border border-primary-500 bg-primary-600 text-white hover:bg-primary-700 transition-colors inline-flex items-center gap-1.5"
+                            >
+                                Create order
+                            </Link>
+                            <button
+                                type="button"
+                                disabled={resolving}
+                                onClick={markSolved}
+                                className="rounded-lg px-3 py-1.5 text-sm font-semibold border border-surface-300 bg-surface-100 text-surface-800 hover:bg-surface-200 dark:border-surface-600 dark:bg-surface-700 dark:text-surface-200 dark:hover:bg-surface-600 transition-colors disabled:opacity-50"
+                            >
+                                Return to bot
+                            </button>
+                        </div>
                     </div>
                 </div>
                 )}
@@ -228,19 +254,27 @@ export default function ConversationInboxShow({ session, outbound_sms: outboundS
 
                 {session?.mode !== 'bot' && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-900/60 p-4">
+                    <div
+                        className="rounded-2xl border border-surface-200 dark:border-surface-700 bg-white/80 dark:bg-surface-900/60 p-4"
+                        role="region"
+                        aria-label="Reply to customer"
+                    >
                         <div className="flex items-center justify-between gap-2 mb-3">
                             <h2 className="text-lg font-bold">Reply</h2>
                             <span className="text-xs text-surface-500">
                                 {isSms ? 'Sends via SMS (FCM → phone)' : isMessenger ? 'Sends via Messenger' : ''}
                             </span>
                         </div>
-                        <form onSubmit={submitReply} className="flex flex-col gap-3">
+                        <p className="text-xs text-surface-500 mb-2">
+                            Use Tab to move between sections; Ctrl+Enter to send.
+                        </p>
+                        <form onSubmit={submitReply} className="flex flex-col gap-3" onKeyDown={handleReplyKeyDown}>
                             <textarea
                                 value={message}
                                 onChange={(e) => setMessage(e.target.value)}
                                 rows={5}
-                                placeholder="Type your message…"
+                                placeholder="Type your message… (Tab to move between sections; Ctrl+Enter to send)"
+                                aria-label="Reply message"
                                 className="w-full rounded-xl border-2 border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                             />
                             <button

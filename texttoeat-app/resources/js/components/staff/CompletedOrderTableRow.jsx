@@ -1,11 +1,12 @@
 import { router } from '@inertiajs/react';
 import { Globe, MessageCircle, UserRound, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatCurrency } from '../../utils/formatNumber';
 
 const CHANNEL_BADGES = {
     sms: { icon: MessageCircle, label: 'SMS', color: 'bg-surface-200 text-surface-700 dark:bg-surface-700 dark:text-surface-300' },
     messenger: { icon: MessageCircle, label: 'Messenger', color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300' },
-    web: { icon: Globe, label: 'Online', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' },
+    web: { icon: Globe, label: 'Web', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' },
     walkin: { icon: UserRound, label: 'Walk-in', color: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300' },
 };
 
@@ -67,7 +68,7 @@ export function CompletedOrderTableRow({ order }) {
             <td className="py-2.5 px-3 whitespace-nowrap">
                 <span className={`${badge.color} text-[10px] font-semibold px-1.5 py-0.5 rounded inline-flex items-center gap-1`}>
                     <Icon className="h-3 w-3" />
-                    {channel === 'web' ? 'Online' : badge.label}
+                    {badge.label}
                 </span>
             </td>
             <td className="py-2.5 px-3 text-xs text-surface-600 dark:text-surface-400 max-w-[120px] truncate" title={typeLabel}>
@@ -95,7 +96,7 @@ export function CompletedOrderTableRow({ order }) {
                     className="font-bold text-sm tabular-nums text-primary-600 dark:text-primary-400 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-500 rounded"
                     title={isPaid ? 'Mark unpaid' : 'Mark paid'}
                 >
-                    ₱{Number(order.total).toFixed(2)}
+                    {formatCurrency(Number(order.total))}
                 </button>
             </td>
             <td className="py-2.5 px-3 text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap">

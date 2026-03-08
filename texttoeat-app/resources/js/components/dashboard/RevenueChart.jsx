@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
     ResponsiveContainer,
     LineChart,
@@ -10,11 +9,8 @@ import {
     Line,
 } from 'recharts';
 
-export default function RevenueChart({ revenueWeekly = [], revenueMonthly = [], formatCurrency, className = '' }) {
-    const [range, setRange] = useState('week');
-    const data = range === 'week' ? revenueWeekly : revenueMonthly;
-    const xKey = range === 'week' ? 'label' : 'label';
-    const hasData = Array.isArray(data) && data.length > 0;
+export default function RevenueChart({ revenueByHour = [], formatCurrency, className = '' }) {
+    const hasData = Array.isArray(revenueByHour) && revenueByHour.length > 0;
 
     const safeFormatCurrency =
         typeof formatCurrency === 'function'
@@ -27,22 +23,6 @@ export default function RevenueChart({ revenueWeekly = [], revenueMonthly = [], 
     if (!hasData) {
         return (
             <div className={`flex flex-col min-h-[280px] ${className}`.trim()}>
-                <div className="flex justify-end gap-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-800/50 p-1 mb-3 w-fit ml-auto">
-                    <button
-                        type="button"
-                        onClick={() => setRange('week')}
-                        className={`rounded-md px-2.5 py-1 text-xs font-medium ${range === 'week' ? 'bg-white dark:bg-surface-700 shadow text-surface-900 dark:text-surface-100' : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-200'}`}
-                    >
-                        Week
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setRange('month')}
-                        className={`rounded-md px-2.5 py-1 text-xs font-medium ${range === 'month' ? 'bg-white dark:bg-surface-700 shadow text-surface-900 dark:text-surface-100' : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-200'}`}
-                    >
-                        Month
-                    </button>
-                </div>
                 <div className="flex flex-1 items-center justify-center text-xs text-surface-500 dark:text-surface-400">
                     No revenue data yet.
                 </div>
@@ -50,7 +30,7 @@ export default function RevenueChart({ revenueWeekly = [], revenueMonthly = [], 
         );
     }
 
-    const chartData = data.map((d) => ({
+    const chartData = revenueByHour.map((d) => ({
         ...d,
         walkin: Number(d.walkin ?? 0),
         delivery: Number(d.delivery ?? 0),
@@ -64,31 +44,16 @@ export default function RevenueChart({ revenueWeekly = [], revenueMonthly = [], 
 
     return (
         <div className={`flex w-full flex-1 flex-col min-h-[280px] ${className}`.trim()}>
-            <div className="flex justify-end gap-1 rounded-lg border border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-800/50 p-1 mb-3 w-fit ml-auto shrink-0">
-                <button
-                    type="button"
-                    onClick={() => setRange('week')}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${range === 'week' ? 'bg-white dark:bg-surface-700 shadow text-surface-900 dark:text-surface-100' : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-200'}`}
-                >
-                    Week
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setRange('month')}
-                    className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${range === 'month' ? 'bg-white dark:bg-surface-700 shadow text-surface-900 dark:text-surface-100' : 'text-surface-600 dark:text-surface-400 hover:text-surface-900 dark:hover:text-surface-200'}`}
-                >
-                    Month
-                </button>
-            </div>
             <div className="flex-1 min-h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                         <XAxis
-                            dataKey={xKey}
+                            dataKey="label"
                             tickLine={false}
                             axisLine={false}
                             tick={{ fill: '#6b7280', fontSize: 11 }}
+                            interval={1}
                         />
                         <YAxis
                             tickLine={false}
@@ -100,7 +65,6 @@ export default function RevenueChart({ revenueWeekly = [], revenueMonthly = [], 
                         <Tooltip
                             cursor={{ fill: 'rgba(148, 163, 184, 0.12)' }}
                             formatter={(value) => safeFormatCurrency(value)}
-                            labelFormatter={(label) => (range === 'week' ? label : label)}
                             content={({ active, payload, label }) => {
                                 if (!active || !payload?.length) return null;
                                 return (

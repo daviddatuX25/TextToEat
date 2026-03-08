@@ -1,6 +1,7 @@
 import { router, useForm } from '@inertiajs/react';
 import AppLayout from '../Layouts/AppLayout';
 import { Button, Card, Input, SectionHeading } from '../components/ui';
+import { formatCurrency } from '../utils/formatNumber';
 
 const DELIVERY_PLACES = [
     { value: 'Municipal Hall', label: 'Municipal Hall (free delivery)' },
@@ -43,12 +44,12 @@ export default function Checkout({ cart = [], total = 0 }) {
                                 {cart.map((line) => (
                                     <li key={line.menu_item_id} className="flex justify-between p-3 text-sm">
                                         <span>{line.name} × {line.quantity}</span>
-                                        <span>₱{(parseFloat(line.price) * parseInt(line.quantity, 10)).toFixed(2)}</span>
+                                        <span>{formatCurrency(parseFloat(line.price) * parseInt(line.quantity, 10))}</span>
                                     </li>
                                 ))}
                             </ul>
                             <div className="border-t border-surface-200 p-3 font-bold dark:border-surface-800">
-                                Total: ₱{Number(total).toFixed(2)}
+                                Total: {formatCurrency(Number(total))}
                             </div>
                         </Card>
                     </div>

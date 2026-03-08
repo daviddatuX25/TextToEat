@@ -13,8 +13,11 @@ class OrderUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public function __construct(public Order $order)
-    {
+    public function __construct(
+        public Order $order,
+        public bool $statusChanged = false,
+        public bool $paymentStatusChanged = false,
+    ) {
     }
 
     public function broadcastOn(): array
@@ -32,6 +35,12 @@ class OrderUpdated implements ShouldBroadcastNow
         return [
             'order_id' => $this->order->id,
             'reference' => $this->order->reference,
+            'status' => $this->order->status,
+            'delivery_type' => $this->order->delivery_type ?? 'pickup',
+            'channel' => $this->order->channel ?? '',
+            'status_changed' => $this->statusChanged,
+            'payment_status_changed' => $this->paymentStatusChanged,
+            'payment_status' => $this->order->payment_status ?? 'unpaid',
         ];
     }
 }

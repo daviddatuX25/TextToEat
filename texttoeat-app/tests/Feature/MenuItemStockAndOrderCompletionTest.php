@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\OrderStatus;
+use App\Models\Category;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -18,10 +19,11 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
     public function test_virtual_available_excludes_pending_orders(): void
     {
         $today = Carbon::today();
+        $category = Category::firstOrCreate(['name' => 'Ulam'], ['name' => 'Ulam']);
         $item = MenuItem::create([
             'name' => 'Adobo',
             'price' => 100,
-            'category' => 'Ulam',
+            'category_id' => $category->id,
             'units_today' => 10,
             'menu_date' => $today,
         ]);
@@ -43,6 +45,7 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
             'order_id' => $order->id,
             'menu_item_id' => $item->id,
             'name' => $item->name,
+            'category_name' => $category->name,
             'quantity' => 3,
             'price' => $item->price,
         ]);
@@ -58,10 +61,11 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
     public function test_completing_order_decrements_units_today(): void
     {
         $today = Carbon::today();
+        $category = Category::firstOrCreate(['name' => 'Soup'], ['name' => 'Soup']);
         $item = MenuItem::create([
             'name' => 'Sinigang',
             'price' => 120,
-            'category' => 'Soup',
+            'category_id' => $category->id,
             'units_today' => 20,
             'menu_date' => $today,
         ]);
@@ -79,6 +83,7 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
             'order_id' => $order->id,
             'menu_item_id' => $item->id,
             'name' => $item->name,
+            'category_name' => $category->name,
             'quantity' => 2,
             'price' => $item->price,
         ]);
@@ -100,23 +105,25 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
         $user = \App\Models\User::factory()->create();
         $this->actingAs($user);
 
+        $category = \App\Models\Category::firstOrCreate(['name' => 'Ulam'], ['name' => 'Ulam']);
+
         $response = $this->post('/portal/menu-items', [
             'name' => 'Test Item',
             'price' => 99,
-            'category' => 'InvalidCategory',
+            'category_id' => 99999,
             'units_today' => 10,
         ]);
 
-        $response->assertSessionHasErrors('category');
+        $response->assertSessionHasErrors('category_id');
         $this->assertDatabaseMissing('menu_items', ['name' => 'Test Item']);
 
         $response = $this->post('/portal/menu-items', [
             'name' => 'Valid Item',
             'price' => 99,
-            'category' => 'Ulam',
+            'category_id' => $category->id,
             'units_today' => 10,
         ]);
         $response->assertRedirect();
-        $this->assertDatabaseHas('menu_items', ['name' => 'Valid Item', 'category' => 'Ulam']);
+        $this->assertDatabaseHas('menu_items', ['name' => 'Valid Item', 'category_id' => $category->id]);
     }
 }

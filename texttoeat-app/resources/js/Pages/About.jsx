@@ -6,18 +6,19 @@ import {
     ArrowRight, Radio, SmartphoneNfc,
     Globe, ServerCog, Palette, BellRing, MessageCircle
 } from 'lucide-react';
+import { AnimateOnScroll, StaggerScrollIn } from '../components/ui';
 
 export default function About() {
     return (
         <AppLayout>
-            <article className="mx-auto max-w-5xl space-y-16 animate-fade-in relative z-0 pb-16 pt-8">
+            <article className="mx-auto max-w-5xl space-y-16 relative z-0 pb-16 pt-8">
                 {/* Decorative background grids & glow */}
                 <div className="absolute inset-x-0 top-0 h-[500px] w-full bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:40px_40px] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none -z-10"></div>
                 <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/10 dark:bg-primary-500/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
                 <div className="absolute top-[40%] left-0 w-96 h-96 bg-blue-500/10 dark:bg-blue-500/5 blur-[120px] rounded-full pointer-events-none -z-10"></div>
 
                 {/* Hero Header */}
-                <header className="space-y-6 text-center max-w-3xl mx-auto px-4">
+                <header className="space-y-6 text-center max-w-3xl mx-auto px-4 animate-fade-in">
                     <div className="relative inline-block">
                         <div className="absolute inset-0 bg-primary-500 blur-2xl opacity-20 rounded-full animate-pulse-slow"></div>
                         <img
@@ -51,8 +52,8 @@ export default function About() {
                 </header>
 
                 {/* What is TextToEat Section */}
-                <section className="grid md:grid-cols-2 gap-8 px-4">
-                    <div className="space-y-6 p-8 rounded-3xl border border-surface-200/60 bg-white/60 dark:border-surface-800/60 dark:bg-surface-900/40 backdrop-blur-md shadow-xl shadow-surface-200/20 dark:shadow-none hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors">
+                <StaggerScrollIn as="section" className="grid md:grid-cols-2 gap-8 px-4">
+                    <div className="scroll-in space-y-6 p-8 rounded-3xl border border-surface-200/60 bg-white/60 dark:border-surface-800/60 dark:bg-surface-900/40 backdrop-blur-md shadow-xl shadow-surface-200/20 dark:shadow-none hover:border-primary-200 dark:hover:border-primary-900/50 transition-colors" style={{ '--stagger-index': 0 }}>
                         <div className="h-12 w-12 rounded-xl bg-primary-100 text-primary-600 dark:bg-primary-900/30 dark:text-primary-400 flex items-center justify-center mb-6">
                             <Zap className="h-6 w-6" />
                         </div>
@@ -62,7 +63,7 @@ export default function About() {
                         </p>
                     </div>
 
-                    <div className="space-y-6 p-8 rounded-3xl border border-surface-200/60 bg-white/60 dark:border-surface-800/60 dark:bg-surface-900/40 backdrop-blur-md shadow-xl shadow-surface-200/20 dark:shadow-none hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors">
+                    <div className="scroll-in space-y-6 p-8 rounded-3xl border border-surface-200/60 bg-white/60 dark:border-surface-800/60 dark:bg-surface-900/40 backdrop-blur-md shadow-xl shadow-surface-200/20 dark:shadow-none hover:border-blue-200 dark:hover:border-blue-900/50 transition-colors" style={{ '--stagger-index': 1 }}>
                         <div className="h-12 w-12 rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex items-center justify-center mb-6">
                             <ShieldCheck className="h-6 w-6" />
                         </div>
@@ -80,18 +81,18 @@ export default function About() {
                             </div>
                         </div>
                     </div>
-                </section>
+                </StaggerScrollIn>
 
                 {/* Tech Stack Grid */}
                 <section className="space-y-10 px-4">
-                    <div className="text-center space-y-4 max-w-2xl mx-auto">
+                    <AnimateOnScroll className="text-center space-y-4 max-w-2xl mx-auto">
                         <h2 className="text-3xl font-extrabold text-surface-900 dark:text-white">Technology Stack</h2>
                         <p className="text-surface-600 dark:text-surface-400 font-medium">
                             Built with modern, scalable, and responsive web technologies.
                         </p>
-                    </div>
+                    </AnimateOnScroll>
 
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <StaggerScrollIn className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         {[
                             { title: 'Laravel', role: 'Backend API & FSM Engine', icon: Server, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/10' },
                             { title: 'MySQL / PostgreSQL', role: 'Relational database (swappable via Eloquent)', icon: Database, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/10' },
@@ -101,7 +102,7 @@ export default function About() {
                             { title: 'FB Messenger', role: 'Messenger Platform / Graph API (chatbot channel)', icon: MessageCircle, color: 'text-[#0084FF]', bg: 'bg-blue-50 dark:bg-blue-900/10' },
                             { title: 'TextBee', role: 'Android SMS Gateway', icon: Radio, color: 'text-emerald-500', bg: 'bg-emerald-50 dark:bg-emerald-900/10' },
                         ].map((tech, i) => (
-                            <div key={i} className="flex flex-col items-center justify-center p-6 text-center rounded-2xl border border-surface-200/50 bg-white/50 dark:border-surface-800/50 dark:bg-surface-800/30 backdrop-blur-sm transition-transform hover:-translate-y-1">
+                            <div key={i} className="scroll-in flex flex-col items-center justify-center p-6 text-center rounded-2xl border border-surface-200/50 bg-white/50 dark:border-surface-800/50 dark:bg-surface-800/30 backdrop-blur-sm transition-transform hover:-translate-y-1" style={{ '--stagger-index': i }}>
                                 <div className={`h-12 w-12 rounded-full ${tech.bg} flex items-center justify-center mb-4`}>
                                     <tech.icon className={`h-6 w-6 ${tech.color}`} />
                                 </div>
@@ -109,11 +110,11 @@ export default function About() {
                                 <p className="text-xs text-surface-500 dark:text-surface-400 font-medium">{tech.role}</p>
                             </div>
                         ))}
-                    </div>
+                    </StaggerScrollIn>
                 </section>
 
                 {/* Deployment and Hosting */}
-                <section className="space-y-6 px-4">
+                <AnimateOnScroll as="section" className="space-y-6 px-4">
                     <div className="flex flex-col md:flex-row gap-6 items-center p-8 rounded-3xl border border-surface-200/60 bg-surface-100/30 dark:border-surface-800/60 dark:bg-surface-900/40 backdrop-blur-md">
                         <div className="w-full md:w-1/3 space-y-2">
                             <h2 className="text-2xl font-bold text-surface-900 dark:text-white">Deployment & Hosting</h2>
@@ -138,10 +139,10 @@ export default function About() {
                             </div>
                         </div>
                     </div>
-                </section>
+                </AnimateOnScroll>
 
                 {/* Flow Architecture Diagram (CSS Grid based) */}
-                <section className="space-y-10 px-4 py-8 rounded-[2.5rem] bg-surface-900 dark:bg-black text-surface-50 overflow-hidden relative border border-surface-800 shadow-2xl">
+                <AnimateOnScroll as="section" className="space-y-10 px-4 py-8 rounded-[2.5rem] bg-surface-900 dark:bg-black text-surface-50 overflow-hidden relative border border-surface-800 shadow-2xl">
                     {/* Glowing background in dark section */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-[600px] bg-primary-900/20 blur-[120px] rounded-full pointer-events-none"></div>
 
@@ -254,15 +255,15 @@ export default function About() {
                             </p>
                         </div>
                     </div>
-                </section>
+                </AnimateOnScroll>
 
                 {/* Simple Outro */}
-                <section className="text-center space-y-4 border-t border-surface-200 dark:border-surface-800 pt-16 mt-8">
+                <AnimateOnScroll as="section" className="text-center space-y-4 border-t border-surface-200 dark:border-surface-800 pt-16 mt-8">
                     <UtensilsCrossed className="h-8 w-8 text-surface-300 dark:text-surface-600 mx-auto" />
                     <p className="text-surface-500 dark:text-surface-500 text-sm font-medium">
                         Focused on bridging local, traditional eateries with modern technical solutions.
                     </p>
-                </section>
+                </AnimateOnScroll>
 
             </article>
         </AppLayout>

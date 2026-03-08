@@ -95,7 +95,7 @@ class OrderStatusNotificationService
         $pickupSlot = trim((string) ($order->pickup_slot ?? ''));
         $paymentStatus = $order->payment_status;
         $isPaid = $paymentStatus === 'paid' || (is_object($paymentStatus) && $paymentStatus->value === 'paid');
-        $totalFormatted = number_format((float) ($order->total ?? 0), 2);
+        $totalFormatted = number_format((float) ($order->total ?? 0), 2, '.', ',');
 
         $resolver = app(ChatbotReplyResolver::class);
         if ($toStatus === 'on_the_way' && $deliveryType === 'delivery') {
