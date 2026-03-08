@@ -13,31 +13,59 @@ import {
     ClipboardList,
     Inbox,
     MessageCircle,
+    Settings,
     Users,
     Sun,
     Moon,
     Smartphone,
     Bot,
     User,
+    ChevronRight,
+    ChevronDown,
 } from 'lucide-react';
 import { SiFacebook } from 'react-icons/si';
 import { Toaster, toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
+import { Button } from '../components/ui/Button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../components/ui/Collapsible';
 
-const PORTAL_NAV_ITEMS_BASE = [
-    { href: '/portal', label: 'Dashboard', Icon: LayoutDashboard },
-    { href: '/portal/orders', label: 'Orders', Icon: ListOrdered },
-    { href: '/portal/orders/completed', label: 'Completed orders', Icon: CheckCircle },
-    { href: '/portal/quick-orders', label: 'Create order', Icon: Zap },
-    { href: '/portal/deliveries', label: 'Deliveries', Icon: Truck },
-    { href: '/portal/pickup', label: 'Pickup counter', Icon: Store },
-    { href: '/portal/walkin', label: 'Walk-in', Icon: UtensilsCrossed },
-    { href: '/portal/menu-items', label: "Today's menu", Icon: BookOpen },
-    { href: '/portal/logs/orders', label: 'Order logs', Icon: ClipboardList },
-    { href: '/portal/inbox', label: 'Conversation inbox', Icon: Inbox },
-    { href: '/portal/logs/chatbot', label: 'Chatbot logs', Icon: MessageCircle },
-];
-const PORTAL_NAV_ITEM_SMS_DEVICES = { href: '/portal/sms-devices', label: 'SMS devices', Icon: Smartphone };
-const PORTAL_NAV_ITEM_FACEBOOK_MESSENGER = { href: '/portal/facebook-messenger', label: 'Facebook Messenger', Icon: SiFacebook };
+const PORTAL_NAV_LINK_DASHBOARD = { type: 'link', href: '/portal', label: 'Dashboard', Icon: LayoutDashboard };
+const PORTAL_NAV_GROUP_ORDERS = {
+    type: 'group',
+    label: 'Orders',
+    Icon: ListOrdered,
+    items: [
+        { href: '/portal/orders', label: 'Orders', Icon: ListOrdered },
+        { href: '/portal/orders/completed', label: 'Completed orders', Icon: CheckCircle },
+        { href: '/portal/quick-orders', label: 'Create order', Icon: Zap },
+        { href: '/portal/deliveries', label: 'Deliveries', Icon: Truck },
+        { href: '/portal/pickup', label: 'Pickup counter', Icon: Store },
+        { href: '/portal/walkin', label: 'Walk-in', Icon: UtensilsCrossed },
+        { href: '/portal/logs/orders', label: 'Order logs', Icon: ClipboardList },
+    ],
+};
+const PORTAL_NAV_LINK_MENU = { type: 'link', href: '/portal/menu-items', label: "Today's menu", Icon: BookOpen };
+const PORTAL_NAV_GROUP_CONVERSATIONS = {
+    type: 'group',
+    label: 'Conversations',
+    Icon: MessageCircle,
+    items: [
+        { href: '/portal/inbox', label: 'Conversation inbox', Icon: Inbox },
+        { href: '/portal/logs/chatbot', label: 'Chatbot logs', Icon: MessageCircle },
+    ],
+};
+const PORTAL_NAV_GROUP_CHANNELS_SETTINGS = {
+    type: 'group',
+    label: 'Channels & settings',
+    Icon: Settings,
+    items: [
+        { href: '/portal/sms-devices', label: 'SMS devices', Icon: Smartphone },
+        { href: '/portal/facebook-messenger', label: 'Facebook Messenger', Icon: SiFacebook },
+        { href: '/portal/chatbot-replies', label: 'Reply templates', Icon: Settings },
+        { href: '/portal/simulate', label: 'Channel simulator', Icon: Bot },
+        { href: '/portal/users', label: 'Manage users', Icon: Users },
+    ],
+};
 
 function getPathname(url) {
     try {
@@ -51,6 +79,10 @@ function isPortalNavActive(href, pathname) {
     if (href === '/portal') return pathname === '/portal';
     if (href === '/portal/orders') return pathname === '/portal/orders';
     return pathname === href || pathname.startsWith(href + '/');
+}
+
+function isGroupActive(items, pathname) {
+    return items.some((item) => isPortalNavActive(item.href, pathname));
 }
 
 function NavLink({ href, label, Icon, pathname, onClick }) {
@@ -112,7 +144,54 @@ function ThemeToggle() {
     );
 }
 
-function SidebarContent({ navItems, pathname, onNavClick }) {
+function NavGroup({ group, pathname, onNavClick }) {
+    const { label, Icon, items } = group;
+    const isActive = isGroupActive(items, pathname);
+    const [userOpen, setUserOpen] = useState(() => isGroupActive(items, pathname));
+    // When user navigates into this group, open it; otherwise respect their toggle
+    useEffect(() => {
+        if (isActive) setUserOpen(true);
+    }, [isActive]);
+    const open = userOpen;
+    const activeTriggerClass = isActive
+        ? 'text-primary-700 font-semibold dark:text-primary-300 bg-primary-100 dark:bg-primary-500/20'
+        : 'text-surface-600 hover:text-primary-600 dark:text-surface-400 dark:hover:text-primary-400 hover:bg-surface-100 dark:hover:bg-surface-800';
+    return (
+        <Collapsible open={open} onOpenChange={setUserOpen} className="group/collapsible">
+            <CollapsibleTrigger
+                className={`flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-[color,transform] duration-150 whitespace-nowrap active:scale-[0.98] ${activeTriggerClass}`}
+                aria-expanded={open}
+            >
+                {Icon && (
+                    <span className="flex shrink-0 w-6 min-w-6 items-center justify-center text-[1.125rem]" aria-hidden>
+                        <Icon className="h-5 w-5 shrink-0" strokeWidth={2} />
+                    </span>
+                )}
+                {label}
+                <span className="ml-auto flex shrink-0" aria-hidden>
+                    <ChevronRight className="h-5 w-5 group-data-[state=open]/collapsible:hidden" />
+                    <ChevronDown className="h-5 w-5 hidden group-data-[state=open]/collapsible:block" />
+                </span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+                <div className="flex flex-col gap-1 pl-4 pt-1">
+                    {items.map((item) => (
+                        <NavLink
+                            key={item.href}
+                            href={item.href}
+                            label={item.label}
+                            Icon={item.Icon}
+                            pathname={pathname}
+                            onClick={onNavClick}
+                        />
+                    ))}
+                </div>
+            </CollapsibleContent>
+        </Collapsible>
+    );
+}
+
+function SidebarContent({ navEntries, pathname, onNavClick }) {
     return (
         <>
             <div className="flex items-center gap-3 px-4 py-5 border-b border-surface-200 dark:border-surface-800">
@@ -129,16 +208,23 @@ function SidebarContent({ navItems, pathname, onNavClick }) {
                 </Link>
             </div>
             <nav className="flex flex-col gap-1 p-4 overflow-y-auto flex-1">
-                {navItems.map((item) => (
-                    <NavLink
-                        key={item.href}
-                        href={item.href}
-                        label={item.label}
-                        Icon={item.Icon}
-                        pathname={pathname}
-                        onClick={onNavClick}
-                    />
-                ))}
+                {navEntries.map((entry) => {
+                    if (entry.type === 'link') {
+                        return (
+                            <NavLink
+                                key={entry.href}
+                                href={entry.href}
+                                label={entry.label}
+                                Icon={entry.Icon}
+                                pathname={pathname}
+                                onClick={onNavClick}
+                            />
+                        );
+                    }
+                    return (
+                        <NavGroup key={entry.label} group={entry} pathname={pathname} onNavClick={onNavClick} />
+                    );
+                })}
             </nav>
             <div className="p-4 border-t border-surface-200 dark:border-surface-800 space-y-2">
                 <Link
@@ -173,7 +259,7 @@ const DEBUG_LOG = (location, message, data, hypothesisId) => {
 };
 
 export default function PortalLayout({ children }) {
-    const { auth, flash } = usePage().props;
+    const { auth, flash, show_daily_greeting } = usePage().props;
     const pageUrl = usePage().url;
     const pathname = getPathname(pageUrl);
     const isAdmin = auth?.user?.role === 'admin';
@@ -199,20 +285,42 @@ export default function PortalLayout({ children }) {
         if (flash?.success) toast.success(flash.success);
     }, [flash?.error, flash?.success]);
 
-    const navItems = [...PORTAL_NAV_ITEMS_BASE];
-    if (isAdmin) {
-        navItems.push(PORTAL_NAV_ITEM_SMS_DEVICES);
-        navItems.push(PORTAL_NAV_ITEM_FACEBOOK_MESSENGER);
-        navItems.push({ href: '/portal/simulate', label: 'Channel simulator', Icon: Bot });
-        navItems.push({ href: '/portal/users', label: 'Manage users', Icon: Users });
-    }
+    const navEntries = [
+        PORTAL_NAV_LINK_DASHBOARD,
+        PORTAL_NAV_GROUP_ORDERS,
+        PORTAL_NAV_LINK_MENU,
+        PORTAL_NAV_GROUP_CONVERSATIONS,
+        ...(isAdmin ? [PORTAL_NAV_GROUP_CHANNELS_SETTINGS] : []),
+    ];
 
     const closeSidebar = () => setSidebarOpen(false);
     const openSidebar = () => setSidebarOpen(true);
 
+    const handleDismissGreeting = () => {
+        router.post('/portal/dismiss-daily-greeting');
+    };
+
     return (
         <div className="flex min-h-screen w-full bg-surface-50 text-surface-900 transition-colors duration-500 selection:bg-primary-500 selection:text-white dark:bg-surface-900 dark:text-surface-50 antialiased overflow-x-hidden">
             <Toaster richColors position="top-right" />
+
+            <Dialog open={!!show_daily_greeting} onOpenChange={() => {}}>
+                <DialogContent
+                    className="max-w-sm"
+                    onInteractOutside={(e) => e.preventDefault()}
+                    onEscapeKeyDown={(e) => e.preventDefault()}
+                >
+                    <DialogHeader>
+                        <DialogTitle>Good morning!</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-surface-600 dark:text-surface-400">
+                        Today&apos;s menu has been reset. Enable items and set quantities as needed.
+                    </p>
+                    <div className="flex justify-end pt-2">
+                        <Button onClick={handleDismissGreeting}>Go to menu</Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Mobile overlay */}
             {sidebarOpen && (
@@ -223,17 +331,17 @@ export default function PortalLayout({ children }) {
                 />
             )}
 
-            {/* Sidebar: fixed on desktop, drawer on mobile */}
+            {/* Sidebar: fixed on desktop (no scroll), drawer on mobile */}
             <aside
-                className={`fixed lg:static inset-y-0 left-0 z-50 w-64 flex flex-col bg-white dark:bg-surface-900 border-r border-surface-200 dark:border-surface-800 shadow-xl lg:shadow-none transition-transform duration-300 ease-out ${
+                className={`fixed inset-y-0 left-0 z-50 w-64 flex flex-col bg-white dark:bg-surface-900 border-r border-surface-200 dark:border-surface-800 shadow-xl lg:shadow-none transition-transform duration-300 ease-out ${
                     sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
                 }`}
             >
-                <SidebarContent navItems={navItems} pathname={pathname} onNavClick={closeSidebar} />
+                <SidebarContent navEntries={navEntries} pathname={pathname} onNavClick={closeSidebar} />
             </aside>
 
             {/* Main content area */}
-            <div className="flex flex-col flex-1 min-w-0">
+            <div className="flex flex-col flex-1 min-w-0 lg:ml-64">
                 {/* Mobile top bar */}
                 <header className="lg:hidden sticky top-0 z-30 flex h-16 items-center justify-between gap-4 px-4 border-b border-surface-200 bg-white/95 dark:bg-surface-900/95 dark:border-surface-800 glass-panel backdrop-blur">
                     <div className="flex items-center gap-3 min-w-0 flex-1">

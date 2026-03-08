@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Messenger\FacebookMessengerClient;
 use App\Models\ChatbotSession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Tests\TestCase;
 
 class ConversationInboxTest extends TestCase
@@ -284,5 +286,47 @@ class ConversationInboxTest extends TestCase
                 ->has('sessions.data', 1)
                 ->where('sessions.data.0.external_id', 'sms-takeover')
             );
+    }
+
+    public function test_messenger_staff_reply_appears_in_inbox_thread(): void
+    {
+        $user = User::factory()->create();
+
+        $session = ChatbotSession::create([
+            'channel' => 'messenger',
+            'external_id' => 'psid-inbox-test',
+            'language' => 'en',
+            'state' => ['current_state' => 'human_takeover'],
+            'last_activity_at' => now(),
+        ]);
+
+        $client = Mockery::mock(FacebookMessengerClient::class);
+        $client->shouldReceive('sendTextMessage')
+            ->once()
+            ->with('psid-inbox-test', 'Staff reply here');
+        $this->app->instance(FacebookMessengerClient::class, $client);
+
+        $this->app->instance(
+            \App\Contracts\MessengerSenderInterface::class,
+            $this->app->make(\App\Services\Channels\FacebookMessengerSender::class)
+        );
+
+        $this->actingAs($user)
+            ->post("/portal/inbox/sessions/{$session->id}/reply", ['message' => 'Staff reply here'])
+            ->assertStatus(302)
+            ->assertSessionHas('success');
+
+        $response = $this->actingAs($user)
+            ->get("/portal/inbox/{$session->id}")
+            ->assertStatus(200)
+            ->assertInertia(fn ($page) => $page
+                ->component('ConversationInboxShow')
+                ->has('thread')
+                ->where('session.id', $session->id)
+            );
+
+        $thread = $response->original->getData()['page']['props']['thread'] ?? [];
+        $outbound = array_values(array_filter($thread, fn (array $m): bool => ($m['direction'] ?? '') === 'out' && ($m['body'] ?? '') === 'Staff reply here'));
+        $this->assertCount(1, $outbound, 'Thread should contain one outbound message with body "Staff reply here"');
     }
 }

@@ -5,6 +5,7 @@ use App\Http\Controllers\ChatbotWebhookController;
 use App\Http\Controllers\CheckoutController;
 use App\Http\Controllers\CustomerMenuController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DismissDailyGreetingController;
 use App\Http\Controllers\DeliveriesController;
 use App\Http\Controllers\DeliveryAreasController;
 use App\Http\Controllers\DiningMarkersController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\ConversationInboxController;
 use App\Http\Controllers\PickupController;
 use App\Http\Controllers\PickupSlotsController;
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\ChatbotRepliesController;
 use App\Http\Controllers\QuickOrdersController;
 use App\Http\Controllers\MessengerIntegrationController;
 use App\Http\Controllers\SmsDevicesController;
@@ -65,6 +67,7 @@ Route::get('/menu-items', fn () => redirect('/portal/menu-items', 301));
 Route::get('/delivery-areas', fn () => redirect('/portal/deliveries', 302));
 
 Route::prefix('portal')->middleware('auth')->group(function () {
+    Route::post('/dismiss-daily-greeting', DismissDailyGreetingController::class)->name('portal.dismiss-daily-greeting');
     Route::get('/', [DashboardController::class, 'index'])->name('portal.dashboard');
     Route::get('/orders', [OrdersController::class, 'index'])->name('portal.orders');
     Route::get('/orders/completed', [OrdersController::class, 'completedIndex'])->name('portal.orders.completed');
@@ -78,6 +81,9 @@ Route::prefix('portal')->middleware('auth')->group(function () {
     Route::get('/inbox/{session}', [ConversationInboxController::class, 'show'])->name('portal.inbox.show');
     Route::get('/facebook-messenger', [MessengerIntegrationController::class, 'index'])->name('portal.facebook-messenger')->middleware('admin');
     Route::post('/facebook-messenger/set-persistent-menu', [MessengerIntegrationController::class, 'setPersistentMenu'])->name('portal.facebook-messenger.set-persistent-menu')->middleware('admin');
+    Route::get('/chatbot-replies', [ChatbotRepliesController::class, 'index'])->name('portal.chatbot-replies')->middleware('admin');
+    Route::post('/chatbot-replies', [ChatbotRepliesController::class, 'store'])->name('portal.chatbot-replies.store')->middleware('admin');
+    Route::delete('/chatbot-replies', [ChatbotRepliesController::class, 'destroy'])->name('portal.chatbot-replies.destroy')->middleware('admin');
     Route::get('/sms-devices', [SmsDevicesController::class, 'index'])->name('portal.sms-devices')->middleware('admin');
     Route::post('/sms-devices/{deviceId}/heartbeat', [SmsDevicesController::class, 'heartbeat'])->name('portal.sms-devices.heartbeat')->middleware('admin');
     Route::patch('/sms-devices/{deviceId}', [SmsDevicesController::class, 'update'])->name('portal.sms-devices.update')->middleware('admin');

@@ -2,6 +2,9 @@
 
 namespace App\Messenger;
 
+use App\Services\ChatbotReplyResolver;
+use App\Services\ChatbotSmsNumberLayer;
+
 /**
  * Builds Messenger-specific outbound message descriptors (quick replies, button template)
  * from chatbot FSM state and reply text. Used only for channel=messenger; SMS stays text-only.
@@ -11,6 +14,11 @@ namespace App\Messenger;
  */
 class MessengerReplyBuilder
 {
+    public function __construct(
+        private ChatbotReplyResolver $replyResolver,
+        private ChatbotSmsNumberLayer $smsNumberLayer
+    ) {}
+
     /**
      * Build message descriptors for the given FSM transition.
      *
@@ -39,7 +47,7 @@ class MessengerReplyBuilder
             case 'language_selection':
                 $out[] = [
                     'type' => 'quick_reply',
-                    'text' => $this->messengerPrompt('choose_language', $locale),
+                    'text' => trim((string) $this->replyResolver->get('language_prompt', $locale)),
                     'options' => [
                         ['title' => $this->shortLabel('English', $locale), 'payload' => MessengerPayloads::LANG_EN],
                         ['title' => $this->shortLabel('Tagalog', $locale), 'payload' => MessengerPayloads::LANG_TL],
@@ -50,7 +58,7 @@ class MessengerReplyBuilder
             case 'main_menu':
                 $out[] = [
                     'type' => 'quick_reply',
-                    'text' => $this->messengerPrompt('main_menu', $locale),
+                    'text' => trim((string) $this->replyResolver->get('main_menu_prompt', $locale)),
                     'options' => [
                         ['title' => $this->shortLabel('Place order', $locale), 'payload' => MessengerPayloads::MAIN_ORDER],
                         ['title' => $this->shortLabel('Track order', $locale), 'payload' => MessengerPayloads::MAIN_TRACK],
@@ -62,7 +70,7 @@ class MessengerReplyBuilder
             case 'track_choice':
                 $out[] = [
                     'type' => 'quick_reply',
-                    'text' => $this->messengerPrompt('track_choice', $locale),
+                    'text' => trim((string) $this->replyResolver->get('track_choice_prompt', $locale)),
                     'options' => [
                         ['title' => $this->shortLabel('List my orders', $locale), 'payload' => MessengerPayloads::TRACK_LIST],
                         ['title' => $this->shortLabel('Enter reference', $locale), 'payload' => MessengerPayloads::TRACK_REF],
@@ -72,22 +80,19 @@ class MessengerReplyBuilder
             case 'delivery_choice':
                 $options = [
                     ['title' => $this->shortLabel('Pickup', $locale), 'payload' => MessengerPayloads::DELIVERY_PICKUP],
+                    ['title' => $this->shortLabel('Delivery', $locale), 'payload' => MessengerPayloads::DELIVERY_DELIVERY],
                 ];
-                $areaIndex = 2;
-                foreach (array_slice($deliveryAreas, 0, 10) as $area) {
-                    $name = $area['name'] ?? 'Delivery';
-                    $options[] = ['title' => mb_substr($name, 0, 20), 'payload' => 'DELIVERY_AREA_' . $areaIndex];
-                    $areaIndex++;
-                }
-                if (count($deliveryAreas) > 0) {
-                    $options[] = ['title' => $this->shortLabel('Other area', $locale), 'payload' => 'DELIVERY_AREA_' . $areaIndex];
-                } else {
-                    $options[] = ['title' => $this->shortLabel('Delivery', $locale), 'payload' => MessengerPayloads::DELIVERY_DELIVERY];
-                }
                 $out[] = [
                     'type' => 'quick_reply',
-                    'text' => $this->messengerPrompt('delivery_choice', $locale),
-                    'options' => array_slice($options, 0, 13),
+                    'text' => $this->smsNumberLayer->formatDeliveryTypeChoiceReply($locale),
+                    'options' => $options,
+                ];
+                break;
+            case 'delivery_area_choice':
+                $areaText = $this->smsNumberLayer->formatDeliveryAreaChoiceReply($deliveryAreas, $locale);
+                $out[] = [
+                    'type' => 'text',
+                    'text' => $areaText,
                 ];
                 break;
             case 'confirm':
@@ -114,10 +119,9 @@ class MessengerReplyBuilder
                             ],
                         ];
                     }
-                    $header = $this->messengerPrompt('menu_header', $locale);
                     $out[] = [
                         'type' => 'carousel',
-                        'text' => trim($header),
+                        'text' => $text,
                         'elements' => $elements,
                     ];
                 } else {
@@ -135,19 +139,5 @@ class MessengerReplyBuilder
     private function shortLabel(string $label, string $locale): string
     {
         return mb_substr($label, 0, 20);
-    }
-
-    /**
-     * Get Messenger-specific short prompt (no numeric options). Fallback to English if key missing for locale.
-     */
-    private function messengerPrompt(string $key, string $locale): string
-    {
-        $fullKey = 'chatbot.messenger.' . $key;
-        $value = __($fullKey, [], $locale);
-        if ($value === $fullKey && $locale !== 'en') {
-            $value = __('chatbot.messenger.' . $key, [], 'en');
-        }
-
-        return trim((string) $value);
     }
 }

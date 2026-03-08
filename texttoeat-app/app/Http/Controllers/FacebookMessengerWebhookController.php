@@ -142,6 +142,7 @@ class FacebookMessengerWebhookController extends Controller
         $locale = $newState['selected_language'] ?? ($existingSession?->language ?? 'en');
         $replies = $data['replies'] ?? null;
         $reply = $data['reply'] ?? '';
+        $fullReply = $reply;
 
         if (\is_array($replies) && $replies !== [] && count($replies) > 1) {
             foreach (array_slice($replies, 0, -1) as $replyText) {
@@ -161,10 +162,11 @@ class FacebookMessengerWebhookController extends Controller
         $menuItems = $this->loadMenuItems();
         $deliveryAreas = $this->loadDeliveryAreas();
 
+        $replyForBuild = $nextState === 'menu' ? $fullReply : $reply;
         $descriptors = $this->replyBuilder->build(
             $currentState,
             $nextState,
-            $reply,
+            $replyForBuild,
             $newState,
             $menuItems,
             $deliveryAreas,

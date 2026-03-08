@@ -360,7 +360,7 @@ class ConversationInboxController extends Controller
         $session->save();
 
         $locale = $session->language ?? 'en';
-        $message = __('chatbot.takeover_ended_by_staff', [], $locale);
+        $message = app(\App\Services\ChatbotReplyResolver::class)->get('takeover_ended_by_staff', $locale);
         try {
             if ($session->channel === 'sms') {
                 $result = $this->smsSender->send($session->external_id, $message, 'sms', $session->id);
