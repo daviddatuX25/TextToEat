@@ -78,6 +78,10 @@
         0%, 100% { opacity: 1; }
         50% { opacity: 0; }
     }
+    @keyframes lowStockPulse {
+        0%, 100% { opacity: 0.75; }
+        50% { opacity: 0.5; }
+    }
 }
 
 /* Dark mode semantic overrides */
@@ -124,6 +128,10 @@
 
     .proceed-blink {
         animation: proceedBlink 2s ease-in-out infinite;
+    }
+
+    .low-stock-pulse {
+        animation: lowStockPulse 2s ease-in-out infinite;
     }
 
     /* Scroll-in (Intersection Observer) — fade/slide when in view */

@@ -89,6 +89,8 @@ Route::prefix('portal')->middleware('auth')->group(function () {
     Route::get('/menu-items', [MenuItemsController::class, 'index'])->name('portal.menu-items');
     Route::get('/menu-settings', [MenuSettingsController::class, 'index'])->name('portal.menu-settings')->middleware('admin');
     Route::patch('/menu-settings', [MenuSettingsController::class, 'update'])->name('portal.menu-settings.update')->middleware('admin');
+    Route::get('/menu-settings/preview-reset-cancellations', [MenuSettingsController::class, 'previewResetCancellations'])->name('portal.menu-settings.preview-reset-cancellations')->middleware('admin');
+    Route::post('/menu-settings/run-reset', [MenuSettingsController::class, 'runReset'])->name('portal.menu-settings.run-reset')->middleware('admin');
     Route::get('/logs/orders', [OrderLogsController::class, 'index'])->name('portal.logs.orders');
     Route::get('/logs/chatbot', [ChatbotLogsController::class, 'index'])->name('portal.logs.chatbot');
     Route::get('/inbox', [ConversationInboxController::class, 'index'])->name('portal.inbox');

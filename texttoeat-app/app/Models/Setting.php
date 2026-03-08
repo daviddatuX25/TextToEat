@@ -138,8 +138,11 @@ class Setting extends Model
                 return false;
             }
         }
-        if ($key === 'menu.reset_morning_until_hour' || $key === 'menu.low_stock_threshold') {
+        if ($key === 'menu.reset_morning_until_hour' || $key === 'menu.low_stock_threshold' || $key === 'menu.auto_reset_at_hour') {
             return (int) $value;
+        }
+        if ($key === 'menu.auto_reset_enabled') {
+            return $value === '1' || $value === 'true' || $value === true;
         }
         if ($key === 'menu.low_stock_badge_style') {
             $v = (string) $value;

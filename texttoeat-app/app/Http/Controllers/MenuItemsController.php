@@ -94,6 +94,7 @@ class MenuItemsController extends Controller
             'filterCategory' => $validated['category'] ?? null,
             'totalMenuItems' => $totalMenuItems,
             'lowStockCount' => $lowStockCount,
+            'lowStockThreshold' => $threshold,
         ]);
     }
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, router, useForm } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/Dialog';
 import { Input } from '../components/ui/Input';
 import { Button, Card, CardContent, Badge, PageHeader } from '../components/ui';
 import { Plus, Pencil, Trash2, Minus, ImagePlus, Utensils, Power, PowerOff } from 'lucide-react';
@@ -56,6 +56,7 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>Add menu item</DialogTitle>
+                    <DialogDescription>Add a new item to today&apos;s menu.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <Input
@@ -78,12 +79,13 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
                         onChange={(e) => form.setData('price', e.target.value)}
                         error={form.errors.price}
                     />
-                    <div>
-                        <label className="block text-sm font-bold text-foreground mb-2">Category</label>
+                    <div className="space-y-2">
+                        <label htmlFor="add_category" className="block text-sm font-bold text-foreground">Category</label>
                         <select
+                            id="add_category"
                             value={form.data.category_id}
                             onChange={(e) => form.setData('category_id', e.target.value ? Number(e.target.value) : '')}
-                            className="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-800"
+                            className="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                             required
                         >
                             {(categories || []).map((c) => (
@@ -100,8 +102,8 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
                         onChange={(e) => form.setData('units_today', e.target.value)}
                         error={form.errors.units_today}
                     />
-                    <div>
-                        <label className="block text-sm font-bold text-foreground mb-2">Image</label>
+                    <div className="space-y-2">
+                        <span className="block text-sm font-bold text-foreground">Image</span>
                         <input
                             ref={fileInputRef}
                             type="file"
@@ -109,24 +111,26 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
                             className="hidden"
                             onChange={(e) => form.setData('image', e.target.files?.[0] ?? null)}
                         />
-                        <button
-                            type="button"
+                        <div
+                            role="button"
+                            tabIndex={0}
                             onClick={() => fileInputRef.current?.click()}
-                            className="flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm"
+                            onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+                            className="flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-800/50 p-4 hover:border-primary/50 hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors cursor-pointer"
                         >
-                            <ImagePlus className="h-4 w-4" />
-                            {form.data.image instanceof File ? form.data.image.name : 'Choose image'}
-                        </button>
-                        {previewUrl && (
-                            <div className="mt-2 relative inline-block">
-                                <img src={previewUrl} alt="" className="h-24 w-24 object-cover rounded-lg" />
-                            </div>
-                        )}
+                            <ImagePlus className="h-8 w-8 text-surface-400 dark:text-surface-500" />
+                            <span className="text-sm font-medium text-surface-600 dark:text-surface-400">
+                                {form.data.image instanceof File ? form.data.image.name : 'Choose image'}
+                            </span>
+                            {previewUrl && (
+                                <img src={previewUrl} alt="" className="h-20 w-20 object-cover rounded-lg border border-surface-200 dark:border-surface-600" />
+                            )}
+                        </div>
                     </div>
-                    <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-sm font-medium">Cancel</button>
+                    <DialogFooter className="flex-row justify-end gap-2 pt-2">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                         <Button type="submit" disabled={form.processing}>Add</Button>
-                    </div>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -189,6 +193,7 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <DialogTitle>Edit menu item</DialogTitle>
+                    <DialogDescription>Update name, category, or photo.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
                     <Input
@@ -200,12 +205,13 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
                         onChange={(e) => form.setData('name', e.target.value)}
                         error={form.errors.name}
                     />
-                    <div>
-                        <label className="block text-sm font-bold text-foreground mb-2">Category</label>
+                    <div className="space-y-2">
+                        <label htmlFor="edit_category" className="block text-sm font-bold text-foreground">Category</label>
                         <select
+                            id="edit_category"
                             value={form.data.category_id}
                             onChange={(e) => form.setData('category_id', e.target.value ? Number(e.target.value) : '')}
-                            className="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-800"
+                            className="w-full rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm bg-white dark:bg-surface-800 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                             required
                         >
                             {(categories || []).map((c) => (
@@ -213,8 +219,8 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
                             ))}
                         </select>
                     </div>
-                    <div>
-                        <label className="block text-sm font-bold text-foreground mb-2">Photo</label>
+                    <div className="space-y-2">
+                        <span className="block text-sm font-bold text-foreground">Photo</span>
                         <input
                             ref={fileInputRef}
                             type="file"
@@ -225,40 +231,43 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
                                 if (e.target.files?.[0]) form.setData('remove_image', false);
                             }}
                         />
-                        <div className="flex flex-wrap items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-700 px-3 py-2 text-sm"
-                            >
-                                <ImagePlus className="h-4 w-4" />
-                                {form.data.image instanceof File ? form.data.image.name : 'Change photo'}
-                            </button>
-                            {(item.image_url || form.data.image) && (
-                                <label className="flex items-center gap-2 text-sm">
-                                    <input
-                                        type="checkbox"
-                                        checked={form.data.remove_image}
-                                        onChange={(e) => {
-                                            form.setData('remove_image', e.target.checked);
-                                            if (e.target.checked) form.setData('image', null);
-                                        }}
-                                        className="rounded border-surface-300"
-                                    />
-                                    Remove photo
-                                </label>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="gap-2"
+                                    onClick={() => fileInputRef.current?.click()}
+                                >
+                                    <ImagePlus className="h-4 w-4" />
+                                    {form.data.image instanceof File ? form.data.image.name : 'Change photo'}
+                                </Button>
+                                {(item.image_url || form.data.image) && (
+                                    <label className="flex items-center gap-2 text-sm text-surface-600 dark:text-surface-400 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.data.remove_image}
+                                            onChange={(e) => {
+                                                form.setData('remove_image', e.target.checked);
+                                                if (e.target.checked) form.setData('image', null);
+                                            }}
+                                            className="rounded border-surface-300 text-primary focus:ring-primary"
+                                        />
+                                        Remove photo
+                                    </label>
+                                )}
+                            </div>
+                            {currentImageUrl && (
+                                <div className="rounded-xl border border-surface-200 dark:border-surface-600 p-2 inline-flex">
+                                    <img src={currentImageUrl} alt="" className="h-24 w-24 object-cover rounded-lg" />
+                                </div>
                             )}
                         </div>
-                        {currentImageUrl && (
-                            <div className="mt-2 relative inline-block">
-                                <img src={currentImageUrl} alt="" className="h-24 w-24 object-cover rounded-lg" />
-                            </div>
-                        )}
                     </div>
-                    <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-sm font-medium">Cancel</button>
+                    <DialogFooter className="flex-row justify-end gap-2 pt-2">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                         <Button type="submit" disabled={form.processing}>Save</Button>
-                    </div>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
@@ -327,21 +336,23 @@ function EnableForTodayDialog({ item, open, onOpenChange }) {
                             />
                         </div>
                     </div>
-                    <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={() => onOpenChange(false)} className="px-4 py-2 rounded-lg border border-surface-200 dark:border-surface-700 text-sm font-medium">Cancel</button>
+                    <DialogFooter className="flex-row justify-end gap-2 pt-2">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
                         <Button type="submit">Enable</Button>
-                    </div>
+                    </DialogFooter>
                 </form>
             </DialogContent>
         </Dialog>
     );
 }
 
-function MenuItemCard({ item, onEdit, onEnableClick }) {
+function MenuItemCard({ item, onEdit, onEnableClick, lowStockThreshold = 5 }) {
     const routerImpl = r();
     const units = Number(item.units_today ?? 0);
     const currentOrders = Number(item.current_orders ?? 0);
     const soldOut = !!item.is_sold_out;
+    const available = Number(item.virtual_available ?? item.units_today ?? 0);
+    const isLowStock = !soldOut && available < lowStockThreshold;
 
     const setQuantity = (newVal) => {
         const n = Math.max(0, Math.floor(Number(newVal)));
@@ -381,6 +392,11 @@ function MenuItemCard({ item, onEdit, onEnableClick }) {
                 {soldOut && (
                     <div className="absolute inset-0 bg-surface-900/60 flex items-center justify-center">
                         <span className="text-white font-bold text-[10px] uppercase tracking-wider">Sold out</span>
+                    </div>
+                )}
+                {isLowStock && (
+                    <div className="low-stock-pulse absolute inset-0 bg-red-500/40 dark:bg-red-600/35 flex items-center justify-center pointer-events-none">
+                        <span className="text-white font-bold text-[10px] uppercase tracking-wider drop-shadow-sm">Low stock</span>
                     </div>
                 )}
             </div>
@@ -455,7 +471,7 @@ function MenuItemCard({ item, onEdit, onEnableClick }) {
     );
 }
 
-export default function MenuItems({ menuItems = [], categories = [], menuCategories = [], filterCategory = null, totalMenuItems = 0, lowStockCount = 0 }) {
+export default function MenuItems({ menuItems = [], categories = [], menuCategories = [], filterCategory = null, totalMenuItems = 0, lowStockCount = 0, lowStockThreshold = 5 }) {
     const [addOpen, setAddOpen] = useState(false);
     const [editItem, setEditItem] = useState(null);
     const [enableItem, setEnableItem] = useState(null);
@@ -529,6 +545,7 @@ export default function MenuItems({ menuItems = [], categories = [], menuCategor
                                     item={item}
                                     onEdit={setEditItem}
                                     onEnableClick={setEnableItem}
+                                    lowStockThreshold={lowStockThreshold}
                                 />
                             ))}
                         </div>

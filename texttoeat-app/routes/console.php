@@ -92,7 +92,7 @@ Artisan::command('menu:reset-today {--force : Run even outside morning window}',
     $today = Carbon::today();
     $yesterday = Carbon::yesterday();
 
-    $morningUntilHour = (int) config('menu.reset_morning_until_hour', 11);
+    $morningUntilHour = (int) Setting::get('menu.reset_morning_until_hour', config('menu.reset_morning_until_hour', 11));
     if (! $this->option('force') && $morningUntilHour >= 0 && now()->hour > $morningUntilHour) {
         $this->warn('Skipping: current hour (' . now()->hour . ') is after morning window (0-' . $morningUntilHour . '). Use --force to override.');
 
@@ -189,3 +189,13 @@ Artisan::command('menu:reset-today {--force : Run even outside morning window}',
 
     $this->info("Rollover: {$rolloverCount} item(s) copied from yesterday. Reset: {$resetCount} item(s) disabled with zero stock. Greeting modal will show for portal users.");
 })->purpose('Rollover yesterday to today, reset today items to disabled with zero stock, flag greeting modal');
+
+Schedule::call(function (): void {
+    if (! (bool) Setting::get('menu.auto_reset_enabled', false)) {
+        return;
+    }
+    $atHour = (int) Setting::get('menu.auto_reset_at_hour', Setting::get('menu.reset_morning_until_hour', 4));
+    if (now()->hour === $atHour) {
+        Artisan::call('menu:reset-today');
+    }
+})->hourly();
