@@ -417,9 +417,17 @@ class AnalyticsController extends Controller
      */
     private function ordersHeatmap(Carbon $from, Carbon $to): array
     {
+        $driver = Order::query()->getConnection()->getDriverName();
+        if ($driver === 'mysql') {
+            $dowSql = '(DAYOFWEEK(created_at) - 1) as dow';
+            $hourSql = 'HOUR(created_at) as hour';
+        } else {
+            $dowSql = 'EXTRACT(DOW FROM created_at)::int as dow';
+            $hourSql = 'EXTRACT(HOUR FROM created_at)::int as hour';
+        }
         $raw = Order::query()
-            ->selectRaw('EXTRACT(DOW FROM created_at)::int as dow')
-            ->selectRaw('EXTRACT(HOUR FROM created_at)::int as hour')
+            ->selectRaw($dowSql)
+            ->selectRaw($hourSql)
             ->selectRaw('COUNT(*) as count')
             ->whereBetween('created_at', [$from, $to])
             ->groupBy('dow', 'hour')
