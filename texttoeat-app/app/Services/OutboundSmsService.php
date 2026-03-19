@@ -6,7 +6,6 @@ use App\Models\OutboundSms;
 use App\Models\Setting;
 use App\Models\SmsDevice;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\Messaging\CloudMessage;
@@ -14,14 +13,14 @@ use Kreait\Firebase\Exception\MessagingException;
 
 class OutboundSmsService
 {
-    private const SMS_CHAR_LIMIT = 160;
-
     private ?Messaging $messaging = null;
 
     /**
-     * Enqueue outbound SMS (one row per 160-char segment) and send FCM data message(s) to the registered device.
+     * Enqueue one outbound SMS row (full body) and send exactly one FCM data message to the registered device.
+     * Payload contract: smsData contains smsId (string), recipients (array), message (full text).
      *
      * @param  int|null  $simSubscriptionId  Optional SIM subscription ID for multi-SIM targeting.
+     * @param  int|null  $conversationId  Optional; when set, message is part of a human-intervention segment.
      * @return array{success: bool, ids?: list<int>, message?: string}
      */
     public function enqueueAndSendFcm(
@@ -29,58 +28,59 @@ class OutboundSmsService
         string $body,
         ?string $channel = null,
         ?int $chatbotSessionId = null,
-        ?int $simSubscriptionId = null
+        ?int $simSubscriptionId = null,
+        ?int $conversationId = null
     ): array {
-        $segments = $this->splitMessage($body);
-        if ($segments === []) {
+        $body = trim($body);
+        if ($body === '') {
             return ['success' => true, 'ids' => []];
         }
 
-        $batchId = (string) Str::uuid();
-        $ids = [];
-        foreach ($segments as $segment) {
-            $row = OutboundSms::create([
-                'to' => $to,
-                'body' => $segment,
-                'status' => 'pending',
-                'channel' => $channel,
-                'chatbot_session_id' => $chatbotSessionId,
-                'sms_batch_id' => $batchId,
-            ]);
-            $ids[] = $row->id;
-        }
-
         $device = $this->resolveFcmDevice();
+
+        $row = OutboundSms::create([
+            'to' => $to,
+            'body' => $body,
+            'status' => 'pending',
+            'channel' => $channel,
+            'chatbot_session_id' => $chatbotSessionId,
+            'conversation_id' => $conversationId,
+            'sms_device_id' => $device !== null && $device->exists ? $device->id : null,
+        ]);
+
         if ($device === null || $device->device_token === null || $device->device_token === '') {
             Log::debug('OutboundSmsService: no FCM token configured or registered, rows left pending');
 
-            return ['success' => true, 'ids' => $ids];
+            return ['success' => true, 'ids' => [$row->id]];
         }
 
         $token = $device->device_token;
         $effectiveSimId = $simSubscriptionId ?? $device->preferred_sim_subscription_id;
-        $sent = 0;
-        foreach ($ids as $i => $id) {
-            $row = OutboundSms::find($id);
-            if (! $row || $row->status !== 'pending') {
-                continue;
+        $result = $this->sendFcmToToken($token, (string) $row->id, $to, $body, $effectiveSimId);
+
+        if ($result['sent']) {
+            if ($device->exists) {
+                $device->touchLastUsedAt();
             }
-            $result = $this->sendFcmToToken($token, (string) $id, $to, $row->body, $batchId, $effectiveSimId);
-            if ($result['sent']) {
-                $sent++;
-            } else {
-                if ($result['invalid_token'] ?? false) {
-                    $this->invalidateToken($token);
-                    break;
-                }
-            }
+            return ['success' => true, 'ids' => [$row->id]];
         }
 
-        if ($device && $sent > 0 && $device->exists) {
-            $device->touchLastUsedAt();
+        if ($result['invalid_token'] ?? false) {
+            $this->invalidateToken($token);
         }
 
-        return ['success' => true, 'ids' => $ids];
+        $failureReason = $result['error_message'] ?? 'FCM delivery failed';
+        $row->update([
+            'status' => 'failed',
+            'failure_reason' => $failureReason,
+            'error_message' => $failureReason,
+        ]);
+
+        return [
+            'success' => false,
+            'ids' => [$row->id],
+            'message' => $failureReason,
+        ];
     }
 
     /**
@@ -117,34 +117,6 @@ class OutboundSmsService
     }
 
     /**
-     * Split message into segments of max 160 chars. Prefer splitting on newlines so lines stay intact.
-     *
-     * @return list<string>
-     */
-    private function splitMessage(string $message): array
-    {
-        if ($message === '') {
-            return [];
-        }
-        $segments = [];
-        $lines = explode("\n", $message);
-
-        foreach ($lines as $line) {
-            $remaining = $line;
-            while ($remaining !== '') {
-                if (mb_strlen($remaining) <= self::SMS_CHAR_LIMIT) {
-                    $segments[] = $remaining;
-                    break;
-                }
-                $segments[] = mb_substr($remaining, 0, self::SMS_CHAR_LIMIT);
-                $remaining = mb_substr($remaining, self::SMS_CHAR_LIMIT);
-            }
-        }
-
-        return $segments;
-    }
-
-    /**
      * Resolve the enabled device to use for FCM (most recently used). Returns null if none.
      */
     private function resolveFcmDevice(): ?SmsDevice
@@ -171,6 +143,8 @@ class OutboundSmsService
     }
 
     /**
+     * Send one FCM data message. smsData payload: smsId (string), recipients (array), message (full text).
+     *
      * @return array{sent: bool, invalid_token?: bool}
      */
     private function sendFcmToToken(
@@ -178,7 +152,6 @@ class OutboundSmsService
         string $id,
         string $to,
         string $body,
-        ?string $batchId = null,
         ?int $simSubscriptionId = null
     ): array {
         $messaging = $this->getMessaging();
@@ -187,18 +160,14 @@ class OutboundSmsService
         }
 
         $smsData = [
+            'smsId' => $id,
             'recipients' => [$to],
             'message' => $body,
-            'smsId' => (int) $id,
-            'smsBatchId' => $batchId ?? '',
         ];
 
         $data = [
             'type' => 'smsData',
             'smsData' => json_encode($smsData),
-            'id' => $id,
-            'to' => $to,
-            'body' => $body,
         ];
         if ($simSubscriptionId !== null) {
             $data['simSubscriptionId'] = (string) $simSubscriptionId;
@@ -222,7 +191,11 @@ class OutboundSmsService
                 || str_contains(strtolower($e->getMessage()), 'invalid')
                 || str_contains(strtolower($e->getMessage()), 'not found');
 
-            return ['sent' => false, 'invalid_token' => $invalid];
+            return [
+                'sent' => false,
+                'invalid_token' => $invalid,
+                'error_message' => $e->getMessage(),
+            ];
         }
     }
 
@@ -236,6 +209,10 @@ class OutboundSmsService
     {
         if ($this->messaging !== null) {
             return $this->messaging;
+        }
+
+        if (app()->bound(Messaging::class)) {
+            return app(Messaging::class);
         }
 
         $credentialsPath = Setting::get('firebase.credentials_path');

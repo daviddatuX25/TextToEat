@@ -15,12 +15,12 @@ class FcmSmsSender implements SmsSenderInterface
     /**
      * @return array{success: bool, ids?: list<int>, message?: string}
      */
-    public function send(string $to, string $body, ?string $channel = null, ?int $chatbotSessionId = null): array
+    public function send(string $to, string $body, ?string $channel = null, ?int $chatbotSessionId = null, ?int $conversationId = null): array
     {
         if (! Setting::get('channels.sms_enabled', true)) {
             return ['success' => false, 'message' => 'SMS channel is disabled'];
         }
 
-        return $this->outboundSmsService->enqueueAndSendFcm($to, $body, $channel, $chatbotSessionId);
+        return $this->outboundSmsService->enqueueAndSendFcm($to, $body, $channel, $chatbotSessionId, null, $conversationId);
     }
 }

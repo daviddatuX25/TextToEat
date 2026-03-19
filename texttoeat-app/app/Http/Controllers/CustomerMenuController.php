@@ -22,11 +22,10 @@ class CustomerMenuController extends Controller
         if (! Setting::get('channels.web_enabled', true)) {
             return redirect()->route('web-unavailable');
         }
-
         $today = Carbon::today();
         $menuItems = MenuItem::query()
             ->with('category')
-            ->whereDate('menu_date', $today)
+            ->whereDate('menu_items.menu_date', $today)
             ->join('categories', 'menu_items.category_id', '=', 'categories.id')
             ->select('menu_items.*')
             ->orderBy('categories.sort_order')
@@ -39,9 +38,13 @@ class CustomerMenuController extends Controller
             $item->load('category');
             $arr = $item->toArray();
             $arr['category'] = $item->category?->name ?? '';
-            $arr['available'] = $virtualAvailable[$item->id] ?? (int) $item->units_today;
+            $arr['available'] = $virtualAvailable[$item->id] ?? 0;
             return $arr;
-        })->values()->all();
+        })
+            // Customers should only see items that are actually available today.
+            ->filter(fn ($arr) => (int) ($arr['available'] ?? 0) > 0)
+            ->values()
+            ->all();
 
         $cart = session('customer_cart', []);
 
@@ -62,15 +65,17 @@ class CustomerMenuController extends Controller
             'quantity' => ['required', 'integer', 'min:1'],
         ]);
 
-        $menuItem = MenuItem::with('category')->findOrFail($validated['menu_item_id']);
         $today = Carbon::today();
+        $menuItem = MenuItem::with('category')->findOrFail($validated['menu_item_id']);
 
-        if (! $menuItem->menu_date->isSameDay($today)) {
-            return redirect()->route('menu')->with('error', 'Item is not on today\'s menu.');
-        }
-
-        if ($menuItem->is_sold_out || (int) $menuItem->units_today <= 0) {
+        // Enforce inventory based on per-day stock/virtual availability for today.
+        $availableMap = $this->stockService->getVirtualAvailableForToday([$menuItem->id]);
+        $available = (int) ($availableMap[$menuItem->id] ?? 0);
+        if ($available <= 0) {
             return redirect()->route('menu')->with('error', 'Item is sold out.');
+        }
+        if ($validated['quantity'] > $available) {
+            return redirect()->route('menu')->with('error', 'Not enough stock available for this item.');
         }
 
         $cart = session('customer_cart', []);

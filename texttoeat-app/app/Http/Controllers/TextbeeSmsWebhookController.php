@@ -10,6 +10,8 @@ use App\Models\Setting;
 use App\Services\ChatbotSmsNumberLayer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class TextbeeSmsWebhookController extends Controller
 {
@@ -34,85 +36,138 @@ class TextbeeSmsWebhookController extends Controller
 
         $normalizedPhone = $this->normalizePhone($validated['from']);
         $body = $validated['message'];
+        $messageId = $validated['message_id'] ?? null;
 
-        $existingSession = ChatbotSession::where('channel', 'sms')
-            ->where('external_id', $normalizedPhone)
-            ->first();
-        if ($existingSession !== null) {
-            $state = $existingSession->state ?? [];
-            if ((bool) ($state['automation_disabled'] ?? false) === true) {
-                $existingSession->update(['last_activity_at' => now()]);
-                InboundMessage::create([
-                    'chatbot_session_id' => $existingSession->id,
-                    'body' => $body,
+        // Idempotency: avoid processing the same incoming message twice (gateway retries / duplicate delivery).
+        // Real SMS gateways often retry or send duplicate webhooks; without this we send the same reply batch twice.
+        $idempotencyKey = ($messageId !== null && $messageId !== '') ? 'sms_webhook_seen:' . $messageId : null;
+        if ($idempotencyKey !== null && ! Cache::add($idempotencyKey, true, 600)) {
+            return response()->json([
+                'success' => true,
+                'message_id' => $messageId,
+                'duplicate' => true,
+            ]);
+        }
+
+        try {
+            $existingSession = ChatbotSession::where('channel', 'sms')
+                ->where('external_id', $normalizedPhone)
+                ->first();
+            if ($existingSession !== null) {
+                $state = $existingSession->state ?? [];
+                if ((bool) ($state['automation_disabled'] ?? false) === true) {
+                    $existingSession->update(['last_activity_at' => now()]);
+                    $conversation = $existingSession->getOrCreateLatestHumanConversation();
+                    InboundMessage::create([
+                        'chatbot_session_id' => $existingSession->id,
+                        'conversation_id' => $conversation->id,
+                        'body' => $body,
+                        'channel' => 'sms',
+                    ]);
+                    event(new ConversationUpdated($existingSession, 'message'));
+
+                    return response()->json([
+                        'success' => true,
+                        'skipped' => 'automation_disabled',
+                        'message_id' => $validated['message_id'] ?? null,
+                    ]);
+                }
+            }
+
+            $chatbotRequest = Request::create(
+                '/api/chatbot/webhook',
+                'POST',
+                [
                     'channel' => 'sms',
-                ]);
-                event(new ConversationUpdated($existingSession, 'message'));
+                    'external_id' => $normalizedPhone,
+                    'body' => $body,
+                ]
+            );
+
+            $response = $this->chatbot->webhook($chatbotRequest);
+            $data = $response->getData(true);
+
+            $sessionId = $existingSession?->id
+                ?? ChatbotSession::where('channel', 'sms')->where('external_id', $normalizedPhone)->value('id');
+
+            $replies = $data['replies'] ?? null;
+            if (! \is_array($replies) || $replies === []) {
+                $reply = $data['reply'] ?? null;
+                $replies = \is_string($reply) && $reply !== '' ? [$reply] : [];
+            }
+
+            // Dedupe consecutive identical segments so we never send the same SMS twice in one batch.
+            $replies = $this->dedupeConsecutiveReplies($replies);
+
+            $anySendFailed = false;
+            foreach ($replies as $replyText) {
+                if (! \is_string($replyText) || $replyText === '') {
+                    continue;
+                }
+                $sendResult = $this->smsSender->send($normalizedPhone, $replyText, 'sms', $sessionId);
+                if (! ($sendResult['success'] ?? true)) {
+                    $anySendFailed = true;
+                    Log::warning('TextbeeSmsWebhook: send failed for reply segment', [
+                        'to' => $normalizedPhone,
+                        'message_id' => $messageId,
+                        'reason' => $sendResult['message'] ?? 'unknown',
+                    ]);
+                }
+            }
+
+            if ($anySendFailed && $idempotencyKey !== null) {
+                Cache::forget($idempotencyKey);
+                Log::info('TextbeeSmsWebhook: forgot idempotency key after send failure so gateway can retry', ['message_id' => $messageId]);
 
                 return response()->json([
-                    'success' => true,
-                    'skipped' => 'automation_disabled',
-                    'message_id' => $validated['message_id'] ?? null,
+                    'success' => false,
+                    'message_id' => $messageId,
+                    'retry' => true,
+                ], 503);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message_id' => $messageId,
+            ]);
+        } catch (\Throwable $e) {
+            if ($idempotencyKey !== null) {
+                Cache::forget($idempotencyKey);
+                Log::info('TextbeeSmsWebhook: forgot idempotency key after exception so gateway retry can process', [
+                    'message_id' => $messageId,
+                    'exception' => $e->getMessage(),
                 ]);
             }
+            Log::error('TextbeeSmsWebhook: exception while processing inbound SMS', [
+                'from' => $normalizedPhone,
+                'message_id' => $messageId,
+                'exception' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
         }
+    }
 
-        $currentState = $existingSession !== null
-            ? ($existingSession->state['current_state'] ?? null)
-            : null;
-        $bodyForWebhook = $this->smsNumberLayer->normalizeBodyForChoiceState($currentState, $body);
-
-        $chatbotRequest = Request::create(
-            '/api/chatbot/webhook',
-            'POST',
-            [
-                'channel' => 'sms',
-                'external_id' => $normalizedPhone,
-                'body' => $bodyForWebhook,
-            ]
-        );
-
-        $response = $this->chatbot->webhook($chatbotRequest);
-        $data = $response->getData(true);
-
-        $sessionId = $existingSession?->id
-            ?? ChatbotSession::where('channel', 'sms')->where('external_id', $normalizedPhone)->value('id');
-
-        $nextState = $data['state']['current_state'] ?? null;
-        $locale = $data['state']['selected_language'] ?? 'en';
-
-        $replies = $data['replies'] ?? null;
-        if (! \is_array($replies) || $replies === []) {
-            $reply = $data['reply'] ?? null;
-            $replies = \is_string($reply) && $reply !== '' ? [$reply] : [];
-        }
-
-        $formattedChoice = null;
-        $promptOnly = null;
-        if ($nextState !== null && $this->smsNumberLayer->isChoiceState($nextState)) {
-            $context = [];
-            if ($nextState === 'delivery_choice' && isset($data['delivery_areas']) && is_array($data['delivery_areas'])) {
-                $context['delivery_areas'] = $data['delivery_areas'];
-            }
-            $formattedChoice = $this->smsNumberLayer->formatChoiceStateReply($nextState, $locale, $context);
-            $promptOnly = $this->smsNumberLayer->getChoiceStatePromptOnly($nextState, $locale);
-        }
-
+    /**
+     * Remove consecutive duplicate reply segments so the same message is not sent twice in one batch.
+     *
+     * @param  array<int, string>  $replies
+     * @return array<int, string>
+     */
+    private function dedupeConsecutiveReplies(array $replies): array
+    {
+        $out = [];
+        $prev = null;
         foreach ($replies as $replyText) {
-            if (! \is_string($replyText) || $replyText === '') {
-                continue;
+            $trimmed = \is_string($replyText) ? trim($replyText) : '';
+            if ($trimmed !== '' && $trimmed !== $prev) {
+                $out[] = $replyText;
+                $prev = $trimmed;
             }
-            // If this segment contains the bare prompt (e.g. "Invalid option. What would you like to do?"), include options.
-            if ($formattedChoice !== null && $promptOnly !== null && str_contains($replyText, $promptOnly)) {
-                $replyText = str_replace($promptOnly, $formattedChoice, $replyText);
-            }
-            $this->smsSender->send($normalizedPhone, $replyText, 'sms', $sessionId);
         }
 
-        return response()->json([
-            'success' => true,
-            'message_id' => $validated['message_id'] ?? null,
-        ]);
+        return $out;
     }
 
     /**

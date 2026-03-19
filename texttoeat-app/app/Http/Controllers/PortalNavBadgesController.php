@@ -50,13 +50,19 @@ class PortalNavBadgesController extends Controller
             ->sessionState(['active', 'pending'])
             ->count();
 
-        // Low-stock badge: same definition as menu page (units_today < threshold).
+        // Low-stock badge: per-day stock based on MenuItemDailyStock (units_leftover < threshold).
         $today = Carbon::today();
         $threshold = (int) Setting::get('menu.low_stock_threshold', 5);
         $badgeStyle = Setting::get('menu.low_stock_badge_style', 'count');
         $lowCount = MenuItem::query()
-            ->whereDate('menu_date', $today)
-            ->where('units_today', '<', $threshold)
+            ->leftJoin('menu_item_daily_stock as s', function ($join) use ($today): void {
+                $join->on('s.menu_item_id', '=', 'menu_items.id')
+                    ->whereDate('s.menu_date', $today);
+            })
+            ->where(function ($q) use ($threshold): void {
+                $q->whereNull('s.menu_item_id')
+                    ->orWhere('s.units_leftover', '<', $threshold);
+            })
             ->count();
         $low_stock_meals = $badgeStyle === 'one' ? min(1, $lowCount) : $lowCount;
 

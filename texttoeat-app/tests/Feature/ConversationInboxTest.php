@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Messenger\FacebookMessengerClient;
 use App\Models\ChatbotSession;
+use App\Models\Conversation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
@@ -100,7 +101,7 @@ class ConversationInboxTest extends TestCase
             'language' => 'en',
             'state' => ['current_state' => 'human_takeover', 'automation_disabled' => true],
         ]);
-        \App\Models\Conversation::create([
+        $activeConversation = \App\Models\Conversation::create([
             'chatbot_session_id' => $activeSession->id,
             'channel' => 'sms',
             'external_id' => 'active-1',
@@ -108,6 +109,7 @@ class ConversationInboxTest extends TestCase
         ]);
         \App\Models\OutboundSms::create([
             'chatbot_session_id' => $activeSession->id,
+            'conversation_id' => $activeConversation->id,
             'to' => 'active-1',
             'body' => 'Hello',
             'status' => 'sent',
@@ -230,7 +232,7 @@ class ConversationInboxTest extends TestCase
             'language' => 'en',
             'state' => ['current_state' => 'human_takeover'],
         ]);
-        \App\Models\Conversation::create([
+        $activeConversation = \App\Models\Conversation::create([
             'chatbot_session_id' => $activeSession->id,
             'channel' => 'sms',
             'external_id' => 'active-msg',
@@ -238,6 +240,7 @@ class ConversationInboxTest extends TestCase
         ]);
         \App\Models\InboundMessage::create([
             'chatbot_session_id' => $activeSession->id,
+            'conversation_id' => $activeConversation->id,
             'body' => 'Customer reply',
             'channel' => 'sms',
         ]);
@@ -328,5 +331,82 @@ class ConversationInboxTest extends TestCase
         $thread = $response->original->getData()['page']['props']['thread'] ?? [];
         $outbound = array_values(array_filter($thread, fn (array $m): bool => ($m['direction'] ?? '') === 'out' && ($m['body'] ?? '') === 'Staff reply here'));
         $this->assertCount(1, $outbound, 'Thread should contain one outbound message with body "Staff reply here"');
+
+        $this->assertDatabaseHas('outbound_messenger', [
+            'to' => 'psid-inbox-test',
+            'body' => 'Staff reply here',
+        ]);
+        $row = \App\Models\OutboundMessenger::where('to', 'psid-inbox-test')->where('body', 'Staff reply here')->first();
+        $this->assertNotNull($row->conversation_id, 'Staff reply should tag outbound with conversation_id');
+    }
+
+    public function test_sms_staff_reply_sets_conversation_id(): void
+    {
+        $user = User::factory()->create();
+
+        $session = ChatbotSession::create([
+            'channel' => 'sms',
+            'external_id' => '09123456789',
+            'language' => 'en',
+            'state' => ['current_state' => 'human_takeover'],
+        ]);
+
+        $this->actingAs($user)
+            ->post("/portal/inbox/sessions/{$session->id}/reply", ['message' => 'SMS staff reply'])
+            ->assertStatus(302)
+            ->assertSessionHas('success');
+
+        $row = \App\Models\OutboundSms::where('chatbot_session_id', $session->id)->where('body', 'SMS staff reply')->first();
+        $this->assertNotNull($row);
+        $this->assertNotNull($row->conversation_id, 'Staff reply should tag OutboundSms with conversation_id');
+    }
+
+    public function test_inbox_show_returns_only_human_segment_messages(): void
+    {
+        $user = User::factory()->create();
+
+        $session = ChatbotSession::create([
+            'channel' => 'sms',
+            'external_id' => '09123456789',
+            'language' => 'en',
+            'state' => ['current_state' => 'human_takeover'],
+        ]);
+        $conversation = Conversation::create([
+            'chatbot_session_id' => $session->id,
+            'channel' => 'sms',
+            'external_id' => '09123456789',
+            'status' => 'human_takeover',
+        ]);
+        \App\Models\InboundMessage::create([
+            'chatbot_session_id' => $session->id,
+            'conversation_id' => null,
+            'body' => 'Bot segment inbound',
+            'channel' => 'sms',
+        ]);
+        \App\Models\InboundMessage::create([
+            'chatbot_session_id' => $session->id,
+            'conversation_id' => $conversation->id,
+            'body' => 'Human segment inbound',
+            'channel' => 'sms',
+        ]);
+        \App\Models\OutboundSms::create([
+            'chatbot_session_id' => $session->id,
+            'conversation_id' => $conversation->id,
+            'to' => '09123456789',
+            'body' => 'Staff reply',
+            'status' => 'sent',
+            'channel' => 'sms',
+        ]);
+
+        $response = $this->actingAs($user)
+            ->get("/portal/inbox/{$session->id}")
+            ->assertStatus(200)
+            ->assertInertia(fn ($page) => $page->component('ConversationInboxShow')->has('thread'));
+
+        $thread = $response->original->getData()['page']['props']['thread'] ?? [];
+        $bodies = array_column($thread, 'body');
+        $this->assertContains('Human segment inbound', $bodies);
+        $this->assertContains('Staff reply', $bodies);
+        $this->assertNotContains('Bot segment inbound', $bodies);
     }
 }

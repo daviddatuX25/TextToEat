@@ -27,6 +27,14 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
             'units_today' => 10,
             'menu_date' => $today,
         ]);
+        // Seed today's stock row instead of relying on legacy units_today.
+        \App\Models\MenuItemDailyStock::create([
+            'menu_item_id' => $item->id,
+            'menu_date' => $today,
+            'units_set' => 10,
+            'units_sold' => 0,
+            'units_leftover' => 10,
+        ]);
 
         $service = app(MenuItemStockService::class);
         $available = $service->getVirtualAvailableForToday([$item->id]);
@@ -58,7 +66,7 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
         $this->assertSame(10, $available[$item->id]);
     }
 
-    public function test_completing_order_decrements_units_today(): void
+    public function test_completing_order_increments_daily_units_sold(): void
     {
         $today = Carbon::today();
         $category = Category::firstOrCreate(['name' => 'Soup'], ['name' => 'Soup']);
@@ -66,8 +74,14 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
             'name' => 'Sinigang',
             'price' => 120,
             'category_id' => $category->id,
-            'units_today' => 20,
             'menu_date' => $today,
+        ]);
+        \App\Models\MenuItemDailyStock::create([
+            'menu_item_id' => $item->id,
+            'menu_date' => $today,
+            'units_set' => 20,
+            'units_sold' => 0,
+            'units_leftover' => 20,
         ]);
 
         $order = Order::create([
@@ -96,8 +110,11 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
         ]);
         $response->assertRedirect();
 
-        $item->refresh();
-        $this->assertSame(18, $item->units_today);
+        $stock = \App\Models\MenuItemDailyStock::where('menu_item_id', $item->id)
+            ->whereDate('menu_date', $today)
+            ->first();
+        $this->assertNotNull($stock);
+        $this->assertSame(2, (int) $stock->units_sold);
     }
 
     public function test_menu_item_category_must_be_from_fixed_list(): void

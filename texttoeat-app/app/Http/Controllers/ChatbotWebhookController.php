@@ -16,7 +16,8 @@ use App\Models\OutboundSms;
 use App\Models\Setting;
 use App\Services\ChatbotReplyResolver;
 use App\Services\ChatbotSmsNumberLayer;
-use App\Services\MenuItemStockService;
+use App\Services\CartItemNormalizer;
+use App\Services\MenuDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -121,54 +122,23 @@ class ChatbotWebhookController extends Controller
             ]);
         }
 
-        $todayMenuItems = MenuItem::forToday()->with('category')->get();
-        $virtualAvailable = app(MenuItemStockService::class)->getVirtualAvailableForToday($todayMenuItems->pluck('id')->all());
-        $menuItems = $todayMenuItems
-            ->sort(function ($a, $b) {
-                $orderA = $a->category?->sort_order ?? 999;
-                $orderB = $b->category?->sort_order ?? 999;
-                if ($orderA !== $orderB) {
-                    return $orderA <=> $orderB;
-                }
-                $nameA = $a->category?->name ?? '';
-                $nameB = $b->category?->name ?? '';
-                if ($nameA !== $nameB) {
-                    return strcmp($nameA, $nameB);
-                }
-                return strcmp($a->name, $b->name);
-            })
-            ->values()
-            ->map(fn ($m) => [
-                'id' => $m->id,
-                'name' => $m->name,
-                'price' => (float) $m->price,
-                'category' => $m->category?->name ?? '',
-                'available' => (int) ($virtualAvailable[$m->id] ?? 0),
-            ])
-            ->all();
+        $menuDataService = app(MenuDataService::class);
+        $menuData = $menuDataService->loadMenuItemsWithVirtualAvailable();
+        $menuItems = $menuData['menu_items'];
+        $state['virtual_available'] = $menuData['virtual_available'];
 
-        $state['virtual_available'] = $virtualAvailable;
+        $deliveryAreas = $menuDataService->loadDeliveryAreas();
 
-        $deliveryAreas = DeliveryArea::query()
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get()
-            ->map(fn ($a) => [
-                'id' => $a->id,
-                'name' => $a->name,
-                'is_free' => (bool) $a->is_free,
-                'fee' => $a->fee !== null ? (float) $a->fee : null,
-            ])
-            ->values()
-            ->all();
-
+        $conversationId = null;
         if ($currentState === 'human_takeover') {
-            InboundMessage::create([
-                'chatbot_session_id' => $session->id,
-                'body' => $body,
-                'channel' => $channel,
-            ]);
+            $conversationId = $session->getOrCreateLatestHumanConversation()->id;
         }
+        InboundMessage::create([
+            'chatbot_session_id' => $session->id,
+            'conversation_id' => $conversationId,
+            'body' => $body,
+            'channel' => $channel,
+        ]);
 
         // Translation layer (number → canonical) only for SMS/Web. Messenger sends canonical body from payload mapping.
         if (\in_array($channel, ['sms', 'web'], true)) {
@@ -207,7 +177,7 @@ class ChatbotWebhookController extends Controller
         }
 
         if ($nextState === 'order_placed') {
-            $selectedItems = $this->normalizeSelectedItems($newState['selected_items'] ?? []);
+            $selectedItems = app(CartItemNormalizer::class)->normalizeSelectedItems($newState['selected_items'] ?? []);
             $customerName = $newState['customer_name'] ?? 'Anonymous';
             // Block order creation when using simulator/system IDs; only real SMS phone or Messenger PSID may place orders
             $isSimulatorId = str_starts_with($externalId, 'sim_') || str_starts_with($externalId, 'web_');
@@ -302,6 +272,18 @@ class ChatbotWebhookController extends Controller
             }
         }
 
+        if ($channel === 'web') {
+            foreach ($replies as $replyText) {
+                if (\is_string($replyText) && trim($replyText) !== '') {
+                    OutboundMessenger::create([
+                        'to' => $externalId,
+                        'body' => $replyText,
+                        'conversation_id' => null,
+                    ]);
+                }
+            }
+        }
+
         $payload = [
             'reply' => $reply,
             'replies' => $replies,
@@ -345,26 +327,4 @@ class ChatbotWebhookController extends Controller
         return response()->json(['messages' => $messages]);
     }
 
-    /**
-     * @param mixed $raw
-     * @return list<array{menu_item_id: int, name: string, price: float, quantity: int}>
-     */
-    private function normalizeSelectedItems($raw): array
-    {
-        if (! is_array($raw)) {
-            return [];
-        }
-        $out = [];
-        foreach ($raw as $i) {
-            if (is_array($i) && isset($i['menu_item_id'], $i['name'], $i['price'])) {
-                $out[] = [
-                    'menu_item_id' => (int) $i['menu_item_id'],
-                    'name' => (string) $i['name'],
-                    'price' => (float) $i['price'],
-                    'quantity' => (int) ($i['quantity'] ?? 1),
-                ];
-            }
-        }
-        return $out;
-    }
 }

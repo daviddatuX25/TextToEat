@@ -179,10 +179,21 @@ class SmsDeviceController extends Controller
      */
     public function smsStatus(Request $request, string $deviceId): JsonResponse
     {
-        SmsDevice::where('device_id', $deviceId)->firstOrFail();
+        $device = SmsDevice::where('device_id', $deviceId)->firstOrFail();
 
         $validated = $request->validate([
-            'smsId' => ['required', 'integer', 'exists:outbound_sms,id'],
+            'smsId' => [
+                'required',
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (! is_numeric($value) || (int) $value < 1) {
+                        $fail('The selected smsId is invalid.');
+                        return;
+                    }
+                    if (! OutboundSms::where('id', (int) $value)->exists()) {
+                        $fail('The selected smsId is invalid.');
+                    }
+                },
+            ],
             'smsBatchId' => ['nullable', 'string', 'max:64'],
             'status' => ['required', 'string', 'in:SENT,DELIVERED,FAILED'],
             'errorCode' => ['nullable', 'string', 'max:64'],
@@ -193,17 +204,28 @@ class SmsDeviceController extends Controller
             (int) $validated['smsId'],
             $validated['status'],
             $validated['errorCode'] ?? null,
-            $validated['errorMessage'] ?? null
+            $validated['errorMessage'] ?? null,
+            $device
         );
 
         return response()->json(['ok' => true]);
     }
 
-    private function applySmsStatus(int $id, string $status, ?string $errorCode, ?string $errorMessage): void
+    private function applySmsStatus(
+        int $id,
+        string $status,
+        ?string $errorCode,
+        ?string $errorMessage,
+        ?SmsDevice $device = null
+    ): void
     {
         $row = OutboundSms::find($id);
         if ($row === null || ! in_array($row->status, ['pending', 'sent'], true)) {
             return;
+        }
+
+        if ($device !== null && $device->exists && $row->sms_device_id === null) {
+            $row->sms_device_id = $device->id;
         }
 
         $normalized = strtolower($status);

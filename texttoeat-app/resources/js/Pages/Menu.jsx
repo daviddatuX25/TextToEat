@@ -37,8 +37,9 @@ export default function Menu({ menuItems = [], cart = [] }) {
     };
 
     const addToCart = (item, quantity = 1) => {
-        if (item.is_sold_out || (item.units_today != null && item.units_today <= 0)) return;
-        const qty = Math.min(quantity, item.units_today ?? MAX_QUANTITY, MAX_QUANTITY);
+        const available = item.available ?? item.units_today ?? 0;
+        if (available <= 0) return;
+        const qty = Math.min(quantity, available, MAX_QUANTITY);
         if (qty < 1) return;
         router.post('/cart/add', { menu_item_id: item.id, quantity: qty });
     };
@@ -113,7 +114,7 @@ export default function Menu({ menuItems = [], cart = [] }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredItems.map((item) => {
                         const available = item.available ?? item.units_today ?? 0;
-                        const soldOut = item.is_sold_out || available <= 0;
+                        const soldOut = available <= 0;
                         const cartQty = getCartQuantity(item.id);
                         const maxAdd = Math.min(available, MAX_QUANTITY) - cartQty;
 

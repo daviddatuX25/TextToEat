@@ -6,10 +6,11 @@ use App\Services\ChatbotReplyResolver;
 use App\Services\ChatbotSmsNumberLayer;
 
 /**
- * Builds Messenger-specific outbound message descriptors (quick replies, button template)
- * from chatbot FSM state and reply text. Used only for channel=messenger; SMS stays text-only.
+ * Messenger-specific presentation layer on top of the shared ChatbotFsm/ChatbotReplyResolver output.
+ * Builds outbound message descriptors (quick replies, button templates, carousels) from FSM next_state,
+ * reply text, and payload so Messenger renders the same conversation as SMS/Web with channel-appropriate UI.
  *
- * Returns a list of message descriptors: ['type' => 'text'|'quick_reply'|'button_template', ...].
+ * Returns a list of message descriptors: ['type' => 'text'|'quick_reply'|'button_template'|'carousel', ...].
  * The webhook controller sends these via FacebookMessengerClient.
  */
 class MessengerReplyBuilder
@@ -42,7 +43,6 @@ class MessengerReplyBuilder
         }
 
         $out = [];
-
         switch ($nextState) {
             case 'language_selection':
                 $out[] = [
@@ -108,6 +108,11 @@ class MessengerReplyBuilder
             case 'menu':
                 if ($menuItems !== []) {
                     $elements = [];
+                    // IMPORTANT: Messenger menu must remain a carousel (or equivalent element list) with a
+                    // dedicated Add button per item using payload MENU_ITEM_<n>. Any refactor must preserve
+                    // this per-item Add button behavior so item selection stays aligned with the FSM.
+                    // Messenger carousel supports at most 10 elements; extra menu items beyond this slice
+                    // will not be visible.
                     foreach (array_slice($menuItems, 0, 10) as $idx => $item) {
                         $oneBased = $idx + 1;
                         $price = number_format((float) ($item['price'] ?? 0), 2, '.', ',');
@@ -123,6 +128,22 @@ class MessengerReplyBuilder
                         'type' => 'carousel',
                         'text' => $text,
                         'elements' => $elements,
+                    ];
+                } else {
+                    $out[] = ['type' => 'text', 'text' => $text];
+                }
+                break;
+            case 'item_selection':
+                $itemSelectionMode = $statePayload['item_selection_mode'] ?? '';
+                if ($itemSelectionMode === 'cart_menu') {
+                    $out[] = [
+                        'type' => 'button_template',
+                        'text' => $text,
+                        'buttons' => [
+                            ['type' => 'postback', 'title' => $this->shortLabel('Done', $locale), 'payload' => MessengerPayloads::CART_DONE],
+                            ['type' => 'postback', 'title' => $this->shortLabel('Add more', $locale), 'payload' => MessengerPayloads::CART_ADD],
+                            ['type' => 'postback', 'title' => $this->shortLabel('Edit', $locale), 'payload' => MessengerPayloads::CART_EDIT],
+                        ],
                     ];
                 } else {
                     $out[] = ['type' => 'text', 'text' => $text];

@@ -31,10 +31,8 @@ class OrdersController extends Controller
             ->orderByDesc('created_at')
             ->get();
 
-        $today = Carbon::today();
         $menuItems = MenuItem::query()
             ->with('category')
-            ->whereDate('menu_date', $today)
             ->join('categories', 'menu_items.category_id', '=', 'categories.id')
             ->select('menu_items.*')
             ->orderBy('categories.sort_order')
@@ -178,31 +176,21 @@ class OrdersController extends Controller
             DB::transaction(function () use ($order, $today): void {
                 foreach ($order->orderItems as $orderItem) {
                     if ($orderItem->menu_item_id) {
-                        $menuItem = MenuItem::query()
-                            ->where('id', $orderItem->menu_item_id)
+                        MenuItemDailyStock::firstOrCreate(
+                            [
+                                'menu_item_id' => $orderItem->menu_item_id,
+                                'menu_date' => $today,
+                            ],
+                            [
+                                'units_set' => 0,
+                                'units_sold' => 0,
+                                'units_leftover' => 0,
+                            ]
+                        );
+                        MenuItemDailyStock::query()
+                            ->where('menu_item_id', $orderItem->menu_item_id)
                             ->whereDate('menu_date', $today)
-                            ->first();
-                        if ($menuItem) {
-                            MenuItemDailyStock::firstOrCreate(
-                                [
-                                    'menu_item_id' => $menuItem->id,
-                                    'menu_date' => $today,
-                                ],
-                                [
-                                    'units_set' => (int) $menuItem->units_today,
-                                    'units_sold' => 0,
-                                    'units_leftover' => (int) $menuItem->units_today,
-                                ]
-                            );
-                            MenuItemDailyStock::query()
-                                ->where('menu_item_id', $orderItem->menu_item_id)
-                                ->whereDate('menu_date', $today)
-                                ->increment('units_sold', $orderItem->quantity);
-                            MenuItem::query()
-                                ->where('id', $orderItem->menu_item_id)
-                                ->whereDate('menu_date', $today)
-                                ->decrement('units_today', $orderItem->quantity);
-                        }
+                            ->increment('units_sold', $orderItem->quantity);
                     }
                 }
             });

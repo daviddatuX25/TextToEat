@@ -5,7 +5,8 @@ namespace App\Services;
 /**
  * Number translation and formatting layer: maps numeric replies to canonical FSM input,
  * and formats choice-state replies as prompt + numbered options (single place for this logic).
- * Used by web, SMS, and Messenger (e.g. delivery_area_choice); delivery_choice on Messenger is button-only.
+ * SMS-first presentation layer on top of the shared ChatbotFsm/ChatbotReplyResolver output; Messenger
+ * reuses only specific helpers (e.g. delivery_area_choice text) while keeping the same underlying replies.
  * Menu item list is still built in ChatbotFsm::buildMenuText; for full uniformity it could be moved here later.
  */
 class ChatbotSmsNumberLayer

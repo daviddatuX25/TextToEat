@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Models\OutboundSms;
 use App\Models\SmsDevice;
 use App\Models\SmsGatewaySetting;
 use App\Services\OutboundSmsService;
@@ -54,6 +55,51 @@ class SmsDevicesController extends Controller
                 'firebase_credentials_path' => Setting::has('firebase.credentials_path'),
                 'firebase_device_token' => Setting::has('firebase.device_token'),
             ],
+        ]);
+    }
+
+    public function logs(string $deviceId): Response
+    {
+        $device = SmsDevice::where('device_id', $deviceId)->firstOrFail();
+
+        $logs = OutboundSms::query()
+            ->where('sms_device_id', $device->id)
+            ->orderByDesc('id')
+            ->paginate(50)
+            ->through(function (OutboundSms $row) {
+                return [
+                    'id' => $row->id,
+                    'to' => $row->to,
+                    'body' => $row->body,
+                    'status' => $row->status,
+                    'sent_at' => $row->sent_at?->toIso8601String(),
+                    'delivered_at' => $row->delivered_at?->toIso8601String(),
+                    'failure_reason' => $row->failure_reason,
+                    'error_code' => $row->error_code,
+                    'error_message' => $row->error_message,
+                    'channel' => $row->channel,
+                    'chatbot_session_id' => $row->chatbot_session_id,
+                    'chatbot_log_url' => $row->chatbot_session_id !== null
+                        ? route('portal.logs.chatbot.show', ['session' => $row->chatbot_session_id])
+                        : null,
+                    'created_at' => $row->created_at?->toIso8601String(),
+                ];
+            });
+
+        return Inertia::render('SmsDeviceLogs', [
+            'device' => [
+                'id' => $device->id,
+                'device_id' => $device->device_id,
+                'name' => $device->name,
+                'brand' => $device->brand,
+                'model' => $device->model,
+                'os' => $device->os,
+                'app_version_code' => $device->app_version_code,
+                'enabled' => (bool) $device->enabled,
+                'last_used_at' => $device->last_used_at?->toIso8601String(),
+                'last_heartbeat_at' => $device->last_heartbeat_at?->toIso8601String(),
+            ],
+            'logs' => $logs,
         ]);
     }
 

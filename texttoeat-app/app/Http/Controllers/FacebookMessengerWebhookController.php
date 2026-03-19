@@ -7,13 +7,14 @@ use App\Events\ConversationUpdated;
 use App\Messenger\MessengerPayloads;
 use App\Messenger\MessengerReplyBuilder;
 use App\Models\ChatbotSession;
+use App\Models\OutboundMessenger;
 use App\Models\DeliveryArea;
 use App\Models\InboundMessage;
 use App\Models\MenuItem;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Messenger\FacebookMessengerClient;
-use App\Services\MenuItemStockService;
+use App\Services\MenuDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -24,7 +25,8 @@ class FacebookMessengerWebhookController extends Controller
         private MessengerSenderInterface $messengerSender,
         private ChatbotWebhookController $chatbot,
         private MessengerReplyBuilder $replyBuilder,
-        private FacebookMessengerClient $messengerClient
+        private FacebookMessengerClient $messengerClient,
+        private MenuDataService $menuDataService
     ) {}
 
     /**
@@ -115,8 +117,10 @@ class FacebookMessengerWebhookController extends Controller
             $state = $existingSession->state ?? [];
             if ((bool) ($state['automation_disabled'] ?? false) === true) {
                 $existingSession->update(['last_activity_at' => now()]);
+                $conversation = $existingSession->getOrCreateLatestHumanConversation();
                 InboundMessage::create([
                     'chatbot_session_id' => $existingSession->id,
+                    'conversation_id' => $conversation->id,
                     'body' => $body,
                     'channel' => 'messenger',
                 ]);
@@ -165,8 +169,8 @@ class FacebookMessengerWebhookController extends Controller
             return;
         }
 
-        $menuItems = $this->loadMenuItems();
-        $deliveryAreas = $this->loadDeliveryAreas();
+        $menuItems = $this->menuDataService->loadMenuItems();
+        $deliveryAreas = $this->menuDataService->loadDeliveryAreas();
 
         $replyForBuild = $nextState === 'menu' ? $fullReply : $reply;
         $descriptors = $this->replyBuilder->build(
@@ -178,21 +182,36 @@ class FacebookMessengerWebhookController extends Controller
             $deliveryAreas,
             $locale
         );
-
         foreach ($descriptors as $desc) {
             $type = $desc['type'] ?? 'text';
             $text = $desc['text'] ?? '';
             if ($type === 'quick_reply' && isset($desc['options'])) {
                 $this->messengerClient->sendQuickReply($psid, $text, $desc['options']);
+                OutboundMessenger::create([
+                    'to' => $psid,
+                    'body' => (string) $text,
+                ]);
             } elseif ($type === 'button_template' && isset($desc['buttons'])) {
                 $this->messengerClient->sendButtonTemplate($psid, $text, $desc['buttons']);
+                OutboundMessenger::create([
+                    'to' => $psid,
+                    'body' => (string) $text,
+                ]);
             } elseif ($type === 'carousel' && isset($desc['elements']) && $desc['elements'] !== []) {
                 if ($text !== '') {
                     $this->messengerClient->sendTextMessage($psid, $text);
+                    OutboundMessenger::create([
+                        'to' => $psid,
+                        'body' => (string) $text,
+                    ]);
                 }
                 $this->messengerClient->sendCarousel($psid, $desc['elements']);
             } elseif ($text !== '') {
                 $this->messengerClient->sendTextMessage($psid, $text);
+                OutboundMessenger::create([
+                    'to' => $psid,
+                    'body' => (string) $text,
+                ]);
             }
         }
 
@@ -244,58 +263,6 @@ class FacebookMessengerWebhookController extends Controller
             ],
             'elements' => $elements,
         ];
-    }
-
-    /**
-     * @return array<int, array{id: int, name: string, price: float, category?: string}>
-     */
-    private function loadMenuItems(): array
-    {
-        $todayMenuItems = MenuItem::forToday()->with('category')->get();
-        $virtualAvailable = app(MenuItemStockService::class)->getVirtualAvailableForToday($todayMenuItems->pluck('id')->all());
-
-        return $todayMenuItems
-            ->sort(function ($a, $b) {
-                $orderA = $a->category?->sort_order ?? 999;
-                $orderB = $b->category?->sort_order ?? 999;
-                if ($orderA !== $orderB) {
-                    return $orderA <=> $orderB;
-                }
-                $nameA = $a->category?->name ?? '';
-                $nameB = $b->category?->name ?? '';
-                if ($nameA !== $nameB) {
-                    return strcmp($nameA, $nameB);
-                }
-                return strcmp($a->name, $b->name);
-            })
-            ->values()
-            ->map(fn ($m) => [
-                'id' => $m->id,
-                'name' => $m->name,
-                'price' => (float) $m->price,
-                'category' => $m->category?->name ?? '',
-                'available' => (int) ($virtualAvailable[$m->id] ?? 0),
-            ])
-            ->all();
-    }
-
-    /**
-     * @return array<int, array{id: int, name: string, is_free: bool, fee: float|null}>
-     */
-    private function loadDeliveryAreas(): array
-    {
-        return DeliveryArea::query()
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->get()
-            ->map(fn ($a) => [
-                'id' => $a->id,
-                'name' => $a->name,
-                'is_free' => (bool) $a->is_free,
-                'fee' => $a->fee !== null ? (float) $a->fee : null,
-            ])
-            ->values()
-            ->all();
     }
 
     private function isValidSignature(Request $request): bool

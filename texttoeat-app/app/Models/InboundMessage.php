@@ -14,6 +14,7 @@ class InboundMessage extends Model
      */
     protected $fillable = [
         'chatbot_session_id',
+        'conversation_id',
         'body',
         'channel',
     ];
@@ -21,5 +22,10 @@ class InboundMessage extends Model
     public function chatbotSession(): BelongsTo
     {
         return $this->belongsTo(ChatbotSession::class);
+    }
+
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class);
     }
 }

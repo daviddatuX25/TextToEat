@@ -24,7 +24,9 @@ class OutboundSms extends Model
         'error_message',
         'channel',
         'chatbot_session_id',
+        'conversation_id',
         'sms_batch_id',
+        'sms_device_id',
     ];
 
     /**
@@ -61,5 +63,15 @@ class OutboundSms extends Model
     public function chatbotSession(): BelongsTo
     {
         return $this->belongsTo(ChatbotSession::class);
+    }
+
+    public function smsDevice(): BelongsTo
+    {
+        return $this->belongsTo(SmsDevice::class);
+    }
+
+    public function conversation(): BelongsTo
+    {
+        return $this->belongsTo(Conversation::class);
     }
 }

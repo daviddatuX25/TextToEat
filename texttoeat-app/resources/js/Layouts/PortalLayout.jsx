@@ -459,20 +459,21 @@ export default function PortalLayout({ children }) {
 
             <Toaster richColors position="top-right" />
 
-            <Dialog open={!!show_daily_greeting} onOpenChange={() => {}}>
-                <DialogContent
-                    className="max-w-sm"
-                    onInteractOutside={(e) => e.preventDefault()}
-                    onEscapeKeyDown={(e) => e.preventDefault()}
-                >
+            <Dialog
+                open={!!show_daily_greeting}
+                onOpenChange={(open) => {
+                    if (!open) handleDismissGreeting();
+                }}
+            >
+                <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>Good morning!</DialogTitle>
+                        <DialogTitle>Menu reset</DialogTitle>
                     </DialogHeader>
                     <p className="text-sm text-surface-600 dark:text-surface-400">
-                        Today&apos;s menu has been reset. Enable items and set quantities as needed.
+                        Today&apos;s servings were reset to zero. Set quantities again to open ordering for the day.
                     </p>
                     <div className="flex justify-end pt-2">
-                        <Button onClick={handleDismissGreeting}>Go to menu</Button>
+                        <Button onClick={handleDismissGreeting}>Open today&apos;s servings</Button>
                     </div>
                 </DialogContent>
             </Dialog>

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Contracts\SmsSenderInterface;
 use App\Models\ChatbotSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Mockery;
 use Tests\TestCase;
 
@@ -121,5 +122,38 @@ class TextbeeSmsWebhookTest extends TestCase
         ]);
 
         $response->assertStatus(422);
+    }
+
+    public function test_incoming_sms_returns_503_when_send_fails_and_forgets_idempotency_so_retry_succeeds(): void
+    {
+        $messageId = 'retry_after_fail_1';
+        $callCount = 0;
+        $outboundMock = Mockery::mock(SmsSenderInterface::class);
+        $outboundMock->shouldReceive('send')
+            ->andReturnUsing(function () use (&$callCount): array {
+                $callCount++;
+                return $callCount === 1
+                    ? ['success' => false, 'message' => 'FCM delivery failed']
+                    : ['success' => true, 'ids' => [1]];
+            });
+        $this->app->instance(SmsSenderInterface::class, $outboundMock);
+
+        $first = $this->postJson('/api/sms/incoming', [
+            'from' => '09123456789',
+            'message' => 'hi',
+            'message_id' => $messageId,
+        ]);
+        $first->assertStatus(503)
+            ->assertJson(['success' => false, 'message_id' => $messageId, 'retry' => true]);
+
+        $this->assertNull(Cache::get('sms_webhook_seen:' . $messageId));
+
+        $retry = $this->postJson('/api/sms/incoming', [
+            'from' => '09123456789',
+            'message' => 'hi',
+            'message_id' => $messageId,
+        ]);
+        $retry->assertStatus(200)
+            ->assertJson(['success' => true, 'message_id' => $messageId]);
     }
 }

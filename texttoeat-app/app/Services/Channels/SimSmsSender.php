@@ -12,7 +12,7 @@ class SimSmsSender implements SmsSenderInterface
     /**
      * @return array{success: bool, ids?: list<int>, message?: string}
      */
-    public function send(string $to, string $body, ?string $channel = null, ?int $chatbotSessionId = null): array
+    public function send(string $to, string $body, ?string $channel = null, ?int $chatbotSessionId = null, ?int $conversationId = null): array
     {
         $segments = $this->splitMessage($body);
         if ($segments === []) {
@@ -27,6 +27,7 @@ class SimSmsSender implements SmsSenderInterface
                 'status' => 'pending',
                 'channel' => $channel ?? 'sms',
                 'chatbot_session_id' => $chatbotSessionId,
+                'conversation_id' => $conversationId,
             ]);
             $ids[] = $row->id;
         }

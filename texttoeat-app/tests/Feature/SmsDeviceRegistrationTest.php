@@ -327,6 +327,7 @@ class SmsDeviceRegistrationTest extends TestCase
         $row->refresh();
         $this->assertSame('sent', $row->status);
         $this->assertNotNull($row->sent_at);
+        $this->assertSame($device->id, $row->sms_device_id);
     }
 
     public function test_sms_status_delivered_sets_delivered_at(): void
@@ -383,6 +384,32 @@ class SmsDeviceRegistrationTest extends TestCase
         $this->assertSame('failed', $row->status);
         $this->assertSame('NO_SERVICE', $row->error_code);
         $this->assertSame('No network', $row->error_message);
+    }
+
+    public function test_sms_status_accepts_sms_id_as_string_when_app_echoes_fcm_payload(): void
+    {
+        config(['firebase.sms_device_api_key' => null]);
+
+        $device = SmsDevice::create([
+            'device_id' => 'dev-string-id',
+            'device_token' => 'fcm-string-id',
+            'enabled' => true,
+        ]);
+        $row = OutboundSms::create([
+            'to' => '09123456789',
+            'body' => 'Hi',
+            'status' => 'pending',
+        ]);
+
+        $response = $this->postJson("/api/sms/device/{$device->device_id}/sms/status", [
+            'smsId' => (string) $row->id,
+            'status' => 'SENT',
+        ]);
+
+        $response->assertStatus(200)->assertJson(['ok' => true]);
+        $row->refresh();
+        $this->assertSame('sent', $row->status);
+        $this->assertNotNull($row->sent_at);
     }
 
     public function test_put_device_returns_404_when_device_missing(): void

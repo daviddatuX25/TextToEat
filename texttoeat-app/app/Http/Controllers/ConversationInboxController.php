@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Events\ConversationUpdated;
 use App\Models\ActionLog;
 use App\Models\ChatbotSession;
+use App\Models\Conversation;
 use App\Models\InboundMessage;
 use App\Models\Setting;
 use App\Contracts\MessengerSenderInterface;
@@ -192,6 +193,7 @@ class ConversationInboxController extends Controller
         if ($session->channel === 'sms') {
             $outboundRows = OutboundSms::query()
                 ->where('chatbot_session_id', $session->id)
+                ->whereNotNull('conversation_id')
                 ->orderByDesc('created_at')
                 ->limit(50)
                 ->get();
@@ -208,6 +210,7 @@ class ConversationInboxController extends Controller
             $outboundRows = collect();
             $outboundForThread = OutboundMessenger::query()
                 ->where('to', $session->external_id)
+                ->whereNotNull('conversation_id')
                 ->orderBy('created_at')
                 ->limit(50)
                 ->get()
@@ -226,6 +229,7 @@ class ConversationInboxController extends Controller
 
         $inbound = InboundMessage::query()
             ->where('chatbot_session_id', $session->id)
+            ->whereNotNull('conversation_id')
             ->orderBy('created_at')
             ->limit(100)
             ->get()
@@ -289,14 +293,24 @@ class ConversationInboxController extends Controller
             return redirect()->back()->with('error', 'Message cannot be empty.');
         }
 
+        $conversation = Conversation::where('chatbot_session_id', $session->id)->orderByDesc('id')->first();
+        if ($conversation === null) {
+            $conversation = Conversation::create([
+                'chatbot_session_id' => $session->id,
+                'channel' => $session->channel,
+                'external_id' => $session->external_id,
+                'status' => 'human_takeover',
+            ]);
+        }
+
         try {
             if ($session->channel === 'sms') {
-                $result = $this->smsSender->send($session->external_id, $message, 'sms', $session->id);
+                $result = $this->smsSender->send($session->external_id, $message, 'sms', $session->id, $conversation->id);
                 if (! ($result['success'] ?? false)) {
                     return redirect()->back()->with('error', $result['message'] ?? 'Failed to send SMS.');
                 }
             } else {
-                $this->messengerSender->send($session->external_id, $message);
+                $this->messengerSender->send($session->external_id, $message, $conversation->id);
             }
 
             $session->update(['last_activity_at' => now()]);
@@ -359,6 +373,11 @@ class ConversationInboxController extends Controller
         $session->state = $state;
         $session->last_activity_at = now();
         $session->save();
+
+        $latestConversation = Conversation::where('chatbot_session_id', $session->id)->orderByDesc('id')->first();
+        if ($latestConversation !== null) {
+            $latestConversation->update(['status' => 'ended']);
+        }
 
         $locale = $session->language ?? 'en';
         $message = app(\App\Services\ChatbotReplyResolver::class)->get('takeover_ended_by_staff', $locale);

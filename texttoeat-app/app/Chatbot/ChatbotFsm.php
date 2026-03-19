@@ -9,6 +9,8 @@ use App\Services\ChatbotReplyResolver;
  * FSM for chatbot: welcome → language_selection → menu → item_selection → confirm → order_placed.
  * States: welcome, language_selection, main_menu, menu, item_selection, collect_name, delivery_choice,
  * delivery_area_choice, confirm, order_placed, human_takeover, track_choice, track_list, track_ref.
+ * Single shared state machine for all channels (SMS, Messenger, web) using canonical reply keys
+ * resolved by ChatbotReplyResolver; channel-specific layers handle numbering, buttons, and templates.
  * Uses $menuItems (id, name, price) for numbered menu; $locale for all replies.
  * For track flow and status replies, pass $externalId and $channel (sms/messenger).
  */

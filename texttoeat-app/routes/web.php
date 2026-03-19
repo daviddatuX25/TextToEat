@@ -93,6 +93,7 @@ Route::prefix('portal')->middleware('auth')->group(function () {
     Route::post('/menu-settings/run-reset', [MenuSettingsController::class, 'runReset'])->name('portal.menu-settings.run-reset')->middleware('admin');
     Route::get('/logs/orders', [OrderLogsController::class, 'index'])->name('portal.logs.orders');
     Route::get('/logs/chatbot', [ChatbotLogsController::class, 'index'])->name('portal.logs.chatbot');
+    Route::get('/logs/chatbot/{session}', [ChatbotLogsController::class, 'show'])->name('portal.logs.chatbot.show');
     Route::get('/inbox', [ConversationInboxController::class, 'index'])->name('portal.inbox');
     Route::get('/inbox/{session}', [ConversationInboxController::class, 'show'])->name('portal.inbox.show');
     Route::get('/settings', [SettingsController::class, 'index'])->name('portal.settings')->middleware('admin');
@@ -104,6 +105,7 @@ Route::prefix('portal')->middleware('auth')->group(function () {
     Route::post('/chatbot-replies', [ChatbotRepliesController::class, 'store'])->name('portal.chatbot-replies.store')->middleware('admin');
     Route::delete('/chatbot-replies', [ChatbotRepliesController::class, 'destroy'])->name('portal.chatbot-replies.destroy')->middleware('admin');
     Route::get('/sms-devices', [SmsDevicesController::class, 'index'])->name('portal.sms-devices')->middleware('admin');
+    Route::get('/sms-devices/{deviceId}/logs', [SmsDevicesController::class, 'logs'])->name('portal.sms-devices.logs')->middleware('admin');
     Route::put('/sms-devices/credentials', [SmsDevicesController::class, 'updateCredentials'])->name('portal.sms-devices.update-credentials')->middleware('admin');
     Route::post('/sms-devices/{deviceId}/heartbeat', [SmsDevicesController::class, 'heartbeat'])->name('portal.sms-devices.heartbeat')->middleware('admin');
     Route::patch('/sms-devices/{deviceId}', [SmsDevicesController::class, 'update'])->name('portal.sms-devices.update')->middleware('admin');

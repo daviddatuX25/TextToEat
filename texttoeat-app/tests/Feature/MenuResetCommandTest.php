@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Category;
 use App\Models\MenuItem;
 use App\Models\MenuItemDailySnapshot;
+use App\Models\MenuItemDailyStock;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
@@ -33,8 +34,9 @@ class MenuResetCommandTest extends TestCase
     public function test_rollover_copies_yesterday_to_today_and_resets(): void
     {
         $yesterday = Carbon::yesterday();
+        $today = Carbon::today();
 
-        MenuItem::create([
+        $adobo = MenuItem::create([
             'name' => 'Chicken Adobo',
             'price' => 125.00,
             'category_id' => $this->ulamCategory->id,
@@ -44,7 +46,7 @@ class MenuResetCommandTest extends TestCase
             'menu_date' => $yesterday,
         ]);
 
-        MenuItem::create([
+        $sinigang = MenuItem::create([
             'name' => 'Pork Sinigang',
             'price' => 135.00,
             'category_id' => $this->ulamCategory->id,
@@ -54,21 +56,42 @@ class MenuResetCommandTest extends TestCase
             'menu_date' => $yesterday,
         ]);
 
+        // Yesterday's stock rows
+        \App\Models\MenuItemDailyStock::create([
+            'menu_item_id' => $adobo->id,
+            'menu_date' => $yesterday,
+            'units_set' => 10,
+            'units_sold' => 3,
+            'units_leftover' => 7,
+        ]);
+        \App\Models\MenuItemDailyStock::create([
+            'menu_item_id' => $sinigang->id,
+            'menu_date' => $yesterday,
+            'units_set' => 5,
+            'units_sold' => 1,
+            'units_leftover' => 4,
+        ]);
+
         Artisan::call('menu:reset-today');
 
-        $todayItems = MenuItem::query()
-            ->whereDate('menu_date', Carbon::today())
-            ->get();
+        // Snapshot created for yesterday
+        $snapshots = MenuItemDailySnapshot::whereDate('menu_date', $yesterday)->get();
+        $this->assertCount(2, $snapshots);
 
-        $this->assertCount(2, $todayItems);
+        $adoboSnap = $snapshots->firstWhere('menu_item_id', $adobo->id);
+        $this->assertNotNull($adoboSnap);
+        $this->assertSame(10, (int) $adoboSnap->units_set);
+        $this->assertSame(3, (int) $adoboSnap->units_sold);
+        $this->assertSame(7, (int) $adoboSnap->units_leftover);
 
-        foreach ($todayItems as $item) {
-            $this->assertTrue($item->is_sold_out);
-            $this->assertSame(0, (int) $item->units_today);
+        // Today's stock initialized to zero for all catalog items
+        $todayStock = \App\Models\MenuItemDailyStock::whereDate('menu_date', $today)->get();
+        $this->assertGreaterThanOrEqual(2, $todayStock->count());
+        foreach ($todayStock as $row) {
+            $this->assertSame(0, (int) $row->units_set);
+            $this->assertSame(0, (int) $row->units_sold);
+            $this->assertSame(0, (int) $row->units_leftover);
         }
-
-        $names = $todayItems->pluck('name')->sort()->values()->all();
-        $this->assertSame(['Chicken Adobo', 'Pork Sinigang'], $names);
 
         $this->assertSame(Carbon::today()->toDateString(), Cache::get('menu_reset_date'));
     }
@@ -89,28 +112,29 @@ class MenuResetCommandTest extends TestCase
 
         Artisan::call('menu:reset-today');
 
-        $item = MenuItem::whereDate('menu_date', $today)->first();
-        $this->assertNotNull($item);
-        $this->assertTrue($item->is_sold_out);
-        $this->assertSame(0, (int) $item->units_today);
+        $this->assertSame(0, MenuItemDailyStock::whereDate('menu_date', Carbon::today())->sum('units_set'));
     }
 
     public function test_rollover_is_idempotent_no_duplicates(): void
     {
-        $yesterday = Carbon::yesterday();
+        $today = Carbon::today();
 
-        MenuItem::create([
+        $item = MenuItem::create([
             'name' => 'Adobo',
             'price' => 100,
             'category_id' => $this->ulamCategory->id,
-            'menu_date' => $yesterday,
+            'menu_date' => $today,
         ]);
 
         Artisan::call('menu:reset-today');
-        $count1 = MenuItem::whereDate('menu_date', Carbon::today())->count();
+        $count1 = MenuItemDailyStock::where('menu_item_id', $item->id)
+            ->whereDate('menu_date', Carbon::today())
+            ->count();
 
         Artisan::call('menu:reset-today');
-        $count2 = MenuItem::whereDate('menu_date', Carbon::today())->count();
+        $count2 = MenuItemDailyStock::where('menu_item_id', $item->id)
+            ->whereDate('menu_date', Carbon::today())
+            ->count();
 
         $this->assertSame(1, $count1);
         $this->assertSame(1, $count2);
@@ -130,13 +154,15 @@ class MenuResetCommandTest extends TestCase
 
         Artisan::call('menu:reset-today', ['--force' => true]);
 
-        $todayCount = MenuItem::whereDate('menu_date', Carbon::today())->count();
-        $this->assertSame(1, $todayCount);
+        // Force flag should still run the reset logic even outside the morning window,
+        // which means today's stock rows get initialized for catalog items.
+        $todayStockCount = MenuItemDailyStock::whereDate('menu_date', Carbon::today())->count();
+        $this->assertGreaterThanOrEqual(1, $todayStockCount);
     }
 
     public function test_snapshot_recorded_before_reset(): void
     {
-        $today = Carbon::today();
+        $yesterday = Carbon::yesterday();
         $item = MenuItem::create([
             'name' => 'Caldereta',
             'price' => 150.00,
@@ -144,13 +170,21 @@ class MenuResetCommandTest extends TestCase
             'image_url' => null,
             'units_today' => 20,
             'is_sold_out' => false,
-            'menu_date' => $today,
+            'menu_date' => $yesterday,
+        ]);
+
+        MenuItemDailyStock::create([
+            'menu_item_id' => $item->id,
+            'menu_date' => $yesterday,
+            'units_set' => 20,
+            'units_sold' => 0,
+            'units_leftover' => 20,
         ]);
 
         Artisan::call('menu:reset-today');
 
         $snapshot = MenuItemDailySnapshot::where('menu_item_id', $item->id)
-            ->whereDate('menu_date', $today)
+            ->whereDate('menu_date', Carbon::yesterday())
             ->first();
         $this->assertNotNull($snapshot);
         $this->assertSame(20, $snapshot->units_set);

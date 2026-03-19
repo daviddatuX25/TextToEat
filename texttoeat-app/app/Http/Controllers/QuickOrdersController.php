@@ -24,10 +24,8 @@ class QuickOrdersController extends Controller
 {
     public function create(): Response
     {
-        $today = Carbon::today();
         $menuItems = MenuItem::query()
             ->with('category')
-            ->whereDate('menu_date', $today)
             ->join('categories', 'menu_items.category_id', '=', 'categories.id')
             ->select('menu_items.*')
             ->orderBy('categories.sort_order')

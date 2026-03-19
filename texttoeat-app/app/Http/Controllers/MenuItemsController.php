@@ -28,11 +28,9 @@ class MenuItemsController extends Controller
         $validated = $request->validate([
             'category' => ['nullable', 'integer', 'exists:categories,id'],
         ]);
-
         $today = Carbon::today();
         $menuItems = MenuItem::query()
             ->with('category')
-            ->whereDate('menu_date', $today)
             ->when(
                 ! empty($validated['category']),
                 fn ($q) => $q->where('category_id', $validated['category'])
@@ -49,12 +47,21 @@ class MenuItemsController extends Controller
         $virtualAvailable = $this->stockService->getVirtualAvailableForToday($ids);
         $currentOrders = $this->stockService->getReservedForToday($ids);
 
-        $menuItems = $menuItems->through(function ($item) use ($virtualAvailable, $currentOrders) {
+        $stockByItem = MenuItemDailyStock::query()
+            ->whereIn('menu_item_id', $ids)
+            ->whereDate('menu_date', $today)
+            ->get()
+            ->keyBy('menu_item_id');
+
+        $menuItems = $menuItems->through(function ($item) use ($virtualAvailable, $currentOrders, $stockByItem) {
             $item->load('category');
             $arr = $item->toArray();
             $arr['category'] = $item->category?->name;
-            $arr['virtual_available'] = $virtualAvailable[$item->id] ?? (int) $item->units_today;
+            $arr['virtual_available'] = $virtualAvailable[$item->id] ?? 0;
             $arr['current_orders'] = $currentOrders[$item->id] ?? 0;
+
+            $stock = $stockByItem->get($item->id);
+            $arr['units_today'] = $stock ? (int) $stock->units_leftover : 0;
 
             return $arr;
         });
@@ -67,7 +74,6 @@ class MenuItemsController extends Controller
             ->all();
 
         $menuCategories = MenuItem::query()
-            ->whereDate('menu_date', $today)
             ->with('category')
             ->get()
             ->pluck('category.name')
@@ -77,12 +83,17 @@ class MenuItemsController extends Controller
             ->values()
             ->all();
 
-        $totalMenuItems = MenuItem::query()->whereDate('menu_date', $today)->count();
+        $totalMenuItems = MenuItem::query()->count();
         $threshold = (int) Setting::get('menu.low_stock_threshold', 5);
-        // Base low-stock count on same Qty (units_today) shown in UI, not virtual_available
         $lowStockCount = MenuItem::query()
-            ->whereDate('menu_date', $today)
-            ->where('units_today', '<', $threshold)
+            ->leftJoin('menu_item_daily_stock as s', function ($join) use ($today): void {
+                $join->on('s.menu_item_id', '=', 'menu_items.id')
+                    ->whereDate('s.menu_date', $today);
+            })
+            ->where(function ($q) use ($threshold): void {
+                $q->whereNull('s.menu_item_id')
+                    ->orWhere('s.units_leftover', '<', $threshold);
+            })
             ->count();
 
         return Inertia::render('MenuItems', [
@@ -125,10 +136,6 @@ class MenuItemsController extends Controller
 
     public function update(UpdateMenuItemRequest $request, MenuItem $menuItem): RedirectResponse
     {
-        if (! $menuItem->menu_date->isToday()) {
-            abort(404);
-        }
-
         $validated = $request->validated();
         unset($validated['image'], $validated['remove_image']);
 
@@ -150,9 +157,10 @@ class MenuItemsController extends Controller
 
         if (array_key_exists('units_today', $validated)) {
             $set = (int) $validated['units_today'];
+            $today = Carbon::today();
             $stock = MenuItemDailyStock::query()
                 ->where('menu_item_id', $menuItem->id)
-                ->whereDate('menu_date', $menuItem->menu_date)
+                ->whereDate('menu_date', $today)
                 ->first();
             if ($stock) {
                 $stock->update([
@@ -162,7 +170,7 @@ class MenuItemsController extends Controller
             } else {
                 MenuItemDailyStock::create([
                     'menu_item_id' => $menuItem->id,
-                    'menu_date' => $menuItem->menu_date,
+                    'menu_date' => $today,
                     'units_set' => $set,
                     'units_sold' => 0,
                     'units_leftover' => $set,
@@ -175,10 +183,6 @@ class MenuItemsController extends Controller
 
     public function destroy(MenuItem $menuItem): RedirectResponse
     {
-        if (! $menuItem->menu_date->isToday()) {
-            abort(404);
-        }
-
         $menuItem->delete();
         return redirect()->back()->with('success', 'Menu item removed.');
     }

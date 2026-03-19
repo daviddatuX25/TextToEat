@@ -259,22 +259,38 @@ function DeviceCard({ device, onHeartbeat, heartbeatLoading }) {
                         {device.enabled ? 'Enabled' : 'Disabled'}
                     </span>
                 </div>
-                {device.device_id && (
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={onHeartbeat}
-                    disabled={heartbeatLoading}
-                >
-                    {heartbeatLoading ? (
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                    ) : (
-                        <RefreshCw className="h-4 w-4" />
+                <div className="flex items-center gap-2">
+                    {device.device_id && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={onHeartbeat}
+                            disabled={heartbeatLoading}
+                        >
+                            {heartbeatLoading ? (
+                                <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <RefreshCw className="h-4 w-4" />
+                            )}
+                            <span className="ml-2">Refresh status</span>
+                        </Button>
                     )}
-                    <span className="ml-2">Refresh status</span>
-                </Button>
-                )}
+                    {device.device_id && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                                router.get(
+                                    `/portal/sms-devices/${encodeURIComponent(device.device_id)}/logs`,
+                                )
+                            }
+                        >
+                            View SMS logs
+                        </Button>
+                    )}
+                </div>
             </CardHeader>
             <CardContent className="px-4 pt-5 pb-4 space-y-4">
                 {(device.brand || device.model || device.os) && (

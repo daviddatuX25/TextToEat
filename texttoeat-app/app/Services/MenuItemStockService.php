@@ -13,7 +13,7 @@ class MenuItemStockService
     /**
      * Virtual available (on the line) = units_set minus reserved (pending orders) minus units_sold.
      * Reads from menu_item_daily_stock; reserves computed from OrderItem.
-     * Only includes menu items where menu_date equals the app's current date (today); previous days are excluded.
+     * Availability is per day, keyed by (menu_item_id, menu_date = today).
      *
      * @param  array<int, int>  $menuItemIds  Optional. If empty, compute for all today's menu items.
      * @return array<int, int> Map of menu_item_id => virtual_available (>= 0)
@@ -21,41 +21,43 @@ class MenuItemStockService
     public function getVirtualAvailableForToday(array $menuItemIds = []): array
     {
         $today = Carbon::today();
-        $query = MenuItem::query()
-            ->whereDate('menu_date', $today)
-            ->select('id', 'units_today');
+        $stockQuery = MenuItemDailyStock::query()
+            ->whereDate('menu_date', $today);
 
         if ($menuItemIds !== []) {
-            $query->whereIn('id', $menuItemIds);
+            $stockQuery->whereIn('menu_item_id', $menuItemIds);
         }
 
-        $items = $query->get();
-        if ($items->isEmpty()) {
-            return [];
-        }
-
-        $ids = $items->pluck('id')->all();
-
-        // Ensure daily_stock row exists for each (fallback: use menu_items.units_today for set)
-        foreach ($items as $item) {
-            MenuItemDailyStock::firstOrCreate(
-                [
-                    'menu_item_id' => $item->id,
-                    'menu_date' => $today,
-                ],
-                [
-                    'units_set' => (int) $item->units_today,
-                    'units_sold' => 0,
-                    'units_leftover' => (int) $item->units_today,
-                ]
-            );
-        }
-
-        $stockByItem = MenuItemDailyStock::query()
-            ->whereIn('menu_item_id', $ids)
-            ->whereDate('menu_date', $today)
+        $stockByItem = $stockQuery
             ->get()
             ->keyBy('menu_item_id');
+
+        // Transitional fallback: if some requested items do not yet have a stock row,
+        // seed stock from the legacy units_today field on MenuItem so we don't break
+        // existing flows that still edit units_today.
+        if ($menuItemIds !== []) {
+            $missingIds = array_values(array_diff($menuItemIds, $stockByItem->keys()->all()));
+            if ($missingIds !== []) {
+                $fallbackItems = MenuItem::query()
+                    ->whereIn('id', $missingIds)
+                    ->get(['id', 'units_today']);
+
+                foreach ($fallbackItems as $item) {
+                    $stock = MenuItemDailyStock::firstOrCreate(
+                        [
+                            'menu_item_id' => $item->id,
+                            'menu_date' => $today,
+                        ],
+                        [
+                            'units_set' => (int) $item->units_today,
+                            'units_sold' => 0,
+                            'units_leftover' => (int) $item->units_today,
+                        ]
+                    );
+                    $stockByItem->put($item->id, $stock);
+                }
+            }
+        }
 
         $pendingStatuses = [
             OrderStatus::Received->value,
@@ -63,6 +65,11 @@ class MenuItemStockService
             OrderStatus::Ready->value,
             OrderStatus::OnTheWay->value,
         ];
+
+        $ids = $stockByItem->keys()->all();
+        if ($ids === []) {
+            return [];
+        }
 
         $reserved = OrderItem::query()
             ->whereIn('menu_item_id', $ids)
@@ -76,12 +83,11 @@ class MenuItemStockService
             ->all();
 
         $result = [];
-        foreach ($items as $item) {
-            $stock = $stockByItem->get($item->id);
-            $set = $stock ? (int) $stock->units_set : (int) $item->units_today;
-            $sold = $stock ? (int) $stock->units_sold : 0;
-            $res = (int) ($reserved[$item->id] ?? 0);
-            $result[$item->id] = max(0, $set - $res - $sold);
+        foreach ($stockByItem as $menuItemId => $stock) {
+            $set = (int) $stock->units_set;
+            $sold = (int) $stock->units_sold;
+            $res = (int) ($reserved[$menuItemId] ?? 0);
+            $result[$menuItemId] = max(0, $set - $res - $sold);
         }
 
         return $result;
@@ -107,15 +113,16 @@ class MenuItemStockService
     public function getReservedForToday(array $menuItemIds = []): array
     {
         $today = Carbon::today();
-        $query = MenuItem::query()
-            ->whereDate('menu_date', $today)
-            ->select('id');
-
-        if ($menuItemIds !== []) {
-            $query->whereIn('id', $menuItemIds);
+        if ($menuItemIds === []) {
+            $ids = MenuItemDailyStock::query()
+                ->whereDate('menu_date', $today)
+                ->pluck('menu_item_id')
+                ->unique()
+                ->all();
+        } else {
+            $ids = $menuItemIds;
         }
 
-        $ids = $query->pluck('id')->all();
         if ($ids === []) {
             return [];
         }

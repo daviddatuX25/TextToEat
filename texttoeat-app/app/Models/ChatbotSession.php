@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class ChatbotSession extends Model
 {
@@ -185,6 +186,25 @@ class ChatbotSession extends Model
         return $this->hasMany(Conversation::class);
     }
 
+    /**
+     * Return the latest conversation for this session (for tagging human-segment messages).
+     * If none exists, create one with status human_takeover.
+     */
+    public function getOrCreateLatestHumanConversation(): Conversation
+    {
+        $conversation = $this->conversations()->orderByDesc('id')->first();
+        if ($conversation !== null) {
+            return $conversation;
+        }
+
+        return Conversation::create([
+            'chatbot_session_id' => $this->id,
+            'channel' => $this->channel,
+            'external_id' => $this->external_id,
+            'status' => 'human_takeover',
+        ]);
+    }
+
     public function inboundMessages(): HasMany
     {
         return $this->hasMany(InboundMessage::class);
@@ -193,5 +213,10 @@ class ChatbotSession extends Model
     public function outboundSms(): HasMany
     {
         return $this->hasMany(OutboundSms::class);
+    }
+
+    public function outboundMessenger(): HasMany
+    {
+        return $this->hasMany(OutboundMessenger::class, 'to', 'external_id');
     }
 }

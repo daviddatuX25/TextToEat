@@ -6,6 +6,8 @@ use App\Models\MenuItem;
 use App\Models\MenuItemDailySnapshot;
 use App\Models\MenuItemDailyStock;
 use App\Models\OrderItem;
+use App\Models\InboundMessage;
+use App\Models\OutboundMessenger;
 use App\Models\OutboundSms;
 use App\Models\ChatbotSession;
 use App\Models\Setting;
@@ -99,96 +101,65 @@ Artisan::command('menu:reset-today {--force : Run even outside morning window}',
         return;
     }
 
-    $yesterdayItems = MenuItem::query()
+    // Snapshot yesterday's stock into MenuItemDailySnapshot for analytics.
+    $yesterdayStock = MenuItemDailyStock::query()
         ->whereDate('menu_date', $yesterday)
         ->get();
 
-    $todayByNameCategory = MenuItem::query()
-        ->whereDate('menu_date', $today)
-        ->get()
-        ->keyBy(fn ($i) => $i->name . '|' . $i->category_id);
-
-    $rolloverCount = 0;
-    foreach ($yesterdayItems as $item) {
-        $key = $item->name . '|' . $item->category_id;
-        if ($todayByNameCategory->has($key)) {
-            continue;
-        }
-        $newItem = MenuItem::create([
-            'name' => $item->name,
-            'price' => $item->price,
-            'category_id' => $item->category_id,
-            'image_url' => $item->image_url,
-            'units_today' => 0,
-            'is_sold_out' => true,
-            'menu_date' => $today,
-        ]);
-        MenuItemDailyStock::create([
-            'menu_item_id' => $newItem->id,
-            'menu_date' => $today,
-            'units_set' => 0,
-            'units_sold' => 0,
-            'units_leftover' => 0,
-        ]);
-        $rolloverCount++;
-        $todayByNameCategory->put($key, (object) []);
-    }
-
-    // Snapshot today's stock before reset (Phase 1: safety net for analytics)
-    $todayItems = MenuItem::query()
-        ->whereDate('menu_date', $today)
-        ->get(['id', 'units_today']);
-    $soldByItem = OrderItem::query()
-        ->whereIn('menu_item_id', $todayItems->pluck('id'))
-        ->whereHas('order', fn ($q) => $q->where('status', OrderStatus::Completed)->whereDate('updated_at', $today))
-        ->selectRaw('menu_item_id, COALESCE(SUM(quantity), 0) as qty')
-        ->groupBy('menu_item_id')
-        ->pluck('qty', 'menu_item_id')
-        ->all();
-    foreach ($todayItems as $item) {
-        $leftover = (int) $item->units_today;
-        $sold = (int) ($soldByItem[$item->id] ?? 0);
-        $set = $leftover + $sold;
+    $snapshotCount = 0;
+    foreach ($yesterdayStock as $stock) {
         MenuItemDailySnapshot::upsert(
             [
-                'menu_item_id' => $item->id,
-                'menu_date' => $today->toDateString(),
-                'units_set' => $set,
-                'units_sold' => $sold,
-                'units_leftover' => $leftover,
+                'menu_item_id' => $stock->menu_item_id,
+                'menu_date' => $yesterday->toDateString(),
+                'units_set' => (int) $stock->units_set,
+                'units_sold' => (int) $stock->units_sold,
+                'units_leftover' => (int) $stock->units_leftover,
                 'updated_at' => now(),
                 'created_at' => now(),
             ],
             ['menu_item_id', 'menu_date'],
             ['units_set', 'units_sold', 'units_leftover', 'updated_at']
         );
+        $snapshotCount++;
     }
 
-    foreach ($todayItems as $item) {
-        MenuItemDailyStock::updateOrCreate(
-            [
-                'menu_item_id' => $item->id,
-                'menu_date' => $today,
-            ],
-            [
-                'units_set' => 0,
-                'units_sold' => 0,
-                'units_leftover' => 0,
-            ]
-        );
-    }
+    // Initialize or reset today's per-item stock to zero for today's menu items.
+    $resetStockCount = 0;
+    MenuItem::query()
+        ->whereDate('menu_date', $today)
+        ->orderBy('id')
+        ->chunkById(200, function ($items) use ($today, &$resetStockCount): void {
+            foreach ($items as $item) {
+                MenuItemDailyStock::updateOrCreate(
+                    [
+                        'menu_item_id' => $item->id,
+                        'menu_date' => $today,
+                    ],
+                    [
+                        'units_set' => 0,
+                        'units_sold' => 0,
+                        'units_leftover' => 0,
+                    ]
+                );
+                $resetStockCount++;
+            }
+        });
 
-    $resetCount = MenuItem::query()
+    // Legacy compatibility: mark all items as sold out with zero units_today so
+    // existing flows that still read these fields remain safe. Core behavior
+    // uses MenuItemDailyStock/virtual availability instead.
+    $resetLegacyCount = MenuItem::query()
         ->whereDate('menu_date', $today)
         ->update([
-            'is_sold_out' => true,
-            'units_today' => 0,
-        ]);
+        'is_sold_out' => true,
+        'units_today' => 0,
+    ]);
 
     Cache::put('menu_reset_date', $today->toDateString(), now()->endOfDay());
 
-    $this->info("Rollover: {$rolloverCount} item(s) copied from yesterday. Reset: {$resetCount} item(s) disabled with zero stock. Greeting modal will show for portal users.");
-})->purpose('Rollover yesterday to today, reset today items to disabled with zero stock, flag greeting modal');
+    $this->info("Snapshot: {$snapshotCount} stock row(s) for {$yesterday->toDateString()}. Reset: {$resetStockCount} per-day stock row(s) initialized for {$today->toDateString()}; {$resetLegacyCount} catalog item(s) marked sold out with zero legacy units_today.");
+})->purpose('Snapshot yesterday stock and reset today per-item stock to zero using MenuItemDailyStock, flag greeting modal');
 
 Schedule::call(function (): void {
     if (! (bool) Setting::get('menu.auto_reset_enabled', false)) {
@@ -199,3 +170,30 @@ Schedule::call(function (): void {
         Artisan::call('menu:reset-today');
     }
 })->hourly();
+
+Artisan::command('chatbot:prune-logs', function () {
+    $days = 30;
+    $cutoff = now()->subDays($days);
+
+    $inboundDeleted = InboundMessage::query()
+        ->where('created_at', '<', $cutoff)
+        ->delete();
+
+    $outboundSmsDeleted = OutboundSms::query()
+        ->where('created_at', '<', $cutoff)
+        ->delete();
+
+    $outboundMessengerDeleted = OutboundMessenger::query()
+        ->where('created_at', '<', $cutoff)
+        ->delete();
+
+    $this->info(sprintf(
+        'Pruned chatbot logs older than %d days: %d inbound, %d outbound_sms, %d outbound_messenger.',
+        $days,
+        $inboundDeleted,
+        $outboundSmsDeleted,
+        $outboundMessengerDeleted,
+    ));
+})->purpose('Prune detailed chatbot message logs older than 30 days');
+
+Schedule::command('chatbot:prune-logs')->daily();

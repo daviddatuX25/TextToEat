@@ -6,7 +6,9 @@ use App\Models\Category;
 use App\Models\ChatbotSession;
 use App\Models\Conversation;
 use App\Models\DeliveryArea;
+use App\Models\InboundMessage;
 use App\Models\MenuItem;
+use App\Models\OutboundMessenger;
 use App\Models\Order;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -408,6 +410,53 @@ class ChatbotWebhookTest extends TestCase
             'body' => 'another message while in takeover',
         ]);
         $this->assertDatabaseCount('conversations', 1);
+
+        $inbound = InboundMessage::where('chatbot_session_id', $session->id)
+            ->where('body', 'another message while in takeover')
+            ->first();
+        $this->assertNotNull($inbound);
+        $this->assertSame($conversation->id, $inbound->conversation_id, 'Inbound during human_takeover should have conversation_id set');
+    }
+
+    public function test_webhook_creates_inbound_message_for_bot_flow(): void
+    {
+        $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'bot_flow_user',
+            'body' => 'hi',
+        ]);
+        $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'sms',
+            'external_id' => 'bot_flow_user',
+            'body' => '1',
+        ]);
+
+        $session = ChatbotSession::where('channel', 'sms')->where('external_id', 'bot_flow_user')->first();
+        $this->assertNotNull($session);
+
+        $inbounds = InboundMessage::where('chatbot_session_id', $session->id)->get();
+        $this->assertCount(2, $inbounds);
+        foreach ($inbounds as $inbound) {
+            $this->assertNull($inbound->conversation_id, 'Bot flow inbound should have null conversation_id for Chatbot Logs');
+        }
+        $this->assertSame('hi', $inbounds[0]->body);
+        $this->assertSame('1', $inbounds[1]->body);
+    }
+
+    public function test_web_channel_creates_outbound_messenger_for_replies(): void
+    {
+        $externalId = 'web_logs_user';
+        $this->postJson('/api/chatbot/webhook', [
+            'channel' => 'web',
+            'external_id' => $externalId,
+            'body' => 'hi',
+        ]);
+
+        $outbound = OutboundMessenger::where('to', $externalId)->get();
+        $this->assertGreaterThan(0, $outbound->count(), 'Web channel should persist outbound replies for Chatbot Logs');
+        foreach ($outbound as $om) {
+            $this->assertNull($om->conversation_id, 'Bot flow outbound should have null conversation_id');
+        }
     }
 
     public function test_keyword_person_in_menu_transitions_to_human_takeover(): void
@@ -1249,9 +1298,10 @@ class ChatbotWebhookTest extends TestCase
         $response->assertStatus(200);
         $replies = $response->json('replies');
         $this->assertGreaterThanOrEqual(1, count($replies));
-        $this->assertStringContainsString('no longer available', $replies[0]);
-        $this->assertSame('confirm', $response->json('state.current_state'));
-        $this->assertNotEmpty($response->json('state.selected_items'));
+        // Inventory failure now surfaces as an invalid option with a clear
+        // \"No menu available for today\" message, and we return the user to the menu.
+        $this->assertStringContainsString('No menu available for today', $replies[0]);
+        $this->assertSame('menu', $response->json('state.current_state'));
         $this->assertDatabaseCount('orders', 0);
     }
 

@@ -13,7 +13,7 @@ class FacebookMessengerSender implements MessengerSenderInterface
         private FacebookMessengerClient $client
     ) {}
 
-    public function send(string $recipientId, string $text): void
+    public function send(string $recipientId, string $text, ?int $conversationId = null): void
     {
         if (! Setting::get('channels.messenger_enabled', true)) {
             return;
@@ -24,6 +24,7 @@ class FacebookMessengerSender implements MessengerSenderInterface
         OutboundMessenger::create([
             'to' => $recipientId,
             'body' => $text,
+            'conversation_id' => $conversationId,
         ]);
     }
 }
