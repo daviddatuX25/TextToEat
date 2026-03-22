@@ -8,7 +8,9 @@ use App\Models\ActionLog;
 use App\Models\Order;
 use App\Models\Setting;
 use App\Services\OrderStatusNotificationService;
+use App\Support\MenuManualResetWindow;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,9 +26,9 @@ class MenuSettingsController extends Controller
      */
     public function index(): Response
     {
-        $menuResetHour = (int) Setting::get('menu.reset_morning_until_hour', config('menu.reset_morning_until_hour', 11));
+        [$windowFrom, $windowUntil] = MenuManualResetWindow::bounds();
         $autoResetEnabled = (bool) Setting::get('menu.auto_reset_enabled', false);
-        $autoResetAtHour = (int) Setting::get('menu.auto_reset_at_hour', $menuResetHour);
+        $autoResetAtHour = (int) Setting::get('menu.auto_reset_at_hour', $windowUntil);
         $lastResetDate = Cache::get('menu_reset_date');
 
         $levelsReminder = [
@@ -36,7 +38,10 @@ class MenuSettingsController extends Controller
 
         return Inertia::render('MenuSettings', [
             'menu' => [
-                'reset_morning_until_hour' => $menuResetHour,
+                'reset_morning_from_hour' => $windowFrom,
+                'reset_morning_until_hour' => $windowUntil,
+                'manual_reset_within_window' => MenuManualResetWindow::isNowWithinWindow(),
+                'manual_reset_window_label' => MenuManualResetWindow::describeBounds($windowFrom, $windowUntil),
                 'auto_reset_enabled' => $autoResetEnabled,
                 'auto_reset_at_hour' => $autoResetAtHour,
                 'last_reset_date' => $lastResetDate,
@@ -53,6 +58,7 @@ class MenuSettingsController extends Controller
     {
         $validated = $request->validate([
             'menu' => ['sometimes', 'array'],
+            'menu.reset_morning_from_hour' => ['sometimes', 'integer', 'min:0', 'max:23'],
             'menu.reset_morning_until_hour' => ['sometimes', 'integer', 'min:0', 'max:23'],
             'menu.auto_reset_enabled' => ['sometimes', 'boolean'],
             'menu.auto_reset_at_hour' => ['sometimes', 'integer', 'min:0', 'max:23'],
@@ -62,6 +68,9 @@ class MenuSettingsController extends Controller
 
         $userId = $request->user()?->id;
         $menu = $validated['menu'] ?? [];
+        if (array_key_exists('reset_morning_from_hour', $menu)) {
+            Setting::set('menu.reset_morning_from_hour', (int) $menu['reset_morning_from_hour'], $userId);
+        }
         if (array_key_exists('reset_morning_until_hour', $menu)) {
             Setting::set('menu.reset_morning_until_hour', (int) $menu['reset_morning_until_hour'], $userId);
         }
@@ -87,11 +96,7 @@ class MenuSettingsController extends Controller
      */
     public function previewResetCancellations(): JsonResponse
     {
-        $today = Carbon::today();
-        $statuses = array_map(fn (OrderStatus $s) => $s->value, OrderStatus::unfulfilledStatuses());
-        $orders = Order::query()
-            ->whereIn('status', $statuses)
-            ->where('created_at', '<', $today)
+        $orders = $this->unfulfilledOrdersPlacedBefore(now())
             ->orderBy('created_at')
             ->get(['id', 'reference', 'status', 'created_at']);
 
@@ -107,37 +112,24 @@ class MenuSettingsController extends Controller
     }
 
     /**
-     * Run manual menu reset (rollover + reset today's items). Optional: cancel unfulfilled orders from previous days.
+     * Run manual menu reset (rollover + reset today's items). Optional: cancel all unfulfilled orders placed before this request.
      */
     public function runReset(Request $request): RedirectResponse|JsonResponse
     {
-        $validated = $request->validate([
+        $request->validate([
             'force' => ['sometimes', 'boolean'],
             'cancel_previous_unfulfilled' => ['sometimes', 'boolean'],
         ]);
 
-        $force = $validated['force'] ?? false;
-        $cancelPreviousUnfulfilled = $validated['cancel_previous_unfulfilled'] ?? false;
-
-        $hour = (int) Setting::get('menu.reset_morning_until_hour', config('menu.reset_morning_until_hour', 11));
-        if (! $force && $hour >= 0 && now()->hour > $hour) {
-            $message = "Manual reset is only allowed before hour {$hour}. Use \"Run even after cutoff\" to override.";
-            if ($request->wantsJson()) {
-                return response()->json(['message' => $message], 422);
-            }
-            return redirect()->route('portal.menu-settings')->with('error', $message);
-        }
+        $force = $request->boolean('force');
+        $cancelPreviousUnfulfilled = $request->boolean('cancel_previous_unfulfilled');
 
         $userId = $request->user()?->id;
         $cancelledCount = 0;
 
         if ($cancelPreviousUnfulfilled) {
-            $today = Carbon::today();
-            $statuses = array_map(fn (OrderStatus $s) => $s->value, OrderStatus::unfulfilledStatuses());
-            $orders = Order::query()
-                ->whereIn('status', $statuses)
-                ->where('created_at', '<', $today)
-                ->get();
+            $cancelBefore = now();
+            $orders = $this->unfulfilledOrdersPlacedBefore($cancelBefore)->get();
 
             $notificationService = app(OrderStatusNotificationService::class);
             foreach ($orders as $order) {
@@ -163,16 +155,61 @@ class MenuSettingsController extends Controller
             }
         }
 
+        if (! $force && ! MenuManualResetWindow::isNowWithinWindow()) {
+            [$from, $until] = MenuManualResetWindow::bounds();
+            $windowLabel = MenuManualResetWindow::describeBounds($from, $until);
+            $rolloverMsg = "Menu rollover was skipped — manual rollover is only allowed when the server hour is within {$windowLabel} unless you check \"Run even after cutoff\".";
+            if ($request->wantsJson()) {
+                $message = $cancelledCount > 0
+                    ? $cancelledCount.' unfulfilled order(s) cancelled. '.$rolloverMsg
+                    : $rolloverMsg;
+
+                return response()->json([
+                    'message' => $message,
+                    'cancelled_count' => $cancelledCount,
+                    'menu_reset_ran' => false,
+                ], $cancelledCount > 0 ? 200 : 422);
+            }
+            if ($cancelledCount > 0) {
+                return redirect()->route('portal.menu-settings')->with(
+                    'success',
+                    $cancelledCount.' unfulfilled order(s) cancelled (placed before this reset). '.$rolloverMsg
+                );
+            }
+
+            return redirect()->route('portal.menu-settings')->with('error', $rolloverMsg);
+        }
+
         Artisan::call('menu:reset-today', ['--force' => $force]);
 
         $success = 'Menu reset run successfully.';
         if ($cancelledCount > 0) {
-            $success .= ' ' . $cancelledCount . ' unfulfilled order(s) from previous days were cancelled.';
+            $success .= ' '.$cancelledCount.' unfulfilled order(s) placed before this reset were cancelled.';
         }
 
         if ($request->wantsJson()) {
-            return response()->json(['message' => $success, 'cancelled_count' => $cancelledCount]);
+            return response()->json([
+                'message' => $success,
+                'cancelled_count' => $cancelledCount,
+                'menu_reset_ran' => true,
+            ]);
         }
+
         return redirect()->route('portal.menu-settings')->with('success', $success);
+    }
+
+    /**
+     * All unfulfilled orders whose created_at is strictly before $before (e.g. the moment reset runs).
+     * Includes earlier today, yesterday, and any older row — anything already in the system when you confirm.
+     *
+     * @return Builder<Order>
+     */
+    private function unfulfilledOrdersPlacedBefore(Carbon $before): Builder
+    {
+        $statuses = array_map(fn (OrderStatus $s) => $s->value, OrderStatus::unfulfilledStatuses());
+
+        return Order::query()
+            ->whereIn('status', $statuses)
+            ->where('orders.created_at', '<', $before);
     }
 }

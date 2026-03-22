@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Setting;
 use App\Models\OutboundSms;
+use App\Models\Setting;
 use App\Models\SmsDevice;
 use App\Models\SmsGatewaySetting;
+use App\Models\SmsInboundWebhookEvent;
 use App\Services\OutboundSmsService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -99,6 +100,29 @@ class SmsDevicesController extends Controller
                 'last_used_at' => $device->last_used_at?->toIso8601String(),
                 'last_heartbeat_at' => $device->last_heartbeat_at?->toIso8601String(),
             ],
+            'logs' => $logs,
+        ]);
+    }
+
+    /**
+     * Inbound Textbee webhook POSTs skipped due to duplicate gateway message_id (server idempotency).
+     * Not tied to a single Android device — the phone may show SMS in the app while the server drops the second POST.
+     */
+    public function inboundWebhookSkipped(): Response
+    {
+        $logs = SmsInboundWebhookEvent::query()
+            ->where('outcome', SmsInboundWebhookEvent::OUTCOME_DUPLICATE_MESSAGE_ID)
+            ->orderByDesc('id')
+            ->paginate(50)
+            ->through(fn (SmsInboundWebhookEvent $row) => [
+                'id' => $row->id,
+                'from_phone' => $row->from_phone,
+                'gateway_message_id' => $row->gateway_message_id,
+                'message_body' => $row->message_body,
+                'created_at' => $row->created_at?->toIso8601String(),
+            ]);
+
+        return Inertia::render('SmsInboundWebhookSkipped', [
             'logs' => $logs,
         ]);
     }

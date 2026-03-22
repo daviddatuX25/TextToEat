@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Link, router } from '@inertiajs/react';
-import { DndContext, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
+import { DndContext, DragOverlay, MouseSensor, TouchSensor, useSensor, useSensors, useDraggable, useDroppable, pointerWithin } from '@dnd-kit/core';
 import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { toast } from 'sonner';
 import PortalLayout from '../Layouts/PortalLayout';
@@ -29,6 +29,14 @@ const SECTION_ICONS = {
     preparing: ChefHat,
     readyOrders: UtensilsCrossed,
 };
+
+/** Query `?section=` from dashboard pipeline cards → single-column tab index. */
+function ordersSectionToSingleIndex(section) {
+    if (section == null || typeof section !== 'string') return null;
+    const map = { pending: 0, preparing: 1, ready: 2 };
+    const idx = map[section];
+    return idx !== undefined ? idx : null;
+}
 
 /** Returns the section key (column) this order belongs to based on its status. */
 function getOrderColumnKey(order) {
@@ -89,7 +97,7 @@ function DraggableOrderCard({ order, isHighlighted }) {
             {...listeners}
             {...attributes}
             data-order-id={order.id}
-            className={`rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 p-3 transition-shadow ${isDragging ? 'opacity-0 pointer-events-none' : ''} ${isHighlighted ? 'ring-2 ring-primary-500 ring-offset-2' : ''}`}
+            className={`rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 p-3 transition-shadow touch-none select-none ${isDragging ? 'opacity-0 pointer-events-none' : ''} ${isHighlighted ? 'ring-2 ring-primary-500 ring-offset-2' : ''}`}
         >
             <OrderListRow order={order} isHighlighted={isHighlighted} />
         </div>
@@ -121,12 +129,13 @@ export default function Orders({
     diningMarkers = [],
     diningMarkersUnavailable = [],
     highlight,
+    ordersSection = null,
 }) {
     const [viewMode, setViewMode] = useState(() => {
         if (typeof window === 'undefined') return 'columns';
         return window.localStorage?.getItem(ORDERS_VIEW_MODE_KEY) || 'columns';
     });
-    const [singleIndex, setSingleIndex] = useState(0);
+    const [singleIndex, setSingleIndex] = useState(() => ordersSectionToSingleIndex(ordersSection) ?? 0);
     const [activeHighlight, setActiveHighlight] = useState(() => (highlight ? String(highlight) : null));
     const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && !window.matchMedia('(min-width: 1024px)').matches);
     const [optimisticStatus, setOptimisticStatus] = useState(() => new Map());
@@ -153,14 +162,19 @@ export default function Orders({
         [activeId, filteredOrders]
     );
 
+    // MouseSensor + TouchSensor (not PointerSensor): on touch devices, pointer events fire
+    // before touch events, so PointerSensor would handle the gesture with a small-movement
+    // constraint while the browser scrolls the column — drag rarely works. TouchSensor uses
+    // long-press (delay) so scroll is still possible, and requires touch-action: none on the
+    // draggable (see DraggableOrderCard). https://docs.dndkit.com/api-documentation/sensors/touch
     const sensors = useSensors(
+        useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
         useSensor(TouchSensor, {
             activationConstraint: {
                 delay: 250,
                 tolerance: 8,
             },
-        }),
-        useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+        })
     );
 
     const routerOpts = useCallback(() => ({
@@ -299,6 +313,12 @@ export default function Orders({
             window.localStorage?.setItem(ORDERS_VIEW_MODE_KEY, viewMode);
         }
     }, [viewMode]);
+
+    useEffect(() => {
+        if (highlight) return;
+        const idx = ordersSectionToSingleIndex(ordersSection);
+        if (idx !== null) setSingleIndex(idx);
+    }, [ordersSection, highlight]);
 
     const prevSection = useCallback(() => {
         setSingleIndex((i) => Math.max(0, i - 1));

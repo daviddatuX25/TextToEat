@@ -490,12 +490,6 @@ export default function Deliveries({ orders = [], deliveryAreas = [], highlight 
                                 aria-label="Search delivery orders"
                             />
                         </div>
-                        <Link
-                            href="/portal/orders"
-                            className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-800 smooth-hover"
-                        >
-                            ← Back to orders
-                        </Link>
                         <button
                             type="button"
                             onClick={() => setManageOpen(true)}
@@ -504,9 +498,6 @@ export default function Deliveries({ orders = [], deliveryAreas = [], highlight 
                             <MapPin className="h-4 w-4" />
                             Manage delivery areas
                         </button>
-                        <Link href="/portal/orders/completed" className="text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline py-2">
-                            Completed orders
-                        </Link>
                     </div>
                 </PageHeader>
 

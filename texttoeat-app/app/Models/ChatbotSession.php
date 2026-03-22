@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class ChatbotSession extends Model
 {
@@ -161,11 +160,12 @@ class ChatbotSession extends Model
                 $query->whereIn('channel', $channels);
             })
             ->when($customer, function (Builder $query, string $customer): void {
-                $like = '%' . $customer . '%';
+                $like = '%'.$customer.'%';
 
                 $query->where(function (Builder $query) use ($like): void {
                     $query->where('saved_customer_name', 'like', $like)
-                        ->orWhere('state->customer_name', 'like', $like);
+                        ->orWhere('state->customer_name', 'like', $like)
+                        ->orWhere('state->saved_customer_name', 'like', $like);
                 });
             })
             ->when($statuses && \is_array($statuses), function (Builder $query) use ($statuses): void {
@@ -218,5 +218,31 @@ class ChatbotSession extends Model
     public function outboundMessenger(): HasMany
     {
         return $this->hasMany(OutboundMessenger::class, 'to', 'external_id');
+    }
+
+    /**
+     * Customer name for admin/logs UI: prefer denormalized column, then JSON state keys
+     * (saved_customer_name, customer_name). The FSM may set only state before the column is persisted.
+     */
+    public function resolvedCustomerDisplayName(): ?string
+    {
+        $candidates = [
+            $this->saved_customer_name,
+            $this->state['saved_customer_name'] ?? null,
+            $this->state['customer_name'] ?? null,
+        ];
+        foreach ($candidates as $v) {
+            if (! is_string($v)) {
+                continue;
+            }
+            $t = trim($v);
+            if ($t === '' || strcasecmp($t, 'Anonymous') === 0) {
+                continue;
+            }
+
+            return $t;
+        }
+
+        return null;
     }
 }

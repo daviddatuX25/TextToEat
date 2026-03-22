@@ -245,7 +245,7 @@ export default function Dashboard({ metrics = {} }) {
                             </Card>
                             <div className="grid grid-cols-3 gap-3">
                                 <Link
-                                    href="/portal/orders"
+                                    href="/portal/orders?section=pending"
                                     className="group block rounded-2xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/30 p-4 transition hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                                 >
                                     <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Pending</p>
@@ -253,7 +253,7 @@ export default function Dashboard({ metrics = {} }) {
                                     <p className="mt-0.5 text-xs text-surface-500 dark:text-surface-400">Awaiting confirmation</p>
                                 </Link>
                                 <Link
-                                    href="/portal/orders"
+                                    href="/portal/orders?section=preparing"
                                     className="group block rounded-2xl border border-primary-200 dark:border-primary-800/60 bg-white/60 dark:bg-surface-900/60 backdrop-blur-sm p-4 transition hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                                 >
                                     <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Preparing</p>
@@ -261,7 +261,7 @@ export default function Dashboard({ metrics = {} }) {
                                     <p className="mt-0.5 text-xs text-surface-500 dark:text-surface-400">In kitchen</p>
                                 </Link>
                                 <Link
-                                    href="/portal/orders"
+                                    href="/portal/orders?section=ready"
                                     className="group block rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/30 p-4 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                                 >
                                     <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Ready</p>
@@ -273,7 +273,7 @@ export default function Dashboard({ metrics = {} }) {
                     ) : (
                         <>
                             <Link
-                                href="/portal/orders"
+                                href="/portal/orders?section=pending"
                                 className="group block rounded-2xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/60 dark:bg-amber-950/30 p-5 transition hover:border-amber-300 dark:hover:border-amber-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
                             >
                                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-400">Pending</p>
@@ -282,7 +282,7 @@ export default function Dashboard({ metrics = {} }) {
                                 <ArrowRight className="mt-2 h-4 w-4 text-amber-500 opacity-0 group-hover:opacity-100 transition" aria-hidden />
                             </Link>
                             <Link
-                                href="/portal/orders"
+                                href="/portal/orders?section=preparing"
                                 className="group block rounded-2xl border border-primary-200 dark:border-primary-800/60 bg-white/60 dark:bg-surface-900/60 backdrop-blur-sm p-5 transition hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
                             >
                                 <p className="text-xs font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-400">Preparing</p>
@@ -291,7 +291,7 @@ export default function Dashboard({ metrics = {} }) {
                                 <ArrowRight className="mt-2 h-4 w-4 text-primary-500 opacity-0 group-hover:opacity-100 transition" aria-hidden />
                             </Link>
                             <Link
-                                href="/portal/orders"
+                                href="/portal/orders?section=ready"
                                 className="group block rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/60 dark:bg-emerald-950/30 p-5 transition hover:border-emerald-300 dark:hover:border-emerald-700 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
                             >
                                 <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Ready</p>

@@ -370,12 +370,6 @@ export default function WalkinCounter({ orders = [], orderMarkers = [], diningMa
                                 aria-label="Search walk-in orders"
                             />
                         </div>
-                        <Link
-                            href="/portal/orders"
-                            className="inline-flex items-center gap-2 border-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400 font-semibold py-2.5 px-4 rounded-xl hover:bg-primary-50 dark:hover:bg-primary-500/10 smooth-hover"
-                        >
-                            ← Back to orders
-                        </Link>
                         <button
                             type="button"
                             onClick={() => setManageOpen(true)}

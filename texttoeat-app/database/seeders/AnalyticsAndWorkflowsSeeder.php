@@ -19,13 +19,16 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
 /**
- * Demo-only: seeds menu per day, then orders/order items/action logs per day so that
- * each day's order quantities never exceed that day's menu item quantities.
+ * Demo-only: seeds historical orders, order items, and action logs for analytics dashboards.
  *
- * Not run by default. For demo/presentation:
- *   php artisan db:seed --class=AnalyticsAndWorkflowsSeeder
+ * **Catalog model (not per-day menu_items rows):** Each dish has a single `menu_items` row.
+ * Per-day availability and caps are represented only in `menu_item_daily_stock` for
+ * `(menu_item_id, menu_date)`. This matches REFRACTOR_MENU_SINGLE_ITEM_CATALOG_PLAN.md and
+ * avoids duplicating the same dish across dozens of `menu_items` rows.
  *
- * Requires: users, pickup slots, delivery areas, dining markers. Creates menu for each date if missing.
+ * Run: php artisan db:seed --class=AnalyticsAndWorkflowsSeeder
+ *
+ * Requires: users, pickup slots, delivery areas, dining markers.
  */
 class AnalyticsAndWorkflowsSeeder extends Seeder
 {
@@ -71,8 +74,11 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
 
     private ?int $userId = null;
 
+    /** @var array<string, int> Meal name => single catalog menu_items.id (stable across days). */
+    private array $catalogIdsByName = [];
+
     /**
-     * Meal definitions (name, price, category, units_today, etc.) for creating menu per date.
+     * Meal definitions (name, price, category, units_today, etc.) for catalog + daily stock.
      * Must match FilipinoMealsSeeder so today's menu is consistent when run after ProductionSeeder.
      *
      * @return list<array{name: string, price: float, category: string, image_url: string, units_today: int, is_sold_out: bool}>
@@ -99,29 +105,61 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
     }
 
     /**
-     * Ensure menu items and daily stock exist for the given date (so orders for that day can respect quantities).
+     * Ensure one catalog row per meal name (stable menu_item_id for all days).
+     * If legacy data has multiple rows per name, the lowest id is used.
      */
-    private function ensureMenuForDate(Carbon $date): void
+    private function ensureCatalog(): void
     {
-        $menuDate = $date->toDateString();
+        $today = Carbon::today(config('app.timezone'));
+        $menuDateStr = $today->toDateString();
+        $this->catalogIdsByName = [];
+
         foreach ($this->getMealDefinitions() as $meal) {
             $category = Category::firstOrCreate(['name' => $meal['category']], ['name' => $meal['category']]);
-            $item = MenuItem::updateOrCreate(
-                [
+            $item = MenuItem::query()
+                ->where('name', $meal['name'])
+                ->orderBy('id')
+                ->first();
+
+            if ($item === null) {
+                $item = MenuItem::query()->create([
                     'name' => $meal['name'],
-                    'menu_date' => $menuDate,
-                ],
-                [
                     'price' => $meal['price'],
                     'category_id' => $category->id,
                     'image_url' => $meal['image_url'],
                     'units_today' => $meal['units_today'],
                     'is_sold_out' => $meal['is_sold_out'],
-                ]
-            );
+                    'menu_date' => $menuDateStr,
+                ]);
+            } else {
+                $item->update([
+                    'price' => $meal['price'],
+                    'category_id' => $category->id,
+                    'image_url' => $meal['image_url'],
+                    'menu_date' => $menuDateStr,
+                ]);
+            }
+
+            $this->catalogIdsByName[$meal['name']] = $item->id;
+        }
+    }
+
+    /**
+     * Per-day stock only (menu_item_daily_stock). Does not create new menu_items rows.
+     */
+    private function ensureStockForDate(Carbon $date): void
+    {
+        $menuDate = $date->toDateString();
+        $defsByName = collect($this->getMealDefinitions())->keyBy('name');
+
+        foreach ($this->catalogIdsByName as $name => $menuItemId) {
+            $meal = $defsByName->get($name);
+            if ($meal === null) {
+                continue;
+            }
             MenuItemDailyStock::updateOrCreate(
                 [
-                    'menu_item_id' => $item->id,
+                    'menu_item_id' => $menuItemId,
                     'menu_date' => $menuDate,
                 ],
                 [
@@ -134,7 +172,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
     }
 
     /**
-     * Load this date's menu into menuItemNamesPrices, unitsSetPerItem, and reset reserved/sold for the day.
+     * Load this date's catalog + daily stock into menuItemNamesPrices, unitsSetPerItem, and reset reserved/sold for the day.
      */
     private function loadMenuForDate(Carbon $date): void
     {
@@ -142,12 +180,37 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
         $this->unitsSetPerItem = [];
         $this->reservedPerItemToday = [];
         $this->soldPerItemToday = [];
-        $items = MenuItem::query()->whereDate('menu_date', $date)->get();
-        foreach ($items as $item) {
-            $this->menuItemNamesPrices[$item->id] = ['name' => $item->name, 'price' => (float) $item->price];
-            $this->unitsSetPerItem[$item->id] = (int) $item->units_today;
-            $this->reservedPerItemToday[$item->id] = 0;
-            $this->soldPerItemToday[$item->id] = 0;
+
+        $catalogIds = array_values($this->catalogIdsByName);
+        if ($catalogIds === []) {
+            return;
+        }
+
+        $defsByName = collect($this->getMealDefinitions())->keyBy('name');
+        $stockByItemId = MenuItemDailyStock::query()
+            ->whereDate('menu_date', $date)
+            ->whereIn('menu_item_id', $catalogIds)
+            ->get()
+            ->keyBy('menu_item_id');
+
+        $items = MenuItem::query()->whereIn('id', $catalogIds)->get()->keyBy('id');
+
+        foreach ($this->catalogIdsByName as $name => $id) {
+            $meal = $defsByName->get($name);
+            if ($meal === null) {
+                continue;
+            }
+            $item = $items->get($id);
+            $stock = $stockByItemId->get($id);
+            $set = $stock !== null ? (int) $stock->units_set : (int) $meal['units_today'];
+
+            $this->menuItemNamesPrices[$id] = [
+                'name' => $name,
+                'price' => $item !== null ? (float) $item->price : (float) $meal['price'],
+            ];
+            $this->unitsSetPerItem[$id] = $set;
+            $this->reservedPerItemToday[$id] = 0;
+            $this->soldPerItemToday[$id] = 0;
         }
     }
 
@@ -156,17 +219,22 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
         $this->loadDependencies();
         $today = Carbon::today(config('app.timezone'));
 
-        $this->command->info('Ensuring menu exists for each date (today first so current day menu is never empty)...');
-        $this->ensureMenuForDate($today);
+        $this->command->info('Ensuring catalog (one menu_items row per dish) and per-day stock...');
+        $this->ensureCatalog();
+        $this->ensureStockForDate($today);
         for ($day = 0; $day < self::DAYS_BACK; $day++) {
             $date = $today->copy()->subDays(self::DAYS_BACK - $day)->startOfDay();
-            $this->ensureMenuForDate($date);
+            $this->ensureStockForDate($date);
         }
 
-        $this->command->info('Seeding orders, order items, and action logs per day (order quantities capped by that day\'s menu)...');
+        $approxOrders = (self::DAYS_BACK + 1) * (int) ((self::ORDERS_PER_DAY_MIN + self::ORDERS_PER_DAY_MAX) / 2);
+        $this->command->info(
+            "Seeding orders, order items, and action logs per day (~{$approxOrders} orders; no output until done unless progress below — may take several minutes in Docker)..."
+        );
         $orderCount = 0;
         $activeCountToday = 0;
         $dummyRef = 0;
+        $progressEvery = 1000;
 
         for ($day = 0; $day <= self::DAYS_BACK; $day++) {
             $date = $today->copy()->subDays(self::DAYS_BACK - $day)->startOfDay();
@@ -179,6 +247,9 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
                 $activeRef = $date->isToday() ? $activeCountToday : $dummyRef;
                 $this->createOrderWithItemsAndLogs($date, $activeRef);
                 $orderCount++;
+                if ($this->command !== null && $orderCount % $progressEvery === 0) {
+                    $this->command->info("  ... {$orderCount} orders created so far");
+                }
             }
         }
 
@@ -205,7 +276,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
     }
 
     /**
-     * @param int $activeCountToday Pass by reference when $date is today; use dummy ref otherwise so only today's active count is tracked.
+     * @param  int  $activeCountToday  Pass by reference when $date is today; use dummy ref otherwise so only today's active count is tracked.
      */
     private function createOrderWithItemsAndLogs(Carbon $date, int &$activeCountToday): void
     {
@@ -237,6 +308,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
             if ($this->isActiveStatus($status) && $date->isToday()) {
                 $activeCountToday = max(0, $activeCountToday - 1);
             }
+
             return;
         }
         // Cap each line to current available so DB never exceeds set per item (defensive)
@@ -253,6 +325,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
             if ($this->isActiveStatus($status) && $date->isToday()) {
                 $activeCountToday = max(0, $activeCountToday - 1);
             }
+
             return;
         }
         $total = array_sum(array_column($itemRows, 'subtotal'));
@@ -316,6 +389,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
                 return $status;
             }
         }
+
         return OrderStatus::Completed->value;
     }
 
@@ -324,6 +398,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
         if (! $date->isToday()) {
             return $this->randomCompletedOrCancelled();
         }
+
         return $this->resolveStatusForToday($activeCountToday);
     }
 
@@ -371,18 +446,20 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
         do {
             $ref = strtoupper(Str::random(8));
         } while (Order::query()->where('reference', $ref)->exists());
+
         return $ref;
     }
 
     private function randomName(): string
     {
         $names = ['Maria Santos', 'Juan Dela Cruz', 'Rosa Garcia', 'Pedro Reyes', 'Ana Lopez', 'Jose Mendoza', 'Liza Torres', 'Carlos Ramos', 'Elena Cruz', 'Miguel Fernandez'];
+
         return $names[array_rand($names)];
     }
 
     private function randomPhone(): string
     {
-        return '+63' . (string) random_int(9000000000, 9999999999);
+        return '+63'.(string) random_int(9000000000, 9999999999);
     }
 
     /**
@@ -426,6 +503,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
                 'subtotal' => $price * $qty,
             ];
         }
+
         return $out;
     }
 
@@ -437,6 +515,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
     private function syncTodayStockFromSeededOrders(): void
     {
         $today = Carbon::today(config('app.timezone'));
+        $menuDate = $today->toDateString();
         $pendingStatuses = [
             OrderStatus::Received->value,
             OrderStatus::Preparing->value,
@@ -444,11 +523,12 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
             OrderStatus::OnTheWay->value,
         ];
 
-        $todayItemIds = MenuItem::query()->whereDate('menu_date', $today)->pluck('id')->all();
+        $todayItemIds = array_values($this->catalogIdsByName);
         if ($todayItemIds === []) {
-            $this->command->warn('No menu items for today found; ensuring today\'s menu.');
-            $this->ensureMenuForDate($today);
-            $todayItemIds = MenuItem::query()->whereDate('menu_date', $today)->pluck('id')->all();
+            $this->command->warn('No catalog menu items; ensuring catalog + today stock.');
+            $this->ensureCatalog();
+            $this->ensureStockForDate($today);
+            $todayItemIds = array_values($this->catalogIdsByName);
         }
 
         $stockRows = MenuItemDailyStock::query()
@@ -500,7 +580,7 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
             MenuItemDailyStock::updateOrCreate(
                 [
                     'menu_item_id' => $menuItemId,
-                    'menu_date' => $today,
+                    'menu_date' => $menuDate,
                 ],
                 [
                     'units_set' => $set,
@@ -510,8 +590,10 @@ class AnalyticsAndWorkflowsSeeder extends Seeder
             );
             MenuItem::query()
                 ->where('id', $menuItemId)
-                ->whereDate('menu_date', $today)
-                ->update(['units_today' => $leftover]);
+                ->update([
+                    'units_today' => $leftover,
+                    'menu_date' => $menuDate,
+                ]);
         }
     }
 

@@ -107,16 +107,39 @@ export default function ChatbotLogs({ sessions, filters = {}, meta = {} }) {
                 ) : viewMode === 'table' ? (
                     <div className="rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800/50 overflow-hidden">
                         <div className="overflow-x-auto max-h-[calc(100vh-18rem)] overflow-y-auto">
-                            <table className="w-full text-left text-sm min-w-[700px]">
+                            <table className="w-full table-fixed border-collapse text-left text-sm min-w-[760px]">
+                                <colgroup>
+                                    <col className="w-[10%]" />
+                                    <col className="w-[14%]" />
+                                    <col className="w-[18%]" />
+                                    <col className="w-[10%]" />
+                                    <col className="w-[12%]" />
+                                    <col className="w-[8%]" />
+                                    <col className="w-[18%]" />
+                                </colgroup>
                                 <thead className="sticky top-0 z-10 bg-surface-100 dark:bg-surface-800 border-b border-surface-200 dark:border-surface-700">
                                     <tr>
-                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Channel</th>
-                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">External ID</th>
-                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Customer</th>
-                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Messages</th>
-                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Takeover</th>
-                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Lang</th>
-                                        <th className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs">Date</th>
+                                        <th scope="col" className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs align-middle text-left">
+                                            Channel
+                                        </th>
+                                        <th scope="col" className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs align-middle text-left">
+                                            External ID
+                                        </th>
+                                        <th scope="col" className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs align-middle text-left">
+                                            Customer
+                                        </th>
+                                        <th scope="col" className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs align-middle text-left">
+                                            Messages
+                                        </th>
+                                        <th scope="col" className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs align-middle text-left">
+                                            Takeover
+                                        </th>
+                                        <th scope="col" className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs align-middle text-left">
+                                            Lang
+                                        </th>
+                                        <th scope="col" className="py-2.5 px-3 font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider text-xs align-middle text-left">
+                                            Date
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>

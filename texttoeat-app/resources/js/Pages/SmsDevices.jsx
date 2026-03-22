@@ -77,10 +77,21 @@ export default function SmsDevices({
     return (
         <PortalLayout>
             <section className="flex flex-col gap-8 animate-fade-in pt-2 pb-12">
-                <PageHeader
-                    title="SMS devices"
-                    description='Android devices that send and receive SMS via FCM. Use "Refresh status" to request battery and network info. Set a preferred SIM for outbound SMS when the device has multiple SIMs.'
-                />
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <PageHeader
+                        title="SMS devices"
+                        description='Android devices that send and receive SMS via FCM. Use "Refresh status" to request battery and network info. Set a preferred SIM for outbound SMS when the device has multiple SIMs.'
+                    />
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => router.get('/portal/sms-devices/inbound-webhook-skipped')}
+                    >
+                        Skipped inbound webhooks (dedupe)
+                    </Button>
+                </div>
 
                 <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                     <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-900/40 px-6 py-5">

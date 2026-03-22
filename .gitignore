@@ -1,0 +1,5 @@
+# Local deploy artifacts (see scripts/build-for-deploy.sh)
+/deploy-builds/
+
+# Local tooling (nested git / build output)
+/codemapper/

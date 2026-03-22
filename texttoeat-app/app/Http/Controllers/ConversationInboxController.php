@@ -2,16 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Contracts\MessengerSenderInterface;
+use App\Contracts\SmsSenderInterface;
 use App\Events\ConversationUpdated;
 use App\Models\ActionLog;
 use App\Models\ChatbotSession;
 use App\Models\Conversation;
 use App\Models\InboundMessage;
-use App\Models\Setting;
-use App\Contracts\MessengerSenderInterface;
-use App\Contracts\SmsSenderInterface;
 use App\Models\OutboundMessenger;
 use App\Models\OutboundSms;
+use App\Models\Setting;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -83,10 +83,11 @@ class ConversationInboxController extends Controller
             fn ($q) => $q->whereIn('channel', $filters['channel'])
         );
         $query->when($filters['customer'], function ($q) use ($filters): void {
-            $like = '%' . $filters['customer'] . '%';
+            $like = '%'.$filters['customer'].'%';
             $q->where(function (Builder $q) use ($like): void {
                 $q->where('saved_customer_name', 'like', $like)
-                    ->orWhere('state->customer_name', 'like', $like);
+                    ->orWhere('state->customer_name', 'like', $like)
+                    ->orWhere('state->saved_customer_name', 'like', $like);
             });
         });
         $query->sessionState($filters['status']);
@@ -135,7 +136,7 @@ class ConversationInboxController extends Controller
                 'channel' => $s->channel,
                 'external_id' => $s->external_id,
                 'language' => $s->language,
-                'saved_customer_name' => $s->saved_customer_name,
+                'saved_customer_name' => $s->resolvedCustomerDisplayName(),
                 'last_activity_at' => $s->last_activity_at?->toIso8601String(),
                 'created_at' => $s->created_at?->toIso8601String(),
                 'current_state' => $currentState,
@@ -198,7 +199,7 @@ class ConversationInboxController extends Controller
                 ->limit(50)
                 ->get();
             $outboundForThread = $outboundRows->map(fn (OutboundSms $o): array => [
-                'id' => 'out-' . $o->id,
+                'id' => 'out-'.$o->id,
                 'direction' => 'out',
                 'body' => $o->body,
                 'status' => $o->status,
@@ -215,7 +216,7 @@ class ConversationInboxController extends Controller
                 ->limit(50)
                 ->get()
                 ->map(fn (OutboundMessenger $o): array => [
-                    'id' => 'out-' . $o->id,
+                    'id' => 'out-'.$o->id,
                     'direction' => 'out',
                     'body' => $o->body,
                     'status' => null,
@@ -234,7 +235,7 @@ class ConversationInboxController extends Controller
             ->limit(100)
             ->get()
             ->map(fn (InboundMessage $m): array => [
-                'id' => 'in-' . $m->id,
+                'id' => 'in-'.$m->id,
                 'direction' => 'in',
                 'body' => $m->body,
                 'created_at' => $m->created_at?->toIso8601String(),
@@ -247,14 +248,14 @@ class ConversationInboxController extends Controller
 
         $outboundSms = $session->channel === 'sms'
             ? $outboundRows->take(25)->map(fn (OutboundSms $o): array => [
-            'id' => $o->id,
-            'to' => $o->to,
-            'body' => $o->body,
-            'status' => $o->status,
-            'sent_at' => $o->sent_at?->toIso8601String(),
-            'failure_reason' => $o->failure_reason,
-            'created_at' => $o->created_at?->toIso8601String(),
-        ])->values()->all()
+                'id' => $o->id,
+                'to' => $o->to,
+                'body' => $o->body,
+                'status' => $o->status,
+                'sent_at' => $o->sent_at?->toIso8601String(),
+                'failure_reason' => $o->failure_reason,
+                'created_at' => $o->created_at?->toIso8601String(),
+            ])->values()->all()
             : [];
 
         return Inertia::render('ConversationInboxShow', [
@@ -263,7 +264,7 @@ class ConversationInboxController extends Controller
                 'channel' => $session->channel,
                 'external_id' => $session->external_id,
                 'language' => $session->language,
-                'saved_customer_name' => $session->saved_customer_name,
+                'saved_customer_name' => $session->resolvedCustomerDisplayName(),
                 'last_activity_at' => $session->last_activity_at?->toIso8601String(),
                 'created_at' => $session->created_at?->toIso8601String(),
                 'current_state' => $currentState,

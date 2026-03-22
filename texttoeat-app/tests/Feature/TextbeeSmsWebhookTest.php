@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Contracts\SmsSenderInterface;
 use App\Models\ChatbotSession;
+use App\Models\SmsInboundWebhookEvent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Mockery;
@@ -98,7 +99,7 @@ class TextbeeSmsWebhookTest extends TestCase
             'message_id' => 'signed_123',
         ];
         $rawBody = json_encode($payload, JSON_THROW_ON_ERROR);
-        $signature = 'sha256=' . hash_hmac('sha256', $rawBody, 'my-secret');
+        $signature = 'sha256='.hash_hmac('sha256', $rawBody, 'my-secret');
 
         $outboundMock = Mockery::mock(SmsSenderInterface::class);
         $outboundMock->shouldReceive('send')
@@ -124,6 +125,44 @@ class TextbeeSmsWebhookTest extends TestCase
         $response->assertStatus(422);
     }
 
+    public function test_duplicate_gateway_message_id_skips_processing_and_records_event(): void
+    {
+        $outboundMock = Mockery::mock(SmsSenderInterface::class);
+        $outboundMock->shouldReceive('send')
+            ->once()
+            ->andReturn(['success' => true, 'ids' => [1]]);
+        $this->app->instance(SmsSenderInterface::class, $outboundMock);
+
+        $messageId = 'gateway_id_used_twice';
+
+        $first = $this->postJson('/api/sms/incoming', [
+            'from' => '09123456789',
+            'message' => '1',
+            'message_id' => $messageId,
+        ]);
+        $first->assertStatus(200)
+            ->assertJsonMissing(['duplicate' => true]);
+
+        $second = $this->postJson('/api/sms/incoming', [
+            'from' => '09123456789',
+            'message' => '1',
+            'message_id' => $messageId,
+        ]);
+        $second->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'message_id' => $messageId,
+                'duplicate' => true,
+            ]);
+
+        $this->assertDatabaseHas('sms_inbound_webhook_events', [
+            'outcome' => SmsInboundWebhookEvent::OUTCOME_DUPLICATE_MESSAGE_ID,
+            'from_phone' => '09123456789',
+            'gateway_message_id' => $messageId,
+            'message_body' => '1',
+        ]);
+    }
+
     public function test_incoming_sms_returns_503_when_send_fails_and_forgets_idempotency_so_retry_succeeds(): void
     {
         $messageId = 'retry_after_fail_1';
@@ -132,6 +171,7 @@ class TextbeeSmsWebhookTest extends TestCase
         $outboundMock->shouldReceive('send')
             ->andReturnUsing(function () use (&$callCount): array {
                 $callCount++;
+
                 return $callCount === 1
                     ? ['success' => false, 'message' => 'FCM delivery failed']
                     : ['success' => true, 'ids' => [1]];
@@ -146,7 +186,7 @@ class TextbeeSmsWebhookTest extends TestCase
         $first->assertStatus(503)
             ->assertJson(['success' => false, 'message_id' => $messageId, 'retry' => true]);
 
-        $this->assertNull(Cache::get('sms_webhook_seen:' . $messageId));
+        $this->assertNull(Cache::get('sms_webhook_seen:'.$messageId));
 
         $retry = $this->postJson('/api/sms/incoming', [
             'from' => '09123456789',

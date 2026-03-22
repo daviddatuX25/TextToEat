@@ -16,9 +16,10 @@ class MenuItemStockService
      * Availability is per day, keyed by (menu_item_id, menu_date = today).
      *
      * @param  array<int, int>  $menuItemIds  Optional. If empty, compute for all today's menu items.
+     * @param  bool  $persistMissingDailyStock  When true (default), missing rows are created from legacy units_today.
      * @return array<int, int> Map of menu_item_id => virtual_available (>= 0)
      */
-    public function getVirtualAvailableForToday(array $menuItemIds = []): array
+    public function getVirtualAvailableForToday(array $menuItemIds = [], bool $persistMissingDailyStock = true): array
     {
         $today = Carbon::today();
         $stockQuery = MenuItemDailyStock::query()
@@ -43,17 +44,27 @@ class MenuItemStockService
                     ->get(['id', 'units_today']);
 
                 foreach ($fallbackItems as $item) {
-                    $stock = MenuItemDailyStock::firstOrCreate(
-                        [
+                    if ($persistMissingDailyStock) {
+                        $stock = MenuItemDailyStock::firstOrCreate(
+                            [
+                                'menu_item_id' => $item->id,
+                                'menu_date' => $today,
+                            ],
+                            [
+                                'units_set' => (int) $item->units_today,
+                                'units_sold' => 0,
+                                'units_leftover' => (int) $item->units_today,
+                            ]
+                        );
+                    } else {
+                        $stock = new MenuItemDailyStock([
                             'menu_item_id' => $item->id,
                             'menu_date' => $today,
-                        ],
-                        [
                             'units_set' => (int) $item->units_today,
                             'units_sold' => 0,
                             'units_leftover' => (int) $item->units_today,
-                        ]
-                    );
+                        ]);
+                    }
                     $stockByItem->put($item->id, $stock);
                 }
             }
@@ -101,6 +112,37 @@ class MenuItemStockService
     public function getVirtualAvailableForTodayAll(): array
     {
         return $this->getVirtualAvailableForToday([]);
+    }
+
+    /**
+     * Meals on today's menu (menu_date = today) that are not sold out and have virtual
+     * available strictly below the threshold. Uses menu_item_daily_stock + reservations,
+     * scoped to one catalog row per dish for today — not every historical menu_items row.
+     */
+    public function countLowStockOnTodaysMenu(int $threshold): int
+    {
+        $today = Carbon::today();
+        $ids = MenuItem::query()
+            ->whereDate('menu_date', $today)
+            ->where('is_sold_out', false)
+            ->orderBy('id')
+            ->pluck('id')
+            ->all();
+
+        if ($ids === []) {
+            return 0;
+        }
+
+        $virtual = $this->getVirtualAvailableForToday($ids, false);
+        $n = 0;
+        foreach ($ids as $id) {
+            $v = (int) ($virtual[$id] ?? 0);
+            if ($v < $threshold) {
+                $n++;
+            }
+        }
+
+        return $n;
     }
 
     /**

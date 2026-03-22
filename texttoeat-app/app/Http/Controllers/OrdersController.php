@@ -6,19 +6,18 @@ use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
 use App\Events\OrderUpdated;
 use App\Models\ActionLog;
-use App\Support\DatabaseDialect;
-use App\Models\OrderItem;
-use App\Services\OrderStatusNotificationService;
 use App\Models\DeliveryArea;
 use App\Models\DiningMarker;
 use App\Models\MenuItem;
 use App\Models\MenuItemDailyStock;
 use App\Models\Order;
 use App\Models\PickupSlot;
+use App\Services\OrderStatusNotificationService;
+use App\Support\DatabaseDialect;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -71,9 +70,14 @@ class OrdersController extends Controller
             ->values()
             ->all();
 
+        $section = $request->query('section');
+        $allowedSections = ['pending', 'preparing', 'ready'];
+        $ordersSection = is_string($section) && in_array($section, $allowedSections, true) ? $section : null;
+
         return Inertia::render('Orders', [
             'orders' => $orders,
             'highlight' => $request->get('highlight'),
+            'ordersSection' => $ordersSection,
             'menuItems' => $menuItems,
             'deliveryAreas' => $deliveryAreas,
             'pickupSlots' => $pickupSlots,
@@ -122,7 +126,7 @@ class OrdersController extends Controller
             DatabaseDialect::addCaseInsensitiveLikeOr(
                 $query,
                 ['customer_name', 'customer_phone', 'reference'],
-                '%' . $search . '%'
+                '%'.$search.'%'
             );
         }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Support\MenuManualResetWindow;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -16,7 +17,7 @@ class SettingsController extends Controller
      */
     public function index(): Response
     {
-        $menuResetHour = Setting::get('menu.reset_morning_until_hour', (int) config('menu.reset_morning_until_hour', 11));
+        [$menuResetFromHour, $menuResetUntilHour] = MenuManualResetWindow::bounds();
         $lastResetDate = Cache::get('menu_reset_date');
 
         $timeouts = [
@@ -48,7 +49,8 @@ class SettingsController extends Controller
 
         return Inertia::render('Settings', [
             'menu' => [
-                'reset_morning_until_hour' => $menuResetHour,
+                'reset_morning_from_hour' => $menuResetFromHour,
+                'reset_morning_until_hour' => $menuResetUntilHour,
                 'last_reset_date' => $lastResetDate,
             ],
             'levels_reminder' => $levelsReminder,

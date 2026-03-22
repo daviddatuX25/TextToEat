@@ -52,7 +52,7 @@ class ChatbotLogsController extends Controller
                 'channel' => $s->channel,
                 'external_id' => $s->external_id,
                 'language' => $s->language,
-                'saved_customer_name' => $s->saved_customer_name,
+                'saved_customer_name' => $s->resolvedCustomerDisplayName(),
                 'last_activity_at' => $s->last_activity_at?->toIso8601String(),
                 'created_at' => $s->created_at?->toIso8601String(),
                 'conversations_count' => $s->conversations_count ?? 0,
@@ -128,7 +128,7 @@ class ChatbotLogsController extends Controller
 
         foreach ($inboundMessages as $message) {
             $messages->push([
-                'id' => 'inbound-' . $message->id,
+                'id' => 'inbound-'.$message->id,
                 'direction' => 'inbound',
                 'channel' => $message->channel ?? $session->channel,
                 'body' => $message->body,
@@ -140,7 +140,7 @@ class ChatbotLogsController extends Controller
 
         foreach ($outboundSms as $sms) {
             $messages->push([
-                'id' => 'sms-' . $sms->id,
+                'id' => 'sms-'.$sms->id,
                 'direction' => 'outbound',
                 'channel' => $sms->channel ?? 'sms',
                 'body' => $sms->body,
@@ -152,7 +152,7 @@ class ChatbotLogsController extends Controller
 
         foreach ($outboundMessenger as $om) {
             $messages->push([
-                'id' => 'messenger-' . $om->id,
+                'id' => 'messenger-'.$om->id,
                 'direction' => 'outbound',
                 'channel' => 'messenger',
                 'body' => $om->body,
@@ -179,7 +179,7 @@ class ChatbotLogsController extends Controller
             'channel' => $session->channel,
             'external_id' => $session->external_id,
             'language' => $session->language,
-            'saved_customer_name' => $session->saved_customer_name,
+            'saved_customer_name' => $session->resolvedCustomerDisplayName(),
             'last_activity_at' => $session->last_activity_at?->toIso8601String(),
             'created_at' => $session->created_at?->toIso8601String(),
             'conversations_count' => $session->conversations()->count(),

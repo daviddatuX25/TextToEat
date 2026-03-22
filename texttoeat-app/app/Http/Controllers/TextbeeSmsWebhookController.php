@@ -7,6 +7,7 @@ use App\Events\ConversationUpdated;
 use App\Models\ChatbotSession;
 use App\Models\InboundMessage;
 use App\Models\Setting;
+use App\Models\SmsInboundWebhookEvent;
 use App\Services\ChatbotSmsNumberLayer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -40,8 +41,10 @@ class TextbeeSmsWebhookController extends Controller
 
         // Idempotency: avoid processing the same incoming message twice (gateway retries / duplicate delivery).
         // Real SMS gateways often retry or send duplicate webhooks; without this we send the same reply batch twice.
-        $idempotencyKey = ($messageId !== null && $messageId !== '') ? 'sms_webhook_seen:' . $messageId : null;
+        $idempotencyKey = ($messageId !== null && $messageId !== '') ? 'sms_webhook_seen:'.$messageId : null;
         if ($idempotencyKey !== null && ! Cache::add($idempotencyKey, true, 600)) {
+            $this->recordDuplicateInboundWebhook($normalizedPhone, $messageId, $body);
+
             return response()->json([
                 'success' => true,
                 'message_id' => $messageId,
@@ -174,6 +177,34 @@ class TextbeeSmsWebhookController extends Controller
      * Normalize phone to canonical form (e.g. 09123456789).
      * Accepts +639123456789, 09123456789, 9123456789.
      */
+    /**
+     * Persist + log when we skip processing because this gateway message_id was already handled.
+     * Used to diagnose duplicate message_id bugs on the mobile/gateway side (e.g. two different SMS sharing one id).
+     */
+    private function recordDuplicateInboundWebhook(string $normalizedPhone, string $messageId, string $body): void
+    {
+        Log::info('TextbeeSmsWebhook: skipped inbound — duplicate message_id (idempotency)', [
+            'from' => $normalizedPhone,
+            'message_id' => $messageId,
+            'message_preview' => mb_substr($body, 0, 160),
+        ]);
+
+        try {
+            SmsInboundWebhookEvent::create([
+                'outcome' => SmsInboundWebhookEvent::OUTCOME_DUPLICATE_MESSAGE_ID,
+                'from_phone' => $normalizedPhone,
+                'gateway_message_id' => $messageId,
+                'message_body' => $body,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('TextbeeSmsWebhook: could not persist duplicate webhook event', [
+                'from' => $normalizedPhone,
+                'message_id' => $messageId,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+    }
+
     private function normalizePhone(string $value): string
     {
         $digits = (string) preg_replace('/\D/', '', $value);
@@ -185,10 +216,10 @@ class TextbeeSmsWebhookController extends Controller
             $digits = substr($digits, 2);
         }
         if (strlen($digits) === 10 && str_starts_with($digits, '9')) {
-            return '0' . $digits;
+            return '0'.$digits;
         }
         if (! str_starts_with($digits, '0')) {
-            return '0' . $digits;
+            return '0'.$digits;
         }
 
         return $digits;
@@ -216,7 +247,7 @@ class TextbeeSmsWebhookController extends Controller
         }
 
         $rawBody = $request->getContent();
-        $expected = 'sha256=' . hash_hmac('sha256', $rawBody, $secret);
+        $expected = 'sha256='.hash_hmac('sha256', $rawBody, $secret);
 
         return hash_equals($expected, $signatureHeader);
     }

@@ -4,9 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Enums\OrderChannel;
 use App\Enums\OrderStatus;
-use App\Models\MenuItem;
-use App\Models\MenuItemDailyStock;
 use App\Models\ActionLog;
+use App\Models\MenuItemDailyStock;
 use App\Models\Order;
 use App\Models\OrderItem;
 use Carbon\Carbon;
@@ -49,6 +48,7 @@ class AnalyticsController extends Controller
         if ($from->gt($to)) {
             $to = $from->copy()->endOfDay();
         }
+
         return [$from, $to];
     }
 
@@ -60,6 +60,7 @@ class AnalyticsController extends Controller
         if ($order->channel === OrderChannel::WalkIn->value) {
             return 'walkin';
         }
+
         return $order->delivery_type === 'delivery' ? 'delivery' : 'pickup';
     }
 
@@ -256,7 +257,11 @@ class AnalyticsController extends Controller
 
     /**
      * Leaderboard: item name, units sold, revenue, sell-through % (when daily stock exists), trend vs previous period.
-     * Sell-through from menu_item_daily_stock (units_sold/units_set) in range; null when no stock data → show "—" in UI.
+     *
+     * Sell-through matches the Units column: completed order quantity for that line-item name in range,
+     * divided by the sum of daily {@see MenuItemDailyStock::units_set} for all catalog rows with that
+     * item name in the same date range. This stays aligned with sales even when the per-day units_sold
+     * ledger was not incremented (e.g. legacy lines without menu_item_id). Null when no units_set in range.
      */
     private function menuLeaderboard(Carbon $from, Carbon $to): array
     {
@@ -286,18 +291,14 @@ class AnalyticsController extends Controller
             ->get()
             ->keyBy('name');
 
-        $stockByMenuItemId = MenuItemDailyStock::query()
-            ->select('menu_item_id')
-            ->selectRaw('SUM(units_set) as units_set')
-            ->selectRaw('SUM(units_sold) as units_sold')
-            ->whereBetween('menu_date', [$from, $to])
-            ->groupBy('menu_item_id')
+        $unitsSetSumByName = MenuItemDailyStock::query()
+            ->join('menu_items', 'menu_items.id', '=', 'menu_item_daily_stock.menu_item_id')
+            ->whereBetween('menu_item_daily_stock.menu_date', [$from->toDateString(), $to->toDateString()])
+            ->selectRaw('menu_items.name as item_name')
+            ->selectRaw('COALESCE(SUM(menu_item_daily_stock.units_set), 0) as units_set_sum')
+            ->groupBy('menu_items.name')
             ->get()
-            ->keyBy('menu_item_id');
-
-        $nameToMenuItemId = MenuItem::query()
-            ->whereIn('id', $stockByMenuItemId->keys())
-            ->pluck('id', 'name');
+            ->keyBy('item_name');
 
         $result = [];
         foreach ($items as $row) {
@@ -309,13 +310,10 @@ class AnalyticsController extends Controller
             $trend = $prevQtyVal !== 0 ? round((($totalQty - $prevQtyVal) / $prevQtyVal) * 100) : null;
 
             $sellThroughPct = null;
-            $menuItemId = $nameToMenuItemId->get($name);
-            if ($menuItemId !== null && $stockByMenuItemId->has($menuItemId)) {
-                $stock = $stockByMenuItemId->get($menuItemId);
-                $set = (int) $stock->units_set;
-                if ($set > 0) {
-                    $sellThroughPct = round(((int) $stock->units_sold / $set) * 100, 1);
-                }
+            $setRow = $unitsSetSumByName->get($name);
+            $setSum = $setRow ? (int) $setRow->units_set_sum : 0;
+            if ($setSum > 0) {
+                $sellThroughPct = round(($totalQty / $setSum) * 100, 1);
             }
 
             $result[] = [
@@ -326,10 +324,13 @@ class AnalyticsController extends Controller
                 'trend' => $trend,
             ];
         }
+
         return $result;
     }
 
-    /** Rising vs falling: this week vs last week (by units sold). */
+    /**
+     * Rising vs falling: selected range vs the previous period of the same length (by units sold on completed orders).
+     */
     private function risingFallingItems(Carbon $from, Carbon $to): array
     {
         $days = $from->diffInDays($to) + 1;
@@ -368,7 +369,20 @@ class AnalyticsController extends Controller
         $falling = array_slice(array_filter($deltas, static fn ($d) => $d['delta'] < 0), 0, 10);
         usort($falling, static fn ($a, $b) => $a['delta'] <=> $b['delta']);
 
-        return ['rising' => $rising, 'falling' => $falling];
+        $risingCount = count(array_filter($deltas, static fn ($d) => $d['delta'] > 0));
+        $fallingCount = count(array_filter($deltas, static fn ($d) => $d['delta'] < 0));
+        $flatCount = count(array_filter($deltas, static fn ($d) => $d['delta'] === 0));
+
+        return [
+            'rising' => $rising,
+            'falling' => $falling,
+            'summary' => [
+                'items_compared' => count($deltas),
+                'rising_count' => $risingCount,
+                'falling_count' => $fallingCount,
+                'flat_count' => $flatCount,
+            ],
+        ];
     }
 
     /** Best item combinations: co-occurrence (same order) from order_items, top pairs by frequency. */
@@ -409,6 +423,7 @@ class AnalyticsController extends Controller
             [$nameA, $nameB] = explode('|', $key, 2);
             $result[] = ['item_a' => $nameA, 'item_b' => $nameB, 'orders' => $count];
         }
+
         return $result;
     }
 
@@ -451,6 +466,7 @@ class AnalyticsController extends Controller
                 }
             }
         }
+
         return ['grid' => $grid, 'max_count' => $maxCount];
     }
 
@@ -524,18 +540,21 @@ class AnalyticsController extends Controller
             if ($d === []) {
                 return null;
             }
+
             return round(array_sum($d) / count($d), 1);
         };
         $min = static function (array $d): ?int {
             if ($d === []) {
                 return null;
             }
+
             return (int) min($d);
         };
         $max = static function (array $d): ?int {
             if ($d === []) {
                 return null;
             }
+
             return (int) max($d);
         };
 
@@ -583,6 +602,7 @@ class AnalyticsController extends Controller
             ];
             $cursor->addDay();
         }
+
         return $result;
     }
 
@@ -604,7 +624,7 @@ class AnalyticsController extends Controller
         $byFulfillment = $data['by_fulfillment'] ?? [];
 
         $bestDayStr = $bestDayDate
-            ? Carbon::parse($bestDayDate)->format('l, M j') . ' with ₱' . number_format($bestDayRevenue, 2, '.', ',')
+            ? Carbon::parse($bestDayDate)->format('l, M j').' with ₱'.number_format($bestDayRevenue, 2, '.', ',')
             : 'n/a';
 
         $topFulfillment = '';

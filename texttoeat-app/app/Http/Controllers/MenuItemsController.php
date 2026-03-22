@@ -85,16 +85,7 @@ class MenuItemsController extends Controller
 
         $totalMenuItems = MenuItem::query()->count();
         $threshold = (int) Setting::get('menu.low_stock_threshold', 5);
-        $lowStockCount = MenuItem::query()
-            ->leftJoin('menu_item_daily_stock as s', function ($join) use ($today): void {
-                $join->on('s.menu_item_id', '=', 'menu_items.id')
-                    ->whereDate('s.menu_date', $today);
-            })
-            ->where(function ($q) use ($threshold): void {
-                $q->whereNull('s.menu_item_id')
-                    ->orWhere('s.units_leftover', '<', $threshold);
-            })
-            ->count();
+        $lowStockCount = $this->stockService->countLowStockOnTodaysMenu($threshold);
 
         return Inertia::render('MenuItems', [
             'menuItems' => $menuItems,
@@ -184,6 +175,7 @@ class MenuItemsController extends Controller
     public function destroy(MenuItem $menuItem): RedirectResponse
     {
         $menuItem->delete();
+
         return redirect()->back()->with('success', 'Menu item removed.');
     }
 }

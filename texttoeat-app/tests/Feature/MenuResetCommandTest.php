@@ -72,6 +72,26 @@ class MenuResetCommandTest extends TestCase
             'units_leftover' => 4,
         ]);
 
+        // Catalog rows dated today so menu:reset-today can ensure zeroed daily_stock for today.
+        MenuItem::create([
+            'name' => 'Chicken Adobo',
+            'price' => 125.00,
+            'category_id' => $this->ulamCategory->id,
+            'image_url' => null,
+            'units_today' => 10,
+            'is_sold_out' => false,
+            'menu_date' => $today,
+        ]);
+        MenuItem::create([
+            'name' => 'Pork Sinigang',
+            'price' => 135.00,
+            'category_id' => $this->ulamCategory->id,
+            'image_url' => null,
+            'units_today' => 5,
+            'is_sold_out' => false,
+            'menu_date' => $today,
+        ]);
+
         Artisan::call('menu:reset-today');
 
         // Snapshot created for yesterday
@@ -144,12 +164,19 @@ class MenuResetCommandTest extends TestCase
     {
         Carbon::setTestNow(Carbon::parse('2025-03-08 14:00:00')); // 2pm
 
+        $today = Carbon::today();
         $yesterday = Carbon::yesterday();
         MenuItem::create([
             'name' => 'Test',
             'price' => 50,
             'category_id' => $this->ulamCategory->id,
             'menu_date' => $yesterday,
+        ]);
+        MenuItem::create([
+            'name' => 'Test today',
+            'price' => 50,
+            'category_id' => $this->ulamCategory->id,
+            'menu_date' => $today,
         ]);
 
         Artisan::call('menu:reset-today', ['--force' => true]);
@@ -158,6 +185,44 @@ class MenuResetCommandTest extends TestCase
         // which means today's stock rows get initialized for catalog items.
         $todayStockCount = MenuItemDailyStock::whereDate('menu_date', Carbon::today())->count();
         $this->assertGreaterThanOrEqual(1, $todayStockCount);
+    }
+
+    public function test_reset_marks_sold_out_when_catalog_menu_date_not_today_but_stock_exists_for_today(): void
+    {
+        $today = Carbon::today();
+        $yesterday = Carbon::yesterday();
+
+        $item = MenuItem::create([
+            'name' => 'Legacy dated row',
+            'price' => 99.00,
+            'category_id' => $this->ulamCategory->id,
+            'image_url' => null,
+            'units_today' => 15,
+            'is_sold_out' => false,
+            'menu_date' => $yesterday,
+        ]);
+
+        MenuItemDailyStock::create([
+            'menu_item_id' => $item->id,
+            'menu_date' => $today,
+            'units_set' => 15,
+            'units_sold' => 0,
+            'units_leftover' => 15,
+        ]);
+
+        Artisan::call('menu:reset-today', ['--force' => true]);
+
+        $item->refresh();
+        $this->assertTrue((bool) $item->is_sold_out);
+        $this->assertSame(0, (int) $item->units_today);
+
+        $stock = MenuItemDailyStock::query()
+            ->where('menu_item_id', $item->id)
+            ->whereDate('menu_date', $today)
+            ->first();
+        $this->assertNotNull($stock);
+        $this->assertSame(0, (int) $stock->units_set);
+        $this->assertSame(0, (int) $stock->units_leftover);
     }
 
     public function test_snapshot_recorded_before_reset(): void

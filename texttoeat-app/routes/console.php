@@ -1,21 +1,21 @@
 <?php
 
-use App\Enums\OrderStatus;
+use App\Messenger\FacebookMessengerClient;
 use App\Messenger\MessengerPayloads;
+use App\Models\ChatbotSession;
+use App\Models\InboundMessage;
 use App\Models\MenuItem;
 use App\Models\MenuItemDailySnapshot;
 use App\Models\MenuItemDailyStock;
-use App\Models\OrderItem;
-use App\Models\InboundMessage;
 use App\Models\OutboundMessenger;
 use App\Models\OutboundSms;
-use App\Models\ChatbotSession;
 use App\Models\Setting;
-use App\Messenger\FacebookMessengerClient;
+use App\Models\SmsInboundWebhookEvent;
+use App\Support\MenuManualResetWindow;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -94,9 +94,10 @@ Artisan::command('menu:reset-today {--force : Run even outside morning window}',
     $today = Carbon::today();
     $yesterday = Carbon::yesterday();
 
-    $morningUntilHour = (int) Setting::get('menu.reset_morning_until_hour', config('menu.reset_morning_until_hour', 11));
-    if (! $this->option('force') && $morningUntilHour >= 0 && now()->hour > $morningUntilHour) {
-        $this->warn('Skipping: current hour (' . now()->hour . ') is after morning window (0-' . $morningUntilHour . '). Use --force to override.');
+    if (! $this->option('force') && ! MenuManualResetWindow::isNowWithinWindow()) {
+        [$from, $until] = MenuManualResetWindow::bounds();
+        $label = MenuManualResetWindow::describeBounds($from, $until);
+        $this->warn('Skipping: current hour ('.now()->hour.') is outside the configured window ('.$label.'). Use --force to override.');
 
         return;
     }
@@ -124,12 +125,24 @@ Artisan::command('menu:reset-today {--force : Run even outside morning window}',
         $snapshotCount++;
     }
 
-    // Initialize or reset today's per-item stock to zero for today's menu items.
-    $resetStockCount = 0;
+    // Zero every per-day stock row for calendar today. Staff edits attach today's
+    // stock to catalog rows even when menu_items.menu_date is still yesterday, so
+    // we must not scope this to menu_items.menu_date = today only.
+    $resetStockCount = MenuItemDailyStock::query()
+        ->whereDate('menu_date', $today)
+        ->update([
+            'units_set' => 0,
+            'units_sold' => 0,
+            'units_leftover' => 0,
+        ]);
+
+    // Ensure each catalog row dated today has a daily_stock row (zeros) for parity
+    // with portal + stock service expectations.
+    $ensureStockRows = 0;
     MenuItem::query()
         ->whereDate('menu_date', $today)
         ->orderBy('id')
-        ->chunkById(200, function ($items) use ($today, &$resetStockCount): void {
+        ->chunkById(200, function ($items) use ($today, &$ensureStockRows): void {
             foreach ($items as $item) {
                 MenuItemDailyStock::updateOrCreate(
                     [
@@ -142,23 +155,30 @@ Artisan::command('menu:reset-today {--force : Run even outside morning window}',
                         'units_leftover' => 0,
                     ]
                 );
-                $resetStockCount++;
+                $ensureStockRows++;
             }
         });
 
-    // Legacy compatibility: mark all items as sold out with zero units_today so
-    // existing flows that still read these fields remain safe. Core behavior
-    // uses MenuItemDailyStock/virtual availability instead.
-    $resetLegacyCount = MenuItem::query()
+    // Legacy + portal: mark sold out on every menu item that has a daily_stock row
+    // for today (includes today-dated rows ensured above). Chatbot still checks is_sold_out.
+    $menuItemIdsForToday = MenuItemDailyStock::query()
         ->whereDate('menu_date', $today)
-        ->update([
-        'is_sold_out' => true,
-        'units_today' => 0,
-    ]);
+        ->pluck('menu_item_id')
+        ->unique()
+        ->all();
+
+    $resetLegacyCount = $menuItemIdsForToday === []
+        ? 0
+        : MenuItem::query()
+            ->whereIn('id', $menuItemIdsForToday)
+            ->update([
+                'is_sold_out' => true,
+                'units_today' => 0,
+            ]);
 
     Cache::put('menu_reset_date', $today->toDateString(), now()->endOfDay());
 
-    $this->info("Snapshot: {$snapshotCount} stock row(s) for {$yesterday->toDateString()}. Reset: {$resetStockCount} per-day stock row(s) initialized for {$today->toDateString()}; {$resetLegacyCount} catalog item(s) marked sold out with zero legacy units_today.");
+    $this->info("Snapshot: {$snapshotCount} stock row(s) for {$yesterday->toDateString()}. Reset: {$resetStockCount} daily stock row(s) zeroed for {$today->toDateString()}; {$ensureStockRows} today-dated catalog row(s) ensured; {$resetLegacyCount} catalog item(s) marked sold out with zero legacy units_today.");
 })->purpose('Snapshot yesterday stock and reset today per-item stock to zero using MenuItemDailyStock, flag greeting modal');
 
 Schedule::call(function (): void {
@@ -187,12 +207,17 @@ Artisan::command('chatbot:prune-logs', function () {
         ->where('created_at', '<', $cutoff)
         ->delete();
 
+    $webhookEventsDeleted = SmsInboundWebhookEvent::query()
+        ->where('created_at', '<', $cutoff)
+        ->delete();
+
     $this->info(sprintf(
-        'Pruned chatbot logs older than %d days: %d inbound, %d outbound_sms, %d outbound_messenger.',
+        'Pruned chatbot logs older than %d days: %d inbound, %d outbound_sms, %d outbound_messenger, %d sms_inbound_webhook_events.',
         $days,
         $inboundDeleted,
         $outboundSmsDeleted,
         $outboundMessengerDeleted,
+        $webhookEventsDeleted,
     ));
 })->purpose('Prune detailed chatbot message logs older than 30 days');
 

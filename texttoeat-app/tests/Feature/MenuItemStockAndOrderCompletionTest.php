@@ -104,7 +104,7 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
 
         $user = \App\Models\User::factory()->create();
         $this->actingAs($user);
-        $response = $this->put('/portal/orders/' . $order->id, [
+        $response = $this->put('/portal/orders/'.$order->id, [
             'status' => 'completed',
             'payment_status' => 'paid',
         ]);
@@ -142,5 +142,47 @@ class MenuItemStockAndOrderCompletionTest extends TestCase
         ]);
         $response->assertRedirect();
         $this->assertDatabaseHas('menu_items', ['name' => 'Valid Item', 'category_id' => $category->id]);
+    }
+
+    public function test_low_stock_count_uses_todays_menu_and_virtual_available_not_duplicate_rows(): void
+    {
+        $today = Carbon::today();
+        $yesterday = Carbon::yesterday();
+        $category = Category::firstOrCreate(['name' => 'Ulam'], ['name' => 'Ulam']);
+
+        $todaysLow = MenuItem::create([
+            'name' => 'Today Low',
+            'price' => 100,
+            'category_id' => $category->id,
+            'menu_date' => $today,
+            'units_today' => 3,
+            'is_sold_out' => false,
+        ]);
+        \App\Models\MenuItemDailyStock::create([
+            'menu_item_id' => $todaysLow->id,
+            'menu_date' => $today,
+            'units_set' => 3,
+            'units_sold' => 0,
+            'units_leftover' => 3,
+        ]);
+
+        $staleRowOtherDate = MenuItem::create([
+            'name' => 'Stale catalog row',
+            'price' => 100,
+            'category_id' => $category->id,
+            'menu_date' => $yesterday,
+            'units_today' => 1,
+            'is_sold_out' => false,
+        ]);
+        \App\Models\MenuItemDailyStock::create([
+            'menu_item_id' => $staleRowOtherDate->id,
+            'menu_date' => $today,
+            'units_set' => 1,
+            'units_sold' => 0,
+            'units_leftover' => 1,
+        ]);
+
+        $service = app(MenuItemStockService::class);
+        $this->assertSame(1, $service->countLowStockOnTodaysMenu(5));
     }
 }

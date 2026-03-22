@@ -28,6 +28,7 @@ class Setting extends Model
      * Env fallback map: setting key => env var name.
      */
     protected static array $envFallback = [
+        'menu.reset_morning_from_hour' => 'MENU_RESET_MORNING_FROM_HOUR',
         'menu.reset_morning_until_hour' => 'MENU_RESET_MORNING_UNTIL_HOUR',
         'channels.sms_enabled' => 'CHANNEL_SMS_ENABLED',
         'channels.messenger_enabled' => 'CHANNEL_MESSENGER_ENABLED',
@@ -61,8 +62,10 @@ class Setting extends Model
                     return self::envFallback($key, $default);
                 }
             }
+
             return self::castValue($key, $value);
         }
+
         return self::envFallback($key, $default);
     }
 
@@ -123,8 +126,10 @@ class Setting extends Model
             if (in_array($key, ['channels.sms_enabled', 'channels.messenger_enabled', 'channels.web_enabled'], true)) {
                 return true;
             }
+
             return $default;
         }
+
         return self::castValue($key, $env);
     }
 
@@ -138,7 +143,7 @@ class Setting extends Model
                 return false;
             }
         }
-        if ($key === 'menu.reset_morning_until_hour' || $key === 'menu.low_stock_threshold' || $key === 'menu.auto_reset_at_hour') {
+        if ($key === 'menu.reset_morning_from_hour' || $key === 'menu.reset_morning_until_hour' || $key === 'menu.low_stock_threshold' || $key === 'menu.auto_reset_at_hour') {
             return (int) $value;
         }
         if ($key === 'menu.auto_reset_enabled') {
@@ -146,11 +151,13 @@ class Setting extends Model
         }
         if ($key === 'menu.low_stock_badge_style') {
             $v = (string) $value;
+
             return in_array($v, ['count', 'one'], true) ? $v : 'count';
         }
         if (str_contains($key, 'timeout') || str_contains($key, 'heartbeat_interval_minutes')) {
             return (int) $value;
         }
+
         return $value;
     }
 }

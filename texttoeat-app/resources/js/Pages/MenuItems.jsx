@@ -351,8 +351,8 @@ function MenuItemCard({ item, onEdit, onEnableClick, lowStockThreshold = 5 }) {
     const units = Number(item.units_today ?? 0);
     const currentOrders = Number(item.current_orders ?? 0);
     const soldOut = !!item.is_sold_out;
-    // Use same Qty (units_today) for low-stock so badge matches displayed remaining stock
-    const isLowStock = !soldOut && units < lowStockThreshold;
+    const available = Number(item.virtual_available ?? 0);
+    const isLowStock = !soldOut && available < lowStockThreshold;
 
     const setQuantity = (newVal) => {
         const n = Math.max(0, Math.floor(Number(newVal)));

@@ -15,10 +15,23 @@ import {
     Line,
     CartesianGrid,
 } from 'recharts';
-import { Card, CardContent, CardHeader, PageHeader, Button, TooltipProvider, InfoTooltip } from '../components/ui';
+import { Card, CardContent, CardHeader, PageHeader, Button, TooltipProvider, MetricInfoDialog } from '../components/ui';
+import { ANALYTICS_METRIC_HELP } from './analyticsMetricHelp';
 import PortalLayout from '../Layouts/PortalLayout';
 import { formatCurrency } from '../utils/formatNumber';
-import { TrendingUp, TrendingDown, Download, BarChart3, UtensilsCrossed, Activity, ArrowUpCircle, ArrowDownCircle, Link2 } from 'lucide-react';
+import {
+    TrendingUp,
+    TrendingDown,
+    Download,
+    BarChart3,
+    UtensilsCrossed,
+    Activity,
+    ArrowUpCircle,
+    ArrowDownCircle,
+    Link2,
+    ChevronUp,
+    ChevronDown,
+} from 'lucide-react';
 
 const TAB_SALES = 'sales';
 const TAB_MENU = 'menu';
@@ -28,6 +41,9 @@ const CHANNEL_LABELS = { sms: 'SMS', messenger: 'Messenger', web: 'Web', walkin:
 const FULFILLMENT_LABELS = { walkin: 'Walk-in', delivery: 'Delivery', pickup: 'Pickup' };
 const CHART_COLORS = { walkin: '#8b5cf6', delivery: '#f97316', pickup: '#f59e0b' };
 const PIE_COLORS = ['#8b5cf6', '#f97316', '#f59e0b', '#10b981'];
+
+const COMPLETION_TARGET_MIN = 0;
+const COMPLETION_TARGET_MAX = 100;
 
 export default function Analytics({
     date_from = '',
@@ -39,13 +55,19 @@ export default function Analytics({
     const [activeTab, setActiveTab] = useState(TAB_SALES);
     const [dateFrom, setDateFrom] = useState(date_from);
     const [dateTo, setDateTo] = useState(date_to);
+    const [completionTargetPct, setCompletionTargetPct] = useState(90);
+
+    const bumpCompletionTarget = (delta) => {
+        setCompletionTargetPct((prev) => Math.min(COMPLETION_TARGET_MAX, Math.max(COMPLETION_TARGET_MIN, prev + delta)));
+    };
 
     const applyDateRange = () => {
         router.get('/portal/analytics', { date_from: dateFrom || undefined, date_to: dateTo || undefined }, { preserveState: true });
     };
 
     const leaderboard = menu_intelligence?.leaderboard ?? [];
-    const risingFalling = menu_intelligence?.rising_falling ?? { rising: [], falling: [] };
+    const risingFalling = menu_intelligence?.rising_falling ?? { rising: [], falling: [], summary: null };
+    const rfSummary = risingFalling.summary;
     const coOccurrence = menu_intelligence?.co_occurrence ?? [];
     const heatmap = operations?.heatmap ?? { grid: {}, max_count: 0 };
     const fulfillmentSpeed = operations?.fulfillment_speed ?? {};
@@ -72,10 +94,18 @@ export default function Analytics({
     } = sales;
 
     const formatShortDate = (d) => (d ? new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
-    const previousPeriodTooltipContent =
-        period_days != null && prev_from != null && prev_to != null
-            ? `Compared to the same number of days right before your selected range. For this range we compare to the previous ${Math.round(Number(period_days))} days (${formatShortDate(prev_from)} to ${formatShortDate(prev_to)}).`
-            : 'Compared to the same number of days right before your selected range. For example, if you select 3 days, we compare to the 3 days immediately before that.';
+    const periodDaysRounded =
+        period_days != null && prev_from != null && prev_to != null ? Math.round(Number(period_days)) : null;
+    const previousPeriodExtraEn =
+        periodDaysRounded != null
+            ? `\n\nFor this period, we are comparing data to the previous ${periodDaysRounded} days (${formatShortDate(prev_from)} – ${formatShortDate(prev_to)}).`
+            : '';
+    const previousPeriodExtraFil =
+        periodDaysRounded != null
+            ? `\n\nPara sa period na ito, ikukumpara natin ang data sa nakaraang ${periodDaysRounded} araw (${formatShortDate(prev_from)} – ${formatShortDate(prev_to)}).`
+            : '';
+    const previousPeriodHelpEn = `${ANALYTICS_METRIC_HELP.previousPeriod.contentEn}${previousPeriodExtraEn}`;
+    const previousPeriodHelpFil = `${ANALYTICS_METRIC_HELP.previousPeriod.contentFil}${previousPeriodExtraFil}`;
 
     const revenueByDayChart = revenue_by_day.map((d) => ({
         ...d,
@@ -172,7 +202,10 @@ export default function Analytics({
                         {/* Hero revenue + period-over-period */}
                         <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                             <CardContent className="pt-6 pb-4">
-                                <p className="text-sm font-semibold text-surface-500 dark:text-surface-400">Total revenue</p>
+                                <p className="text-sm font-semibold text-surface-500 dark:text-surface-400 flex items-center gap-1.5">
+                                    Total sales
+                                    <MetricInfoDialog {...ANALYTICS_METRIC_HELP.totalRevenue} />
+                                </p>
                                 <div className="mt-1 flex items-baseline gap-3">
                                     <span className="text-4xl font-extrabold tracking-tight text-surface-900 dark:text-white">
                                         {formatCurrency(revenue)}
@@ -185,7 +218,11 @@ export default function Analytics({
                                         >
                                             {revenue_change_percent >= 0 ? <TrendingUp className="h-4 w-4 mr-0.5" /> : <TrendingDown className="h-4 w-4 mr-0.5" />}
                                             {revenue_change_percent >= 0 ? '+' : ''}{revenue_change_percent}% vs previous period
-                                            <InfoTooltip content={previousPeriodTooltipContent} side="bottom" />
+                                            <MetricInfoDialog
+                                                {...ANALYTICS_METRIC_HELP.previousPeriod}
+                                                contentEn={previousPeriodHelpEn}
+                                                contentFil={previousPeriodHelpFil}
+                                            />
                                         </span>
                                     )}
                                 </div>
@@ -196,37 +233,46 @@ export default function Analytics({
                         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                             <Card className="rounded-2xl border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40">
                                 <CardContent className="py-4">
-                                    <p className="text-xs font-semibold text-surface-500 dark:text-surface-400">Orders</p>
+                                    <p className="text-xs font-semibold text-surface-500 dark:text-surface-400 flex items-center gap-1">
+                                        Total orders received
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.orders} />
+                                    </p>
                                     <p className="text-2xl font-extrabold text-surface-900 dark:text-white">{orders_count}</p>
                                 </CardContent>
                             </Card>
                             <Card className="rounded-2xl border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40">
                                 <CardContent className="py-4">
-                                    <p className="text-xs font-semibold text-surface-500 dark:text-surface-400">Completed</p>
+                                    <p className="text-xs font-semibold text-surface-500 dark:text-surface-400 flex items-center gap-1">
+                                        Successfully completed
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.completed} />
+                                    </p>
                                     <p className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400">{completed_count}</p>
                                 </CardContent>
                             </Card>
                             <Card className="rounded-2xl border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40">
                                 <CardContent className="py-4">
-                                    <p className="text-xs font-semibold text-surface-500 dark:text-surface-400">Cancelled</p>
+                                    <p className="text-xs font-semibold text-surface-500 dark:text-surface-400 flex items-center gap-1">
+                                        Cancelled orders
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.cancelled} />
+                                    </p>
                                     <p className="text-2xl font-extrabold text-surface-900 dark:text-white">{cancelled_count}</p>
                                 </CardContent>
                             </Card>
                             <Card className="rounded-2xl border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40">
                                 <CardContent className="py-4">
                                     <p className="text-xs font-semibold text-surface-500 dark:text-surface-400 flex items-center gap-1.5">
-                                        Avg order value
-                                        <InfoTooltip
-                                            content="Average order value: total revenue from completed orders divided by the number of completed orders. It's the average amount spent per order in this period."
-                                            side="top"
-                                        />
+                                        Avg spend per order
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.aov} />
                                     </p>
                                     <p className="text-2xl font-extrabold text-surface-900 dark:text-white">{formatCurrency(aov)}</p>
                                 </CardContent>
                             </Card>
                             <Card className="rounded-2xl border-surface-200 dark:border-surface-700 bg-surface-50/60 dark:bg-surface-900/40">
                                 <CardContent className="py-4">
-                                    <p className="text-xs font-semibold text-surface-500 dark:text-surface-400">Best day</p>
+                                    <p className="text-xs font-semibold text-surface-500 dark:text-surface-400 flex items-center gap-1">
+                                        Top selling day
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.bestDay} />
+                                    </p>
                                     <p className="text-lg font-extrabold text-surface-900 dark:text-white">
                                         {best_day_date ? (
                                             <>
@@ -244,7 +290,10 @@ export default function Analytics({
                         {/* Stacked area: revenue by day */}
                         <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                             <CardHeader className="border-b border-surface-200 dark:border-surface-700">
-                                <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Revenue by day</p>
+                                <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+                                    Daily sales breakdown
+                                    <MetricInfoDialog {...ANALYTICS_METRIC_HELP.revenueByDay} />
+                                </p>
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">Walk-in · Delivery · Pickup (completed orders)</p>
                             </CardHeader>
                             <CardContent className="pt-4">
@@ -298,76 +347,43 @@ export default function Analytics({
                         </Card>
 
                         {/* Two donuts + Payment health + Export */}
-                        <div className="grid gap-6 lg:grid-cols-3">
-                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
+                        <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-visible min-w-0">
                                 <CardHeader className="border-b border-surface-200 dark:border-surface-700 pb-2">
-                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Orders by channel</p>
+                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+                                        Orders by platform
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.ordersByChannel} />
+                                    </p>
                                 </CardHeader>
-                                <CardContent className="pt-4">
+                                <CardContent className="pt-4 overflow-visible">
                                     {channelDonutData.length > 0 && totalOrders > 0 ? (
-                                        <div className="h-[220px]">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={channelDonutData}
-                                                        dataKey="value"
-                                                        nameKey="name"
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={60}
-                                                        outerRadius={90}
-                                                        paddingAngle={2}
-                                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                                    >
-                                                        {channelDonutData.map((_, i) => (
-                                                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip formatter={(value) => [value, 'Orders']} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
+                                        <AnalyticsPieDonut data={channelDonutData} />
                                     ) : (
-                                        <div className="flex h-[220px] items-center justify-center text-sm text-surface-500 dark:text-surface-400">No orders in range.</div>
+                                        <div className="flex min-h-[200px] items-center justify-center text-sm text-surface-500 dark:text-surface-400">No orders in range.</div>
                                     )}
                                 </CardContent>
                             </Card>
-                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
+                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-visible min-w-0">
                                 <CardHeader className="border-b border-surface-200 dark:border-surface-700 pb-2">
-                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Orders by fulfillment</p>
+                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+                                        How customers get orders
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.ordersByFulfillment} />
+                                    </p>
                                 </CardHeader>
-                                <CardContent className="pt-4">
+                                <CardContent className="pt-4 overflow-visible">
                                     {fulfillmentDonutData.length > 0 && totalFulfillment > 0 ? (
-                                        <div className="h-[220px]">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={fulfillmentDonutData}
-                                                        dataKey="value"
-                                                        nameKey="name"
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={60}
-                                                        outerRadius={90}
-                                                        paddingAngle={2}
-                                                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                                                    >
-                                                        {fulfillmentDonutData.map((_, i) => (
-                                                            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <Tooltip formatter={(value) => [value, 'Orders']} />
-                                                </PieChart>
-                                            </ResponsiveContainer>
-                                        </div>
+                                        <AnalyticsPieDonut data={fulfillmentDonutData} />
                                     ) : (
-                                        <div className="flex h-[220px] items-center justify-center text-sm text-surface-500 dark:text-surface-400">No orders in range.</div>
+                                        <div className="flex min-h-[200px] items-center justify-center text-sm text-surface-500 dark:text-surface-400">No orders in range.</div>
                                     )}
                                 </CardContent>
                             </Card>
-                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
+                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden min-w-0">
                                 <CardHeader className="border-b border-surface-200 dark:border-surface-700 pb-2">
-                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Payment health</p>
+                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+                                        Payment tracking
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.paymentHealth} />
+                                    </p>
                                 </CardHeader>
                                 <CardContent className="pt-4 space-y-4">
                                     <div>
@@ -416,9 +432,12 @@ export default function Analytics({
                     <div className="space-y-6">
                         <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                             <CardHeader className="border-b border-surface-200 dark:border-surface-700">
-                                <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Item leaderboard</p>
+                                <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+                                    Most popular items
+                                    <MetricInfoDialog {...ANALYTICS_METRIC_HELP.itemLeaderboard} />
+                                </p>
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
-                                    Units sold and revenue in selected range. Sell-through appears when daily stock is set for items.
+                                    Units sold and revenue in selected range. Sell-through uses sold units vs daily stock targets (units_set) in the range.
                                 </p>
                             </CardHeader>
                             <CardContent className="p-0">
@@ -430,10 +449,18 @@ export default function Analytics({
                                                 <th className="px-4 py-3 font-semibold text-surface-500 dark:text-surface-400 text-right">Units</th>
                                                 <th className="px-4 py-3 font-semibold text-surface-500 dark:text-surface-400 text-right">Revenue</th>
                                                 <th className="px-4 py-3 font-semibold text-surface-500 dark:text-surface-400 text-right">
-                                                    Sell-through
-                                                    <span className="block font-normal text-surface-400 dark:text-surface-500 text-xs mt-0.5">When daily stock is set</span>
+                                                    <span className="inline-flex items-center justify-end gap-1">
+                                                        Stock sold %
+                                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.sellThrough} />
+                                                    </span>
+                                                    <span className="block font-normal text-surface-400 dark:text-surface-500 text-xs mt-0.5">vs daily stock (units_set)</span>
                                                 </th>
-                                                <th className="px-4 py-3 font-semibold text-surface-500 dark:text-surface-400 text-right">Trend</th>
+                                                <th className="px-4 py-3 font-semibold text-surface-500 dark:text-surface-400 text-right">
+                                                    <span className="inline-flex items-center justify-end gap-1">
+                                                        Sales trend
+                                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.trend} />
+                                                    </span>
+                                                </th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -495,7 +522,11 @@ export default function Analytics({
                                     </p>
                                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 flex items-center gap-1.5">
                                         Vs previous period of same length
-                                        <InfoTooltip content={previousPeriodTooltipContent} side="top" />
+                                        <MetricInfoDialog
+                                            {...ANALYTICS_METRIC_HELP.risingFalling}
+                                            contentEn={`${ANALYTICS_METRIC_HELP.risingFalling.contentEn}${previousPeriodExtraEn}`}
+                                            contentFil={`${ANALYTICS_METRIC_HELP.risingFalling.contentFil}${previousPeriodExtraFil}`}
+                                        />
                                     </p>
                                 </CardHeader>
                                 <CardContent className="pt-4">
@@ -509,7 +540,20 @@ export default function Analytics({
                                             ))}
                                         </ul>
                                     ) : (
-                                        <p className="text-sm text-surface-500 dark:text-surface-400">No rising items.</p>
+                                        <div className="space-y-2">
+                                            <p className="text-sm text-surface-500 dark:text-surface-400">No rising items.</p>
+                                            {rfSummary && rfSummary.items_compared > 0 && (
+                                                <p className="text-xs text-surface-400 dark:text-surface-500 leading-relaxed">
+                                                    Summary for {rfSummary.items_compared} item{rfSummary.items_compared === 1 ? '' : 's'}: {rfSummary.rising_count} sold more,{' '}
+                                                    {rfSummary.flat_count} unchanged, {rfSummary.falling_count} sold fewer than in the previous period.
+                                                </p>
+                                            )}
+                                            {(!rfSummary || rfSummary.items_compared === 0) && (
+                                                <p className="text-xs text-surface-400 dark:text-surface-500 leading-relaxed">
+                                                    No completed order lines in this range and the prior period to compare.
+                                                </p>
+                                            )}
+                                        </div>
                                     )}
                                 </CardContent>
                             </Card>
@@ -521,7 +565,11 @@ export default function Analytics({
                                     </p>
                                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 flex items-center gap-1.5">
                                         Vs previous period of same length
-                                        <InfoTooltip content={previousPeriodTooltipContent} side="top" />
+                                        <MetricInfoDialog
+                                            {...ANALYTICS_METRIC_HELP.risingFalling}
+                                            contentEn={`${ANALYTICS_METRIC_HELP.risingFalling.contentEn}${previousPeriodExtraEn}`}
+                                            contentFil={`${ANALYTICS_METRIC_HELP.risingFalling.contentFil}${previousPeriodExtraFil}`}
+                                        />
                                     </p>
                                 </CardHeader>
                                 <CardContent className="pt-4">
@@ -535,7 +583,20 @@ export default function Analytics({
                                             ))}
                                         </ul>
                                     ) : (
-                                        <p className="text-sm text-surface-500 dark:text-surface-400">No falling items.</p>
+                                        <div className="space-y-2">
+                                            <p className="text-sm text-surface-500 dark:text-surface-400">No falling items.</p>
+                                            {rfSummary && rfSummary.items_compared > 0 && (
+                                                <p className="text-xs text-surface-400 dark:text-surface-500 leading-relaxed">
+                                                    Summary for {rfSummary.items_compared} item{rfSummary.items_compared === 1 ? '' : 's'}: {rfSummary.rising_count} sold more,{' '}
+                                                    {rfSummary.flat_count} unchanged, {rfSummary.falling_count} sold fewer than in the previous period.
+                                                </p>
+                                            )}
+                                            {(!rfSummary || rfSummary.items_compared === 0) && (
+                                                <p className="text-xs text-surface-400 dark:text-surface-500 leading-relaxed">
+                                                    No completed order lines in this range and the prior period to compare.
+                                                </p>
+                                            )}
+                                        </div>
                                     )}
                                 </CardContent>
                             </Card>
@@ -545,7 +606,8 @@ export default function Analytics({
                             <CardHeader className="border-b border-surface-200 dark:border-surface-700">
                                 <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
                                     <Link2 className="h-4 w-4 text-primary-500" />
-                                    Best item combinations
+                                    Popular item pairings
+                                    <MetricInfoDialog {...ANALYTICS_METRIC_HELP.coOccurrence} />
                                 </p>
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">Items often ordered together (same order)</p>
                             </CardHeader>
@@ -585,7 +647,10 @@ export default function Analytics({
                         {reportCard && (
                             <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                                 <CardHeader className="border-b border-surface-200 dark:border-surface-700">
-                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Summary report</p>
+                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+                                        Quick shop overview
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.reportCard} />
+                                    </p>
                                 </CardHeader>
                                 <CardContent className="pt-4">
                                     <p className="text-sm text-surface-700 dark:text-surface-200 leading-relaxed">{reportCard}</p>
@@ -596,7 +661,10 @@ export default function Analytics({
                         {/* 7×24 heatmap */}
                         <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                             <CardHeader className="border-b border-surface-200 dark:border-surface-700">
-                                <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Order volume by day and hour</p>
+                                <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+                                    Peak ordering hours
+                                    <MetricInfoDialog {...ANALYTICS_METRIC_HELP.heatmap} />
+                                </p>
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">Peak times at a glance (orders created)</p>
                             </CardHeader>
                             <CardContent className="pt-4 overflow-x-auto">
@@ -607,7 +675,10 @@ export default function Analytics({
                         {/* Fulfillment speed */}
                         <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                             <CardHeader className="border-b border-surface-200 dark:border-surface-700">
-                                <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Fulfillment speed</p>
+                                <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+                                    Order preparation speed
+                                    <MetricInfoDialog {...ANALYTICS_METRIC_HELP.fulfillmentSpeed} />
+                                </p>
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">From action logs (completed orders in range)</p>
                             </CardHeader>
                             <CardContent className="pt-4">
@@ -615,14 +686,48 @@ export default function Analytics({
                             </CardContent>
                         </Card>
 
-                        {/* Completion rate line + 90% target */}
+                        {/* Completion rate line + adjustable target */}
                         <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
-                            <CardHeader className="border-b border-surface-200 dark:border-surface-700">
-                                <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">Completion rate by day</p>
-                                <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">90% target line</p>
+                            <CardHeader className="border-b border-surface-200 dark:border-surface-700 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
+                                        Daily success rate
+                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.completionRateByDay} />
+                                    </p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                                        Dashed line shows your target (adjust with arrows).
+                                    </p>
+                                </div>
+                                <div
+                                    className="flex flex-col items-center justify-center gap-0.5 shrink-0 rounded-lg border border-surface-200/80 bg-surface-50/50 px-1.5 py-1 dark:border-surface-700/80 dark:bg-surface-900/40"
+                                    role="group"
+                                    aria-label="Adjust completion target"
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={() => bumpCompletionTarget(1)}
+                                        disabled={completionTargetPct >= COMPLETION_TARGET_MAX}
+                                        className="rounded-md p-1 text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800 dark:text-surface-500 dark:hover:text-surface-300 disabled:opacity-25 disabled:pointer-events-none transition-colors"
+                                        aria-label="Increase target"
+                                    >
+                                        <ChevronUp className="h-4 w-4" strokeWidth={1.75} />
+                                    </button>
+                                    <span className="text-[10px] font-semibold tabular-nums text-surface-500 dark:text-surface-400 leading-tight text-center select-none py-0.5">
+                                        {completionTargetPct}%
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => bumpCompletionTarget(-1)}
+                                        disabled={completionTargetPct <= COMPLETION_TARGET_MIN}
+                                        className="rounded-md p-1 text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:bg-surface-800 dark:text-surface-500 dark:hover:text-surface-300 disabled:opacity-25 disabled:pointer-events-none transition-colors"
+                                        aria-label="Decrease target"
+                                    >
+                                        <ChevronDown className="h-4 w-4" strokeWidth={1.75} />
+                                    </button>
+                                </div>
                             </CardHeader>
                             <CardContent className="pt-4">
-                                <CompletionRateChart data={completionRateByDay} />
+                                <CompletionRateChart data={completionRateByDay} targetPct={completionTargetPct} />
                             </CardContent>
                         </Card>
                     </div>
@@ -634,6 +739,39 @@ export default function Analytics({
 }
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/**
+ * Recharts 3 ResponsiveContainer needs a parent with real dimensions (not just height:100% in a flex/grid chain).
+ * A square box (aspect-square + max width) gives ResizeObserver stable width and height so the donut scales with the card.
+ */
+function AnalyticsPieDonut({ data }) {
+    return (
+        <div className="flex w-full min-w-0 justify-center">
+            <div className="aspect-square w-full max-w-[min(100%,280px)] min-h-0 shrink-0">
+                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                    <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                        <Pie
+                            data={data}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            innerRadius="38%"
+                            outerRadius="68%"
+                            paddingAngle={2}
+                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                            {data.map((_, i) => (
+                                <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                            ))}
+                        </Pie>
+                        <Tooltip formatter={(value) => [value, 'Orders']} />
+                    </PieChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+    );
+}
 
 function HeatmapGrid({ heatmap }) {
     const { grid = {}, max_count: maxCount = 0 } = heatmap;
@@ -703,19 +841,26 @@ function FulfillmentSpeedTable({ fulfillmentSpeed }) {
     );
 }
 
-function CompletionRateChart({ data }) {
-    const chartData = (data ?? []).map((d) => ({ ...d, rate: d.completion_rate ?? 0, target: 90 }));
+function CompletionRateChart({ data, targetPct = 90 }) {
+    const chartData = (data ?? []).map((d) => ({ ...d, rate: d.completion_rate ?? 0, target: targetPct }));
     if (chartData.length === 0) {
         return <div className="h-[240px] flex items-center justify-center text-sm text-surface-500 dark:text-surface-400">No daily data.</div>;
     }
+
     return (
-        <div className="h-[280px] w-full">
+        <div className="h-[280px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
                     <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} />
-                    <Tooltip formatter={(value, name) => [name === 'target' ? '90% target' : `${value}%`, name]} labelFormatter={(l) => l} />
+                    <Tooltip
+                        formatter={(value, name) => [
+                            name === 'target' ? `${targetPct}% target` : `${value}%`,
+                            name === 'target' ? 'Target' : 'Completion rate',
+                        ]}
+                        labelFormatter={(l) => l}
+                    />
                     <Line type="monotone" dataKey="rate" name="Completion rate" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
                     <Line type="monotone" dataKey="target" name="target" stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 4" dot={false} />
                 </LineChart>

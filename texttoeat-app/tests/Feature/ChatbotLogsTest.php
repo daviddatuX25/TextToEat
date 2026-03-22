@@ -136,6 +136,30 @@ class ChatbotLogsTest extends TestCase
             );
     }
 
+    public function test_it_resolves_customer_name_from_state_when_saved_column_empty(): void
+    {
+        $user = User::factory()->create();
+
+        ChatbotSession::create([
+            'channel' => 'sms',
+            'external_id' => 'state-name-user',
+            'language' => 'en',
+            'saved_customer_name' => null,
+            'state' => [
+                'current_state' => 'delivery_choice',
+                'customer_name' => 'Maria Santos',
+            ],
+            'last_activity_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->get('/portal/logs/chatbot')
+            ->assertStatus(200)
+            ->assertInertia(fn ($page) => $page
+                ->component('ChatbotLogs')
+                ->where('sessions.data.0.saved_customer_name', 'Maria Santos'));
+    }
+
     public function test_it_shows_chatbot_log_detail_page_with_messages(): void
     {
         $user = User::factory()->create();
@@ -288,4 +312,3 @@ class ChatbotLogsTest extends TestCase
         $this->assertContains('human_takeover', $statusValues);
     }
 }
-

@@ -15,7 +15,8 @@ class FilipinoMealsSeeder extends Seeder
      */
     public function run(): void
     {
-        $today = Carbon::today();
+        $today = Carbon::today(config('app.timezone'));
+        $menuDate = $today->toDateString();
 
         $meals = [
             [
@@ -25,7 +26,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/chicken-adobo/800/600',
                 'units_today' => 30,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Pork Sinigang na Baboy',
@@ -34,7 +35,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/sinigang/800/600',
                 'units_today' => 25,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Lechon Kawali',
@@ -43,7 +44,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/lechon/800/600',
                 'units_today' => 20,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Kare-Kare',
@@ -52,7 +53,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/kare-kare/800/600',
                 'units_today' => 18,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Beef Caldereta',
@@ -61,7 +62,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/caldereta/800/600',
                 'units_today' => 22,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Pork Sisig',
@@ -70,7 +71,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/sisig/800/600',
                 'units_today' => 28,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Lumpiang Shanghai (6 pcs)',
@@ -79,7 +80,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/lumpia/800/600',
                 'units_today' => 40,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Pancit Canton',
@@ -88,7 +89,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/pancit/800/600',
                 'units_today' => 35,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Tapsilog',
@@ -97,7 +98,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/tapsilog/800/600',
                 'units_today' => 25,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Longsilog',
@@ -106,7 +107,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/longsilog/800/600',
                 'units_today' => 30,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Halo-Halo',
@@ -115,7 +116,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/halo-halo/800/600',
                 'units_today' => 45,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Turon (2 pcs)',
@@ -124,7 +125,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/turon/800/600',
                 'units_today' => 50,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Leche Flan',
@@ -133,7 +134,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/leche-flan/800/600',
                 'units_today' => 20,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Dinuguan',
@@ -142,7 +143,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/dinuguan/800/600',
                 'units_today' => 15,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
             [
                 'name' => 'Pinakbet',
@@ -151,7 +152,7 @@ class FilipinoMealsSeeder extends Seeder
                 'image_url' => 'https://picsum.photos/seed/pinakbet/800/600',
                 'units_today' => 25,
                 'is_sold_out' => false,
-                'menu_date' => $today,
+                'menu_date' => $menuDate,
             ],
         ];
 
@@ -174,7 +175,7 @@ class FilipinoMealsSeeder extends Seeder
             MenuItemDailyStock::updateOrCreate(
                 [
                     'menu_item_id' => $item->id,
-                    'menu_date' => $today,
+                    'menu_date' => $menuDate,
                 ],
                 [
                     'units_set' => (int) $item->units_today,

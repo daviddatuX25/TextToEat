@@ -73,7 +73,7 @@ You can use **Docker** (e.g. Sail) only to build the app; the server does **not*
    After the build, the built app is in `texttoeat-app/` (including `vendor/` and `public/build/`). Copy that directory out of the container if needed (e.g. `docker cp <container>:/var/www/html/texttoeat-app ./deploy-build`), or use a bind mount so the built files are already on your host.
 
 3. **Optional: zip for upload**  
-   From the host, zip the built app (excluding `.env`, `.git`, `node_modules`) into e.g. `texttoeat-app-deploy.zip`. Upload the zip with FileZilla and extract on the server, or upload the unzipped folder.
+   From the repo, run `./scripts/build-for-deploy.sh` to produce a timestamped folder under `deploy-builds/`. Upload that folder’s contents with FileZilla (or zip it yourself if your workflow prefers a single archive).
 
 4. **Upload via FileZilla**  
    Upload the exported folder (or its contents) to the remote app root. Same rules as below: exclude `.env`, `.git`, `node_modules`; include `vendor/`, `public/build/`, and all app files.

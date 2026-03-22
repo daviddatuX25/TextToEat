@@ -10,3 +10,5 @@ export { SectionHeading } from './SectionHeading';
 export { StatCard } from './StatCard';
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from './Tooltip';
 export { InfoTooltip } from './InfoTooltip';
+export { MetricInfoDialog } from './MetricInfoDialog';
+export { Popover, PopoverTrigger, PopoverContent, PopoverAnchor } from './Popover';

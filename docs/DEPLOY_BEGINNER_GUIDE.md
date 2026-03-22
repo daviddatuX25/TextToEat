@@ -60,7 +60,7 @@ We keep two branches:
 
 ## Step 2: Build the app with Docker
 
-From the **repo root** (one level above `texttoeat-app`):
+**Prerequisites:** Docker is installed and running (Docker Desktop, Colima, or Linux daemon). Run from the **repo root** (`texttoeat-v2`, one level above `texttoeat-app`). If the script is not executable: `chmod +x scripts/build-for-deploy.sh`.
 
 ```bash
 ./scripts/build-for-deploy.sh
@@ -68,16 +68,15 @@ From the **repo root** (one level above `texttoeat-app`):
 
 This script:
 
-- Runs `composer install --no-dev --optimize-autoloader` in a Docker container.
-- Runs `npm ci && npm run build` in a Node container. If `.env.prod` exists, it is used so Vite gets `VITE_*` (and other) vars.
+- Verifies `texttoeat-app/composer.json` exists.
+- If there is **no** `vendor/autoload.php`, runs **`composer install` (with dev)** via Docker once so dependencies (and Sail) exist.
+- If **`vendor/bin/sail` exists**: runs **`sail up -d`**, then `npm ci && npm run build` **inside Sail** (loads `.env.prod` when present for `VITE_*`). It does **not** run `composer --no-dev` on your working tree, so Sail and dev tools stay installed locally.
+- If Sail is missing: runs `composer install --no-dev` and Node in Docker on `texttoeat-app/` (dev packages are removed until you run `composer install` again).
+- Copies the app into a **timestamped folder** under `deploy-builds/`, then runs **`composer install --no-dev` on that copy only** so the FTP bundle has a production `vendor/` (and matches what the server should run).
 
-Optional: create a zip for upload (if your host lets you upload one file and extract):
+The folder `deploy-builds/` is listed in the repo root `.gitignore` so build output is not committed by mistake.
 
-```bash
-./scripts/build-for-deploy.sh --zip
-```
-
-That creates `texttoeat-app-deploy.zip` in the repo root. **Included:** `vendor/`, `public/build/`, app-root **`.htaccess`** (denies all web access to the folder containing `.env`, `vendor/`, and `php-run-scripts/` — safety net even if document root were misconfigured), and **`php-run-scripts/`** for running Artisan when you don’t have SSH. **Excluded:** `.env`, `.env.*`, `.git`, `node_modules` (no secrets in the zip). Upload the zip and extract on the server, then create `.env` on the server (Step 4). Or upload the folder as in Step 3.
+**Included in the deploy folder:** `vendor/`, `public/build/`, app-root **`.htaccess`**, **`php-run-scripts/`**. **Excluded:** `.env`, `.env.*`, `.git`, `node_modules`. Upload the **contents** of that folder as in Step 3, then create `.env` on the server (Step 4).
 
 ---
 
@@ -85,7 +84,7 @@ That creates `texttoeat-app-deploy.zip` in the repo root. **Included:** `vendor/
 
 Use **one** of the two layouts below. **Layout A** is the Agila-style setup: `public_html` **is** Laravel’s `public` folder (its contents); `app/`, `vendor/`, etc. are **siblings** of `public_html` in your account home. **Layout B** is for when you prefer (or the panel forces) the whole app inside a subfolder under `public_html`.
 
-**Important:** The document root must always point at the folder that contains only `index.php`, `build/`, etc. — never at the folder that contains `app/`, `vendor/`, or `.env`. The app root also has an **`.htaccess`** that denies all web access to that folder (included in the build and in the deploy zip), so even if the document root were wrong, the app root would not be served.
+**Important:** The document root must always point at the folder that contains only `index.php`, `build/`, etc. — never at the folder that contains `app/`, `vendor/`, or `.env`. The app root also has an **`.htaccess`** that denies all web access to that folder (included in the build and in the deploy folder), so even if the document root were wrong, the app root would not be served.
 
 ---
 

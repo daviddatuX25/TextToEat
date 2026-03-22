@@ -14,12 +14,8 @@ function formatRelativeTime(iso) {
     return d.toLocaleString();
 }
 
-export default function SmsDeviceLogs({ device, logs }) {
+export default function SmsInboundWebhookSkipped({ logs }) {
     const items = logs?.data ?? [];
-
-    const goBack = () => {
-        router.get('/portal/sms-devices');
-    };
 
     const gotoPage = (url) => {
         if (!url) return;
@@ -29,42 +25,25 @@ export default function SmsDeviceLogs({ device, logs }) {
     return (
         <PortalLayout>
             <section className="flex flex-col gap-6 animate-fade-in pt-2 pb-12">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
                     <PageHeader
-                        title={device.name || 'SMS device logs'}
-                        description={`Outbound SMS from this server for device ${device.device_id ?? '—'}. Inbound webhooks skipped due to duplicate gateway message_id are listed under SMS devices → Skipped inbound webhooks (dedupe).`}
+                        title="Skipped inbound webhooks"
+                        description="POSTs to /api/sms/incoming that were not processed because the gateway message_id matched an earlier webhook within 10 minutes (idempotency). Per-device SMS logs only show outbound messages from this server."
                     />
-                    <Button type="button" variant="outline" size="sm" onClick={goBack}>
-                        Back to devices
+                    <Button type="button" variant="outline" size="sm" onClick={() => router.get('/portal/sms-devices')}>
+                        Back to SMS devices
                     </Button>
                 </div>
 
                 <Card className="rounded-2xl border-surface-200 dark:border-surface-700">
-                    <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-surface-50/80 dark:bg-surface-900/40 px-6 py-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <p className="text-sm font-semibold text-surface-800 dark:text-surface-100">
-                                Device details
-                            </p>
-                            <p className="mt-1 text-xs text-surface-500 dark:text-surface-400">
-                                ID: <span className="font-mono">{device.device_id}</span>
-                            </p>
-                        </div>
-                        <div className="text-xs text-surface-500 dark:text-surface-400 space-y-1 text-right">
-                            <p>
-                                Last used:{' '}
-                                <span className="font-mono">
-                                    {device.last_used_at ? formatRelativeTime(device.last_used_at) : '—'}
-                                </span>
-                            </p>
-                            <p>
-                                Last heartbeat:{' '}
-                                <span className="font-mono">
-                                    {device.last_heartbeat_at
-                                        ? formatRelativeTime(device.last_heartbeat_at)
-                                        : '—'}
-                                </span>
-                            </p>
-                        </div>
+                    <CardHeader className="border-b border-surface-200 dark:border-surface-700 bg-amber-50/80 dark:bg-amber-950/20 px-6 py-4">
+                        <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+                            Duplicate gateway message_id — chatbot not run
+                        </p>
+                        <p className="mt-1 text-xs text-amber-800/90 dark:text-amber-300/90">
+                            Rows appear only when the server returns{' '}
+                            <code className="text-[11px] px-1 rounded bg-amber-100 dark:bg-amber-900/40">duplicate: true</code> to TextBee.
+                        </p>
                     </CardHeader>
                     <CardContent className="px-0 py-0">
                         <div className="overflow-x-auto">
@@ -72,21 +51,21 @@ export default function SmsDeviceLogs({ device, logs }) {
                                 <thead className="bg-surface-50 dark:bg-surface-900/60 border-b border-surface-200 dark:border-surface-700">
                                     <tr className="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400">
                                         <th className="px-4 py-3 text-left">Time</th>
-                                        <th className="px-4 py-3 text-left">To</th>
-                                        <th className="px-4 py-3 text-left">Message</th>
-                                        <th className="px-4 py-3 text-left">Status</th>
-                                        <th className="px-4 py-3 text-left">Error</th>
-                                        <th className="px-4 py-3 text-right">Conversation</th>
+                                        <th className="px-4 py-3 text-left">From</th>
+                                        <th className="px-4 py-3 text-left">Gateway message_id</th>
+                                        <th className="px-4 py-3 text-left">Body</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {items.length === 0 ? (
                                         <tr>
                                             <td
-                                                colSpan={6}
+                                                colSpan={4}
                                                 className="px-4 py-8 text-center text-sm text-surface-500 dark:text-surface-400"
                                             >
-                                                No outbound SMS logs for this device yet.
+                                                No skipped webhooks recorded yet. If duplicates occur, they will appear here and in{' '}
+                                                <span className="font-mono text-xs">laravel.log</span> (search for{' '}
+                                                <span className="font-mono text-xs">duplicate message_id</span>).
                                             </td>
                                         </tr>
                                     ) : (
@@ -96,39 +75,17 @@ export default function SmsDeviceLogs({ device, logs }) {
                                                 className="border-b border-surface-100 dark:border-surface-800/80 last:border-b-0"
                                             >
                                                 <td className="px-4 py-3 align-top font-mono text-xs text-surface-600 dark:text-surface-300">
-                                                    {row.sent_at || row.created_at || '—'}
+                                                    {row.created_at ? formatRelativeTime(row.created_at) : '—'}
+                                                    <div className="text-[10px] text-surface-400 mt-0.5 whitespace-nowrap">{row.created_at}</div>
                                                 </td>
                                                 <td className="px-4 py-3 align-top font-mono text-xs text-surface-700 dark:text-surface-200">
-                                                    {row.to}
+                                                    {row.from_phone}
+                                                </td>
+                                                <td className="px-4 py-3 align-top font-mono text-xs break-all text-surface-800 dark:text-surface-100">
+                                                    {row.gateway_message_id ?? '—'}
                                                 </td>
                                                 <td className="px-4 py-3 align-top text-surface-800 dark:text-surface-100">
-                                                    <div className="max-w-xs whitespace-pre-wrap break-words text-xs">
-                                                        {row.body}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 align-top text-xs">
-                                                    <span className="inline-flex rounded-full bg-surface-100 dark:bg-surface-800 px-2 py-0.5 font-medium text-surface-700 dark:text-surface-200">
-                                                        {row.status ?? '—'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-3 align-top text-xs text-red-600 dark:text-red-400">
-                                                    {row.failure_reason || row.error_message || row.error_code || '—'}
-                                                </td>
-                                                <td className="px-4 py-3 align-top text-right">
-                                                    {row.chatbot_log_url ? (
-                                                        <Button
-                                                            type="button"
-                                                            variant="ghost"
-                                                            size="xs"
-                                                            onClick={() => router.get(row.chatbot_log_url)}
-                                                        >
-                                                            View
-                                                        </Button>
-                                                    ) : (
-                                                        <span className="text-xs text-surface-400 dark:text-surface-500">
-                                                            —
-                                                        </span>
-                                                    )}
+                                                    <div className="max-w-md whitespace-pre-wrap break-words text-xs">{row.message_body}</div>
                                                 </td>
                                             </tr>
                                         ))
@@ -140,7 +97,7 @@ export default function SmsDeviceLogs({ device, logs }) {
                         {logs?.links && logs.links.length > 1 && (
                             <div className="flex items-center justify-between px-4 py-3 border-t border-surface-100 dark:border-surface-800 text-xs text-surface-500 dark:text-surface-400">
                                 <span>
-                                    Showing {items.length} of {logs.total} logs
+                                    Showing {items.length} of {logs.total} events
                                 </span>
                                 <div className="inline-flex gap-1">
                                     {logs.links.map((link, index) => {
@@ -175,4 +132,3 @@ export default function SmsDeviceLogs({ device, logs }) {
         </PortalLayout>
     );
 }
-
