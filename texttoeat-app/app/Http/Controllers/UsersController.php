@@ -41,8 +41,13 @@ class UsersController extends Controller
         ]);
 
         $role = 'staff';
-        if ($request->user()->isSuperAdmin()) {
-            $role = $validated['role'] ?? 'staff';
+        if ($request->user()->isAdmin() || $request->user()->isSuperAdmin()) {
+            $requestedRole = $validated['role'] ?? 'staff';
+            // Prevent non-superadmins from creating superadmin accounts
+            if ($requestedRole === 'superadmin' && !$request->user()->isSuperAdmin()) {
+                $requestedRole = 'staff';
+            }
+            $role = $requestedRole;
         }
 
         $user = User::create([

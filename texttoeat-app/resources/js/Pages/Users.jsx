@@ -8,6 +8,7 @@ export default function Users({ users = [] }) {
     const { auth } = usePage().props;
     const currentUserId = auth?.user?.id;
     const isSuperAdmin = auth?.user?.role === 'superadmin';
+    const isAdmin = auth?.user?.is_admin === true;
 
     const [addOpen, setAddOpen] = useState(false);
     const [deleteUser, setDeleteUser] = useState(null);
@@ -27,7 +28,7 @@ export default function Users({ users = [] }) {
             password: form.data.password,
             password_confirmation: form.data.password_confirmation,
         };
-        if (isSuperAdmin) {
+        if (isAdmin) {
             payload.role = form.data.role;
         }
         form.transform(() => payload).post('/portal/users', {
@@ -154,7 +155,7 @@ export default function Users({ users = [] }) {
                                 placeholder="Leave blank for device accounts"
                             />
                         </label>
-                        {isSuperAdmin && (
+                        {isAdmin && (
                             <label className="block">
                                 <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Role</span>
                                 <select
