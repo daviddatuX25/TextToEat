@@ -299,7 +299,7 @@ function EnableForTodayDialog({ item, open, onOpenChange }) {
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-sm w-full sm:max-w-sm">
                 <DialogHeader>
-                    <DialogTitle>Enable for today</DialogTitle>
+                    <DialogTitle>Replenish for today</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <p className="text-sm text-surface-600 dark:text-surface-400">
@@ -338,7 +338,7 @@ function EnableForTodayDialog({ item, open, onOpenChange }) {
                     </div>
                     <DialogFooter className="flex-row justify-end gap-2 pt-2">
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                        <Button type="submit">Enable</Button>
+                        <Button type="submit">Replenish</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
@@ -447,7 +447,7 @@ function MenuItemCard({ item, onEdit, onEnableClick, lowStockThreshold = 5 }) {
                         }`}
                     >
                         {soldOut ? <Power className="h-3 w-3" /> : <PowerOff className="h-3 w-3" />}
-                        {soldOut ? 'Enable' : 'Sold out'}
+                        {soldOut ? 'Replenish' : 'Sold out'}
                     </button>
                     <button
                         type="button"
