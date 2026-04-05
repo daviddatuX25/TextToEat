@@ -26,7 +26,6 @@ import {
     BarChart3,
     UtensilsCrossed,
     Activity,
-    ArrowUpCircle,
     ArrowDownCircle,
     Link2,
     ChevronUp,
@@ -86,8 +85,6 @@ export default function Analytics({
         best_day_revenue = 0,
         revenue_by_day = [],
         by_channel = [],
-        by_fulfillment = [],
-        payment_health = { paid: 0, unpaid: 0, total_completed: 0 },
         period_days = null,
         prev_from = null,
         prev_to = null,
@@ -116,9 +113,7 @@ export default function Analytics({
     }));
 
     const channelDonutData = by_channel.map((r) => ({ name: CHANNEL_LABELS[r.channel] ?? r.channel, value: r.count }));
-    const fulfillmentDonutData = by_fulfillment.map((r) => ({ name: FULFILLMENT_LABELS[r.fulfillment] ?? r.fulfillment, value: r.count }));
     const totalOrders = channelDonutData.reduce((s, d) => s + d.value, 0);
-    const totalFulfillment = fulfillmentDonutData.reduce((s, d) => s + d.value, 0);
 
     const exportUrl = `/portal/analytics?export=csv&date_from=${encodeURIComponent(date_from)}&date_to=${encodeURIComponent(date_to)}`;
 
@@ -287,6 +282,16 @@ export default function Analytics({
                             </Card>
                         </div>
 
+                        <div className="flex justify-end">
+                            <a
+                                href={exportUrl}
+                                className="inline-flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-700 transition"
+                            >
+                                <Download className="h-4 w-4" />
+                                Export sales (CSV)
+                            </a>
+                        </div>
+
                         {/* Stacked area: revenue by day */}
                         <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                             <CardHeader className="border-b border-surface-200 dark:border-surface-700">
@@ -346,8 +351,7 @@ export default function Analytics({
                             </CardContent>
                         </Card>
 
-                        {/* Two donuts + Payment health + Export */}
-                        <div className="grid min-w-0 gap-6 lg:grid-cols-3">
+                        {/* Orders by platform (single card) */}
                             <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-visible min-w-0">
                                 <CardHeader className="border-b border-surface-200 dark:border-surface-700 pb-2">
                                     <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
@@ -363,67 +367,6 @@ export default function Analytics({
                                     )}
                                 </CardContent>
                             </Card>
-                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-visible min-w-0">
-                                <CardHeader className="border-b border-surface-200 dark:border-surface-700 pb-2">
-                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
-                                        How customers get orders
-                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.ordersByFulfillment} />
-                                    </p>
-                                </CardHeader>
-                                <CardContent className="pt-4 overflow-visible">
-                                    {fulfillmentDonutData.length > 0 && totalFulfillment > 0 ? (
-                                        <AnalyticsPieDonut data={fulfillmentDonutData} />
-                                    ) : (
-                                        <div className="flex min-h-[200px] items-center justify-center text-sm text-surface-500 dark:text-surface-400">No orders in range.</div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden min-w-0">
-                                <CardHeader className="border-b border-surface-200 dark:border-surface-700 pb-2">
-                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
-                                        Payment tracking
-                                        <MetricInfoDialog {...ANALYTICS_METRIC_HELP.paymentHealth} />
-                                    </p>
-                                </CardHeader>
-                                <CardContent className="pt-4 space-y-4">
-                                    <div>
-                                        <div className="flex justify-between text-xs font-medium text-surface-500 dark:text-surface-400 mb-1">
-                                            <span>Paid</span>
-                                            <span>{payment_health.paid} of {payment_health.total_completed}</span>
-                                        </div>
-                                        <div className="h-3 w-full rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
-                                            <div
-                                                className="h-full rounded-full bg-emerald-500 dark:bg-emerald-600 transition-all"
-                                                style={{
-                                                    width: payment_health.total_completed > 0 ? `${(payment_health.paid / payment_health.total_completed) * 100}%` : '0%',
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="flex justify-between text-xs font-medium text-surface-500 dark:text-surface-400 mb-1">
-                                            <span>Unpaid (completed)</span>
-                                            <span>{payment_health.unpaid}</span>
-                                        </div>
-                                        <div className="h-3 w-full rounded-full bg-surface-200 dark:bg-surface-700 overflow-hidden">
-                                            <div
-                                                className="h-full rounded-full bg-amber-500 dark:bg-amber-600 transition-all"
-                                                style={{
-                                                    width: payment_health.total_completed > 0 ? `${(payment_health.unpaid / payment_health.total_completed) * 100}%` : '0%',
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <a
-                                        href={exportUrl}
-                                        className="inline-flex items-center gap-2 rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-4 py-2 text-sm font-medium text-surface-700 dark:text-surface-200 hover:bg-surface-50 dark:hover:bg-surface-700 transition"
-                                    >
-                                        <Download className="h-4 w-4" />
-                                        Export sales (CSV)
-                                    </a>
-                                </CardContent>
-                            </Card>
-                        </div>
                     </div>
                 )}
 
@@ -513,50 +456,6 @@ export default function Analytics({
                             </CardContent>
                         </Card>
 
-                        <div className="grid gap-6 lg:grid-cols-2">
-                            <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
-                                <CardHeader className="border-b border-surface-200 dark:border-surface-700">
-                                    <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
-                                        <ArrowUpCircle className="h-4 w-4 text-emerald-500" />
-                                        Rising this period
-                                    </p>
-                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 flex items-center gap-1.5">
-                                        Vs previous period of same length
-                                        <MetricInfoDialog
-                                            {...ANALYTICS_METRIC_HELP.risingFalling}
-                                            contentEn={`${ANALYTICS_METRIC_HELP.risingFalling.contentEn}${previousPeriodExtraEn}`}
-                                            contentFil={`${ANALYTICS_METRIC_HELP.risingFalling.contentFil}${previousPeriodExtraFil}`}
-                                        />
-                                    </p>
-                                </CardHeader>
-                                <CardContent className="pt-4">
-                                    {risingFalling.rising?.length > 0 ? (
-                                        <ul className="space-y-2">
-                                            {risingFalling.rising.map((r) => (
-                                                <li key={r.name} className="flex justify-between text-sm">
-                                                    <span className="font-medium text-surface-800 dark:text-surface-100">{r.name}</span>
-                                                    <span className="text-emerald-600 dark:text-emerald-400">+{r.delta} units</span>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <p className="text-sm text-surface-500 dark:text-surface-400">No rising items.</p>
-                                            {rfSummary && rfSummary.items_compared > 0 && (
-                                                <p className="text-xs text-surface-400 dark:text-surface-500 leading-relaxed">
-                                                    Summary for {rfSummary.items_compared} item{rfSummary.items_compared === 1 ? '' : 's'}: {rfSummary.rising_count} sold more,{' '}
-                                                    {rfSummary.flat_count} unchanged, {rfSummary.falling_count} sold fewer than in the previous period.
-                                                </p>
-                                            )}
-                                            {(!rfSummary || rfSummary.items_compared === 0) && (
-                                                <p className="text-xs text-surface-400 dark:text-surface-500 leading-relaxed">
-                                                    No completed order lines in this range and the prior period to compare.
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
                             <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                                 <CardHeader className="border-b border-surface-200 dark:border-surface-700">
                                     <p className="text-sm font-semibold text-surface-800 dark:text-surface-100 flex items-center gap-2">
@@ -600,7 +499,6 @@ export default function Analytics({
                                     )}
                                 </CardContent>
                             </Card>
-                        </div>
 
                         <Card className="rounded-2xl border-surface-200 dark:border-surface-700 overflow-hidden">
                             <CardHeader className="border-b border-surface-200 dark:border-surface-700">
@@ -749,7 +647,7 @@ function AnalyticsPieDonut({ data }) {
         <div className="flex w-full min-w-0 justify-center">
             <div className="aspect-square w-full max-w-[min(100%,280px)] min-h-0 shrink-0">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+                    <PieChart margin={{ top: 24, right: 40, bottom: 24, left: 40 }}>
                         <Pie
                             data={data}
                             dataKey="value"
@@ -757,7 +655,7 @@ function AnalyticsPieDonut({ data }) {
                             cx="50%"
                             cy="50%"
                             innerRadius="38%"
-                            outerRadius="68%"
+                            outerRadius="55%"
                             paddingAngle={2}
                             label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         >
