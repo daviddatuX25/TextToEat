@@ -2,6 +2,8 @@ import { Link, router, usePage } from '@inertiajs/react';
 import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import ThemeToggle from '../components/ThemeToggle';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
+import { Button } from '../components/ui/Button';
 
 function getPathname(url) {
     try {
@@ -28,6 +30,7 @@ export default function AppLayout({ children, showDashboard = true }) {
     const pathname = getPathname(pageUrl);
     const isStaff = auth?.user != null;
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
     useEffect(() => {
         setMobileOpen(false);
@@ -90,7 +93,7 @@ export default function AppLayout({ children, showDashboard = true }) {
                                 </Link>
                                 <button
                                     type="button"
-                                    onClick={() => router.post('/logout')}
+                                    onClick={() => setLogoutDialogOpen(true)}
                                     className="rounded-lg border-2 border-surface-200 px-3 py-1.5 text-xs font-bold text-surface-600 smooth-hover hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800"
                                 >
                                     Log out
@@ -172,7 +175,7 @@ export default function AppLayout({ children, showDashboard = true }) {
                             </Link>
                             <button
                                 type="button"
-                                onClick={() => { setMobileOpen(false); router.post('/logout'); }}
+                                onClick={() => { setMobileOpen(false); setLogoutDialogOpen(true); }}
                                 className="rounded-lg border-2 border-surface-200 px-3 py-2 text-sm font-bold text-surface-600 smooth-hover hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800 text-left"
                             >
                                 Log out
@@ -194,6 +197,32 @@ export default function AppLayout({ children, showDashboard = true }) {
             <main className="relative z-10 mx-auto w-full max-w-7xl px-6 pt-28 pb-20">
                 {children}
             </main>
+
+            {/* Logout confirmation dialog */}
+            <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Log out?</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-surface-600 dark:text-surface-400">
+                        Are you sure you want to log out of your account?
+                    </p>
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button variant="outline" onClick={() => setLogoutDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                setLogoutDialogOpen(false);
+                                router.post('/logout');
+                            }}
+                        >
+                            Log out
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -310,7 +310,7 @@ function NavGroup({ group, pathname, onNavClick, iconOnly, badgeCount, navBadges
     );
 }
 
-function SidebarContent({ navEntries, pathname, onNavClick, iconOnly, navBadges, isAdmin, isSuperAdmin }) {
+function SidebarContent({ navEntries, pathname, onNavClick, onLogoutClick, iconOnly, navBadges, isAdmin, isSuperAdmin }) {
     return (
         <>
             <div
@@ -392,7 +392,7 @@ function SidebarContent({ navEntries, pathname, onNavClick, iconOnly, navBadges,
                     <ThemeToggle size={18} />
                     <button
                         type="button"
-                        onClick={() => router.post('/logout')}
+                        onClick={onLogoutClick}
                         title="Log out"
                         aria-label="Log out"
                         className={iconOnly ? 'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border-2 border-surface-200 text-surface-600 hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800' : 'flex-1 rounded-lg border-2 border-surface-200 px-3 py-2 text-xs font-bold text-surface-600 hover:bg-surface-100 dark:border-surface-700 dark:text-surface-400 dark:hover:bg-surface-800'}
@@ -412,6 +412,7 @@ export default function PortalLayout({ children }) {
     const isAdmin = auth?.user?.is_admin === true;
     const isSuperAdmin = auth?.user?.role === 'superadmin';
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 
     useEffect(() => {
         setSidebarOpen(false);
@@ -459,6 +460,32 @@ export default function PortalLayout({ children }) {
 
             <Toaster richColors position="top-right" />
 
+            {/* Logout confirmation dialog */}
+            <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Log out?</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-surface-600 dark:text-surface-400">
+                        Are you sure you want to log out of your account?
+                    </p>
+                    <div className="flex justify-end gap-3 pt-2">
+                        <Button variant="outline" onClick={() => setLogoutDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => {
+                                setLogoutDialogOpen(false);
+                                router.post('/logout');
+                            }}
+                        >
+                            Log out
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             <Dialog
                 open={!!show_daily_greeting}
                 onOpenChange={(open) => {
@@ -493,7 +520,7 @@ export default function PortalLayout({ children }) {
                     sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
                 }`}
             >
-                <SidebarContent navEntries={navEntries} pathname={pathname} onNavClick={closeSidebar} iconOnly={iconOnly} navBadges={getEffectiveNavBadges(pathname, navBadges)} isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} />
+                <SidebarContent navEntries={navEntries} pathname={pathname} onNavClick={closeSidebar} onLogoutClick={() => setLogoutDialogOpen(true)} iconOnly={iconOnly} navBadges={getEffectiveNavBadges(pathname, navBadges)} isAdmin={isAdmin} isSuperAdmin={isSuperAdmin} />
             </aside>
 
             {/* Main content area */}
