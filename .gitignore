@@ -3,3 +3,6 @@
 
 # Local tooling (nested git / build output)
 /codemapper/
+
+# Git worktrees (isolated workspaces)
+.worktrees/
