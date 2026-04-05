@@ -140,6 +140,7 @@ function AddMenuItemDialog({ open, onOpenChange, categories = [] }) {
 function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
     const form = useForm({
         name: item?.name ?? '',
+        price: item?.price ?? '',
         category_id: item?.category_id ?? categories[0]?.id ?? '',
         image: null,
         remove_image: false,
@@ -151,6 +152,7 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
         if (!open || !item) return;
         form.setData({
             name: item.name ?? '',
+            price: item.price ?? '',
             category_id: item.category_id ?? categories[0]?.id ?? '',
             image: null,
             remove_image: false,
@@ -204,6 +206,17 @@ function EditMenuItemDialog({ item, open, onOpenChange, categories = [] }) {
                         value={form.data.name}
                         onChange={(e) => form.setData('name', e.target.value)}
                         error={form.errors.name}
+                    />
+                    <Input
+                        id="edit_price"
+                        label="Price (₱)"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={form.data.price}
+                        onChange={(e) => form.setData('price', e.target.value)}
+                        error={form.errors.price}
                     />
                     <div className="space-y-2">
                         <label htmlFor="edit_category" className="block text-sm font-bold text-foreground">Category</label>
