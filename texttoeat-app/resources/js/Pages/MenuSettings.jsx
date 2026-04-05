@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, PageHeader, InfoTooltip } from '../compo
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/Dialog';
-import { Settings as SettingsIcon, RefreshCw, AlertTriangle, Clock } from 'lucide-react';
+import { Settings as SettingsIcon, RefreshCw, AlertTriangle } from 'lucide-react';
 
 const PREVIEW_URL = '/portal/menu-settings/preview-reset-cancellations';
 const RUN_RESET_URL = '/portal/menu-settings/run-reset';
@@ -28,15 +28,12 @@ export default function MenuSettings({ menu = {}, levels_reminder = {} }) {
         low_stock_badge_style: levels_reminder.low_stock_badge_style ?? 'count',
     });
     const [menuResetForm, setMenuResetForm] = useState({
-        reset_morning_from_hour: menu?.reset_morning_from_hour ?? 0,
-        reset_morning_until_hour: menu?.reset_morning_until_hour ?? 11,
         auto_reset_enabled: !!menu?.auto_reset_enabled,
-        auto_reset_at_hour: menu?.auto_reset_at_hour ?? menu?.reset_morning_until_hour ?? 4,
+        auto_reset_at_hour: menu?.auto_reset_at_hour ?? 4,
     });
     const [savingLevelsReminder, setSavingLevelsReminder] = useState(false);
     const [savingMenuReset, setSavingMenuReset] = useState(false);
     const [resetDialogOpen, setResetDialogOpen] = useState(false);
-    const [resetDialogForce, setResetDialogForce] = useState(false);
     const [resetDialogCancelUnfulfilled, setResetDialogCancelUnfulfilled] = useState(false);
     const [previewOrders, setPreviewOrders] = useState(null);
     const [loadingPreview, setLoadingPreview] = useState(false);
@@ -53,13 +50,11 @@ export default function MenuSettings({ menu = {}, levels_reminder = {} }) {
 
     useEffect(() => {
         setMenuResetForm({
-            reset_morning_from_hour: menu?.reset_morning_from_hour ?? 0,
-            reset_morning_until_hour: menu?.reset_morning_until_hour ?? 11,
             auto_reset_enabled: !!menu?.auto_reset_enabled,
-            auto_reset_at_hour: menu?.auto_reset_at_hour ?? menu?.reset_morning_until_hour ?? 4,
+            auto_reset_at_hour: menu?.auto_reset_at_hour ?? 4,
         });
         if (menu?.server_time) setServerTime(menu.server_time);
-    }, [menu?.reset_morning_from_hour, menu?.reset_morning_until_hour, menu?.auto_reset_enabled, menu?.auto_reset_at_hour, menu?.server_time]);
+    }, [menu?.auto_reset_enabled, menu?.auto_reset_at_hour, menu?.server_time]);
 
     useEffect(() => {
         if (flash?.success != null && flash.success !== lastFlashedRef.current.success) {
@@ -114,8 +109,6 @@ export default function MenuSettings({ menu = {}, levels_reminder = {} }) {
         setSavingMenuReset(true);
         router.patch('/portal/menu-settings', {
             menu: {
-                reset_morning_from_hour: Number(menuResetForm.reset_morning_from_hour),
-                reset_morning_until_hour: Number(menuResetForm.reset_morning_until_hour),
                 auto_reset_enabled: menuResetForm.auto_reset_enabled,
                 auto_reset_at_hour: Number(menuResetForm.auto_reset_at_hour),
             },
@@ -128,14 +121,12 @@ export default function MenuSettings({ menu = {}, levels_reminder = {} }) {
     const runReset = () => {
         setRunningReset(true);
         router.post(RUN_RESET_URL, {
-            force: resetDialogForce ? 1 : 0,
             cancel_previous_unfulfilled: resetDialogCancelUnfulfilled ? 1 : 0,
         }, {
             preserveScroll: true,
             onFinish: () => setRunningReset(false),
             onSuccess: () => {
                 setResetDialogOpen(false);
-                setResetDialogForce(false);
                 setResetDialogCancelUnfulfilled(false);
                 setPreviewOrders(null);
             },
@@ -143,9 +134,6 @@ export default function MenuSettings({ menu = {}, levels_reminder = {} }) {
     };
 
     const lastResetDate = menu?.last_reset_date ?? null;
-    /** Server decides using app timezone; refresh page if you’ve been idle across an hour boundary. */
-    const manualResetWithinWindow = menu?.manual_reset_within_window ?? true;
-    const manualResetWindowLabel = menu?.manual_reset_window_label ?? '';
 
     return (
         <PortalLayout>
@@ -170,42 +158,7 @@ export default function MenuSettings({ menu = {}, levels_reminder = {} }) {
                         </p>
                     </CardHeader>
                     <CardContent className="px-6 pt-6 pb-5 space-y-4">
-                        <p className="text-sm text-surface-600 dark:text-surface-400 flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-surface-500" />
-                            <span className="font-medium text-surface-800 dark:text-surface-200">Current time (server):</span>{' '}
-                            {formatServerTime(serverTime)}
-                        </p>
                         <form onSubmit={saveMenuResetSettings} className="space-y-4 max-w-md">
-                            <div>
-                                <p className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-2">Manual menu rollover window (server time, hours 0–23)</p>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">From (inclusive)</label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={23}
-                                            value={menuResetForm.reset_morning_from_hour}
-                                            onChange={(e) => setMenuResetForm((prev) => ({ ...prev, reset_morning_from_hour: e.target.value }))}
-                                            aria-label="Manual reset allowed from hour"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-surface-600 dark:text-surface-400 mb-1">Until (inclusive)</label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            max={23}
-                                            value={menuResetForm.reset_morning_until_hour}
-                                            onChange={(e) => setMenuResetForm((prev) => ({ ...prev, reset_morning_until_hour: e.target.value }))}
-                                            aria-label="Manual reset allowed until hour"
-                                        />
-                                    </div>
-                                </div>
-                                <p className="text-xs text-surface-500 dark:text-surface-500 mt-2">
-                                    Without &quot;Allow menu rollover after…&quot; in the reset dialog, rollover is only allowed when the current hour is inside this range. If &quot;from&quot; is greater than &quot;until&quot;, the window crosses midnight (e.g. 22–6).
-                                </p>
-                            </div>
                             <div className="flex items-center gap-3">
                                 <input
                                     type="checkbox"
@@ -238,58 +191,27 @@ export default function MenuSettings({ menu = {}, levels_reminder = {} }) {
                             <span className="font-medium text-surface-800 dark:text-surface-200">Last reset date:</span>{' '}
                             {lastResetDate ? lastResetDate : 'Not run today.'}
                         </p>
-                        <div className="pt-2 border-t border-surface-200 dark:border-surface-700 space-y-2">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    disabled={!manualResetWithinWindow}
-                                    onClick={() => {
-                                        setResetDialogForce(false);
-                                        setResetDialogOpen(true);
-                                    }}
-                                    className="gap-2"
-                                    title={
-                                        !manualResetWithinWindow
-                                            ? `Outside allowed window (${manualResetWindowLabel}). Use “Reset outside allowed window” or refresh the page.`
-                                            : undefined
-                                    }
-                                >
-                                    <RefreshCw className="h-4 w-4" />
-                                    Reset menu now
-                                </Button>
-                                {!manualResetWithinWindow && (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setResetDialogForce(true);
-                                            setResetDialogOpen(true);
-                                        }}
-                                        className="text-sm font-semibold text-primary-600 dark:text-primary-400 hover:underline text-left sm:ml-1"
-                                    >
-                                        Reset outside allowed window…
-                                    </button>
-                                )}
-                            </div>
-                            {!manualResetWithinWindow && (
-                                <p className="text-xs text-amber-800 dark:text-amber-300/90 max-w-lg">
-                                    Not in your manual rollover window ({manualResetWindowLabel || '—'} server hour). The main button is disabled; use the link to open the dialog with &quot;Allow menu rollover outside the configured window&quot; checked, or refresh the page after the hour changes.
-                                </p>
-                            )}
+                        <div className="pt-2 border-t border-surface-200 dark:border-surface-700">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setResetDialogOpen(true)}
+                                className="gap-2"
+                            >
+                                <RefreshCw className="h-4 w-4" />
+                                Reset menu now
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
 
-                <Dialog open={resetDialogOpen} onOpenChange={(open) => { setResetDialogOpen(open); if (!open) { setResetDialogCancelUnfulfilled(false); setResetDialogForce(false); setPreviewOrders(null); } }}>
+                <Dialog open={resetDialogOpen} onOpenChange={(open) => { setResetDialogOpen(open); if (!open) { setResetDialogCancelUnfulfilled(false); setPreviewOrders(null); } }}>
                     <DialogContent className="max-w-md">
                         <DialogHeader>
                             <DialogTitle>Reset menu now</DialogTitle>
                         </DialogHeader>
                         <p className="text-sm text-surface-600 dark:text-surface-400">
                             This will roll over yesterday&apos;s menu to today and reset today&apos;s quantities. Unfulfilled orders are not changed unless you opt in below.
-                        </p>
-                        <p className="text-xs text-surface-500 dark:text-surface-500">
-                            Cancelling old orders runs whenever you confirm with that option — even in the afternoon. The rollover window below applies only to the menu rollover step.
                         </p>
                         <div className="flex items-start gap-3 pt-2">
                             <input
@@ -304,7 +226,7 @@ export default function MenuSettings({ menu = {}, levels_reminder = {} }) {
                                     Also cancel stale unfulfilled orders (received, preparing, ready, on the way)
                                 </label>
                                 <p className="text-xs text-surface-500 dark:text-surface-500 mt-1">
-                                    Cancels every unfulfilled order that already exists when you confirm — including earlier today — not only “previous calendar days.”
+                                    Cancels every unfulfilled order that already exists when you confirm — including earlier today — not only "previous calendar days."
                                 </p>
                                 {resetDialogCancelUnfulfilled && (
                                     <div className="mt-2 text-xs text-surface-500 dark:text-surface-500">
@@ -319,23 +241,6 @@ export default function MenuSettings({ menu = {}, levels_reminder = {} }) {
                                         ) : null}
                                     </div>
                                 )}
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-3 pt-2">
-                            <input
-                                type="checkbox"
-                                id="reset_force"
-                                checked={resetDialogForce}
-                                onChange={(e) => setResetDialogForce(e.target.checked)}
-                                className="h-4 w-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
-                            />
-                            <div>
-                                <label htmlFor="reset_force" className="text-sm font-medium text-surface-700 dark:text-surface-300 cursor-pointer">
-                                    Allow menu rollover outside the configured window
-                                </label>
-                                <p className="text-xs text-surface-500 dark:text-surface-500 mt-1">
-                                    Normally you can only run the menu rollover when the server hour is inside the window above. Check this to run it at other times. Does not affect cancelling old orders.
-                                </p>
                             </div>
                         </div>
                         <DialogFooter className="gap-2 pt-4">
