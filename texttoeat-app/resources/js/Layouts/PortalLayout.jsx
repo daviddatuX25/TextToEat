@@ -64,7 +64,7 @@ const PORTAL_NAV_GROUP_MENU = {
     Icon: BookOpen,
     badgeKey: 'low_stock_meals',
     items: [
-        { href: '/portal/menu-items', label: "Today's servings", Icon: BookOpen, badgeKey: 'low_stock_meals' },
+        { href: '/portal/menu-items', label: "Today's Menu", Icon: BookOpen, badgeKey: 'low_stock_meals' },
         { href: '/portal/categories', label: 'Categories', Icon: LayoutList },
         { href: '/portal/menu-settings', label: 'Settings', Icon: Settings },
     ],
@@ -470,10 +470,10 @@ export default function PortalLayout({ children }) {
                         <DialogTitle>Menu reset</DialogTitle>
                     </DialogHeader>
                     <p className="text-sm text-surface-600 dark:text-surface-400">
-                        Today&apos;s servings were reset to zero. Set quantities again to open ordering for the day.
+                        Today&apos;s menu was reset to zero. Set quantities again to open ordering for the day.
                     </p>
                     <div className="flex justify-end pt-2">
-                        <Button onClick={handleDismissGreeting}>Open today&apos;s servings</Button>
+                        <Button onClick={handleDismissGreeting}>Open today&apos;s menu</Button>
                     </div>
                 </DialogContent>
             </Dialog>
