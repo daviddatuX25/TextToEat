@@ -357,7 +357,9 @@ function MenuItemCard({ item, onEdit, onEnableClick, lowStockThreshold = 5 }) {
     const setQuantity = (newVal) => {
         const n = Math.max(0, Math.floor(Number(newVal)));
         if (n === units || !routerImpl?.put) return;
-        routerImpl.put(`/portal/menu-items/${item.id}`, { units_today: n }, { preserveScroll: true });
+        const payload = { units_today: n };
+        if (n > 0 && soldOut) payload.is_sold_out = false;
+        routerImpl.put(`/portal/menu-items/${item.id}`, payload, { preserveScroll: true });
     };
 
     const toggleSoldOut = () => {

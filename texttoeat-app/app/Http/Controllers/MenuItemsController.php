@@ -144,8 +144,6 @@ class MenuItemsController extends Controller
             }
         }
 
-        $menuItem->update($validated);
-
         if (array_key_exists('units_today', $validated)) {
             $set = (int) $validated['units_today'];
             $today = Carbon::today();
@@ -167,7 +165,12 @@ class MenuItemsController extends Controller
                     'units_leftover' => $set,
                 ]);
             }
+            if ($set > 0) {
+                $validated['is_sold_out'] = false;
+            }
         }
+
+        $menuItem->update($validated);
 
         return redirect()->back()->with('success', 'Menu item updated.');
     }
