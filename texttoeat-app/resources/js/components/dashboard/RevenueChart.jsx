@@ -87,9 +87,9 @@ export default function RevenueChart({ revenueByHour = [], formatCurrency, class
                                 return value;
                             }}
                         />
-                        <Line type="monotone" dataKey="walkin" name="walkin" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="delivery" name="delivery" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} />
-                        <Line type="monotone" dataKey="pickup" name="pickup" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
+                        <Line type="monotone" dataKey="walkin" name="walkin" stroke="#8b5cf6" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="delivery" name="delivery" stroke="#f97316" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="pickup" name="pickup" stroke="#f59e0b" strokeWidth={2} dot={false} />
                     </LineChart>
                 </ResponsiveContainer>
             </div>

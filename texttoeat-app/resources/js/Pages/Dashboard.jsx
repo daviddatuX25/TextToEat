@@ -111,7 +111,7 @@ export default function Dashboard({ metrics = {} }) {
                                     className="!p-3"
                                 />
                                 <StatCard
-                                    label="Average order value"
+                                    label="Average Spend per Order"
                                     value={formatCurrency(avg_order_value_today)}
                                     helperText="Revenue ÷ completed"
                                     className="!p-3 col-span-2"
@@ -130,7 +130,7 @@ export default function Dashboard({ metrics = {} }) {
                     <Card className="rounded-2xl border-primary-200/60 dark:border-primary-800/40 bg-white/60 dark:bg-surface-900/60 backdrop-blur-md overflow-hidden flex flex-col min-h-[360px] min-w-0 shadow-sm">
                         <CardHeader className="border-b border-primary-100 dark:border-primary-800/50 bg-primary-50/50 dark:bg-primary-900/20 shrink-0">
                             <p className="text-sm font-semibold text-primary-900 dark:text-primary-100">
-                                Revenue by type
+                                Revenue by Hour
                             </p>
                             <p className="text-xs text-primary-700/80 dark:text-primary-200/60 mt-1">
                                 By hour today — Walk-in · Delivery · Pickup (completed orders).
