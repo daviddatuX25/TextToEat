@@ -3,9 +3,11 @@ import './bootstrap';
 import { createInertiaApp, router } from '@inertiajs/react';
 import { createRoot } from 'react-dom/client';
 import { TooltipProvider } from './components/ui';
+import { setupCapacitorBackButton } from './capacitor-back-button';
 
 if (typeof window !== 'undefined') {
     window.__inertia_router = router;
+    setupCapacitorBackButton();
 }
 
 const pages = import.meta.glob('./Pages/**/*.jsx');
