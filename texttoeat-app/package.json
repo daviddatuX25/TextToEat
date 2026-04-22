@@ -7,7 +7,11 @@
         "dev": "vite",
         "start:dev": "vite",
         "start:prod": "vite build",
-        "dev:fresh": "npx -y kill-port 5173 2>/dev/null || true && vite"
+        "dev:fresh": "npx -y kill-port 5173 2>/dev/null || true && vite",
+        "build:android": "vite build && cap sync android",
+        "cap:open": "cap open android",
+        "cap:sync": "cap sync android",
+        "cap:run": "cap run android"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
