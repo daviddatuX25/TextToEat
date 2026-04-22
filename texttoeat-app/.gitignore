@@ -24,3 +24,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Android build artifacts
+/android/app/build/
+/android/.gradle/
+/android/build/
