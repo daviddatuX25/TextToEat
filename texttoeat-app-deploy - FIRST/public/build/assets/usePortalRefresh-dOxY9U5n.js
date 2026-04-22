@@ -1,1 +1,0 @@
-import{r as s,a as o}from"./app-esKOthuv.js";function u(e,r=15e3){s.useEffect(()=>{if(!e||r<=0)return;const t=setInterval(()=>{document.visibilityState==="visible"&&o.reload({preserveScroll:!0})},r);return()=>clearInterval(t)},[e,r])}export{u};

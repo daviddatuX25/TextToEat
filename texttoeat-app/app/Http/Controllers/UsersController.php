@@ -40,14 +40,14 @@ class UsersController extends Controller
             'role' => ['nullable', 'string', 'in:staff,admin'],
         ]);
 
+        // Only superadmins can choose the role (staff or admin).
+        // Regular admins always create staff accounts.
         $role = 'staff';
-        if ($request->user()->isAdmin() || $request->user()->isSuperAdmin()) {
+        if ($request->user()->isSuperAdmin()) {
             $requestedRole = $validated['role'] ?? 'staff';
-            // Prevent non-superadmins from creating superadmin accounts
-            if ($requestedRole === 'superadmin' && !$request->user()->isSuperAdmin()) {
-                $requestedRole = 'staff';
+            if (in_array($requestedRole, ['staff', 'admin'], true)) {
+                $role = $requestedRole;
             }
-            $role = $requestedRole;
         }
 
         $user = User::create([
@@ -74,7 +74,11 @@ class UsersController extends Controller
             return redirect()->back()->with('error', 'Only a super administrator can reset a super administrator\'s password.');
         }
 
-        $user->update(['password' => Hash::make('Password1!')]);
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user->update(['password' => Hash::make($validated['password'])]);
 
         ActionLog::create([
             'user_id' => $request->user()->id,
@@ -84,10 +88,7 @@ class UsersController extends Controller
             'payload' => ['reason' => 'admin_reset'],
         ]);
 
-        return redirect()->back()->with(
-            'success',
-            'Password for ' . $user->username . ' reset to default (Password1!). Remind them to change it from Account.'
-        );
+        return redirect()->back()->with('success', 'Password for ' . $user->username . ' has been reset.');
     }
 
     public function destroy(Request $request, User $user): RedirectResponse

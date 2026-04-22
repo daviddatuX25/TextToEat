@@ -1,17 +1,31 @@
-import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import PortalLayout from '../Layouts/PortalLayout';
 import { PageHeader } from '../components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/Dialog';
 
+function getPasswordStrength(pwd) {
+    if (!pwd) return null;
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (pwd.length >= 12) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    if (score <= 1) return { bars: 1, label: 'Weak', barColor: 'bg-red-500', textColor: 'text-red-500' };
+    if (score === 2) return { bars: 2, label: 'Fair', barColor: 'bg-amber-500', textColor: 'text-amber-500' };
+    if (score === 3) return { bars: 3, label: 'Good', barColor: 'bg-yellow-400', textColor: 'text-yellow-500' };
+    return { bars: 4, label: 'Strong', barColor: 'bg-green-500', textColor: 'text-green-500' };
+}
+
 export default function Users({ users = [] }) {
     const { auth } = usePage().props;
     const currentUserId = auth?.user?.id;
     const isSuperAdmin = auth?.user?.role === 'superadmin';
-    const isAdmin = auth?.user?.is_admin === true;
 
     const [addOpen, setAddOpen] = useState(false);
     const [deleteUser, setDeleteUser] = useState(null);
+    const [resetUser, setResetUser] = useState(null);
     const form = useForm({
         username: '',
         name: '',
@@ -20,18 +34,16 @@ export default function Users({ users = [] }) {
         role: 'staff',
     });
 
+    const resetForm = useForm({
+        password: '',
+        password_confirmation: '',
+    });
+
+    // In Inertia v2, useForm.transform() returns undefined — chaining .post() off it
+    // silently throws a TypeError. Call form.post() directly instead.
     const handleSubmit = (e) => {
         e.preventDefault();
-        const payload = {
-            username: form.data.username,
-            name: form.data.name,
-            password: form.data.password,
-            password_confirmation: form.data.password_confirmation,
-        };
-        if (isAdmin) {
-            payload.role = form.data.role;
-        }
-        form.transform(() => payload).post('/portal/users', {
+        form.post('/portal/users', {
             onSuccess: () => {
                 form.reset();
                 setAddOpen(false);
@@ -39,8 +51,20 @@ export default function Users({ users = [] }) {
         });
     };
 
-    const resetPassword = (user) => {
-        router.post(`/portal/users/${user.id}/reset-password`, {}, { preserveScroll: true });
+    const openResetPassword = (user) => {
+        resetForm.reset();
+        setResetUser(user);
+    };
+
+    const submitResetPassword = (e) => {
+        e.preventDefault();
+        resetForm.post(`/portal/users/${resetUser.id}/reset-password`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setResetUser(null);
+                resetForm.reset();
+            },
+        });
     };
 
     const confirmDeleteAccount = (user) => {
@@ -54,6 +78,9 @@ export default function Users({ users = [] }) {
             onSuccess: () => setDeleteUser(null),
         });
     };
+
+    const passwordStrength = getPasswordStrength(form.data.password);
+    const resetPasswordStrength = getPasswordStrength(resetForm.data.password);
 
     return (
         <PortalLayout>
@@ -102,7 +129,7 @@ export default function Users({ users = [] }) {
                                                 {(isSuperAdmin || user.role !== 'superadmin') && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => resetPassword(user)}
+                                                        onClick={() => openResetPassword(user)}
                                                         className="text-primary-600 dark:text-primary-400 font-semibold text-sm hover:underline"
                                                     >
                                                         Reset password
@@ -155,7 +182,7 @@ export default function Users({ users = [] }) {
                                 placeholder="Leave blank for device accounts"
                             />
                         </label>
-                        {isAdmin && (
+                        {isSuperAdmin && (
                             <label className="block">
                                 <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Role</span>
                                 <select
@@ -168,17 +195,35 @@ export default function Users({ users = [] }) {
                                 </select>
                             </label>
                         )}
-                        <label className="block">
-                            <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Password</span>
-                            <input
-                                type="password"
-                                required
-                                minLength={8}
-                                value={form.data.password}
-                                onChange={(e) => form.setData('password', e.target.value)}
-                                className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
-                            />
-                        </label>
+                        <div className="block">
+                            <label className="block">
+                                <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Password</span>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={8}
+                                    value={form.data.password}
+                                    onChange={(e) => form.setData('password', e.target.value)}
+                                    className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                    autoComplete="new-password"
+                                />
+                            </label>
+                            {passwordStrength && (
+                                <div className="mt-2">
+                                    <div className="flex gap-1">
+                                        {[1, 2, 3, 4].map((i) => (
+                                            <div
+                                                key={i}
+                                                className={`h-1.5 flex-1 rounded-full transition-colors ${i <= passwordStrength.bars ? passwordStrength.barColor : 'bg-surface-200 dark:bg-surface-700'}`}
+                                            />
+                                        ))}
+                                    </div>
+                                    <p className={`mt-1 text-xs font-medium ${passwordStrength.textColor}`}>
+                                        {passwordStrength.label}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                         <label className="block">
                             <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Confirm password</span>
                             <input
@@ -187,6 +232,7 @@ export default function Users({ users = [] }) {
                                 value={form.data.password_confirmation}
                                 onChange={(e) => form.setData('password_confirmation', e.target.value)}
                                 className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                autoComplete="new-password"
                             />
                         </label>
                         {Object.keys(form.errors).length > 0 && (
@@ -210,6 +256,82 @@ export default function Users({ users = [] }) {
                                 className="flex-1 py-2 rounded-xl bg-primary-600 text-white font-semibold text-sm hover:bg-primary-700 disabled:opacity-50"
                             >
                                 {form.processing ? 'Creating...' : 'Create user'}
+                            </button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!resetUser} onOpenChange={(open) => !open && setResetUser(null)}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Reset password</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-surface-600 dark:text-surface-400 mb-2">
+                        Set a new password for <strong>{resetUser?.name || resetUser?.username}</strong>.
+                    </p>
+                    <form onSubmit={submitResetPassword} className="space-y-4">
+                        <div className="block">
+                            <label className="block">
+                                <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">New password</span>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={8}
+                                    value={resetForm.data.password}
+                                    onChange={(e) => resetForm.setData('password', e.target.value)}
+                                    className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                    autoComplete="new-password"
+                                />
+                            </label>
+                            {resetPasswordStrength && (
+                                <div className="mt-2">
+                                    <div className="flex gap-1">
+                                        {[1, 2, 3, 4].map((i) => (
+                                            <div
+                                                key={i}
+                                                className={`h-1.5 flex-1 rounded-full transition-colors ${i <= resetPasswordStrength.bars ? resetPasswordStrength.barColor : 'bg-surface-200 dark:bg-surface-700'}`}
+                                            />
+                                        ))}
+                                    </div>
+                                    <p className={`mt-1 text-xs font-medium ${resetPasswordStrength.textColor}`}>
+                                        {resetPasswordStrength.label}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        <label className="block">
+                            <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Confirm password</span>
+                            <input
+                                type="password"
+                                required
+                                value={resetForm.data.password_confirmation}
+                                onChange={(e) => resetForm.setData('password_confirmation', e.target.value)}
+                                className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                autoComplete="new-password"
+                            />
+                        </label>
+                        {Object.keys(resetForm.errors).length > 0 && (
+                            <ul className="text-sm text-red-600 dark:text-red-400">
+                                {Object.entries(resetForm.errors).map(([k, v]) => (
+                                    <li key={k}>{v}</li>
+                                ))}
+                            </ul>
+                        )}
+                        <div className="flex gap-2 pt-2">
+                            <button
+                                type="button"
+                                onClick={() => setResetUser(null)}
+                                className="flex-1 py-2 rounded-xl border border-surface-200 dark:border-surface-600 text-surface-700 dark:text-surface-300 font-medium text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={resetForm.processing}
+                                className="flex-1 py-2 rounded-xl bg-primary-600 text-white font-semibold text-sm hover:bg-primary-700 disabled:opacity-50"
+                            >
+                                {resetForm.processing ? 'Resetting…' : 'Reset password'}
                             </button>
                         </div>
                     </form>

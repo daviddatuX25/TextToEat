@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('sms_devices', function (Blueprint $table) {
             $table->id();
-            $table->text('device_token');
+            $table->string('device_token', 500);
             $table->string('name')->nullable();
             $table->timestamp('last_used_at')->nullable();
             $table->timestamps();

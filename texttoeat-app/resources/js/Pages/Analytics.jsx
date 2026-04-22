@@ -645,9 +645,9 @@ const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function AnalyticsPieDonut({ data }) {
     return (
         <div className="flex w-full min-w-0 justify-center">
-            <div className="aspect-square w-full max-w-[min(100%,280px)] min-h-0 shrink-0">
+            <div className="aspect-square w-full max-w-[min(100%,320px)] min-h-0 shrink-0">
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                    <PieChart margin={{ top: 24, right: 40, bottom: 24, left: 40 }}>
+                    <PieChart>
                         <Pie
                             data={data}
                             dataKey="value"
@@ -655,15 +655,15 @@ function AnalyticsPieDonut({ data }) {
                             cx="50%"
                             cy="50%"
                             innerRadius="38%"
-                            outerRadius="55%"
+                            outerRadius="52%"
                             paddingAngle={2}
-                            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                         >
                             {data.map((_, i) => (
                                 <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                             ))}
                         </Pie>
-                        <Tooltip formatter={(value) => [value, 'Orders']} />
+                        <Tooltip formatter={(value, name) => [value, name]} />
+                        <Legend verticalAlign="bottom" height={36} />
                     </PieChart>
                 </ResponsiveContainer>
             </div>

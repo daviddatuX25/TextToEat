@@ -304,8 +304,11 @@ function EnableForTodayDialog({ item, open, onOpenChange }) {
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!routerImpl?.put) return;
-        routerImpl.put(`/portal/menu-items/${item.id}`, { is_sold_out: false, units_today: units }, { preserveScroll: true });
-        onOpenChange(false);
+        routerImpl.put(`/portal/menu-items/${item.id}`, { is_sold_out: false, units_today: units }, {
+            preserveScroll: true,
+            onSuccess: () => { console.debug('[MenuItems] EnableForTodayDialog success'); onOpenChange(false); },
+            onError: (errors) => { console.error('[MenuItems] EnableForTodayDialog error:', errors); alert('Failed to replenish: ' + JSON.stringify(errors)); },
+        });
     };
 
     return (
@@ -367,12 +370,28 @@ function MenuItemCard({ item, onEdit, onEnableClick, lowStockThreshold = 5 }) {
     const available = Number(item.virtual_available ?? 0);
     const isLowStock = !soldOut && available < lowStockThreshold;
 
+    const [editingQty, setEditingQty] = useState(false);
+    const [qtyInputVal, setQtyInputVal] = useState(String(units));
+
     const setQuantity = (newVal) => {
         const n = Math.max(0, Math.floor(Number(newVal)));
-        if (n === units || !routerImpl?.put) return;
+        console.debug('[MenuItems] setQuantity called:', { itemId: item.id, currentUnits: units, newVal: n, soldOut });
+        if (n === units) { console.debug('[MenuItems] Early return: n === units'); return; }
+        if (!routerImpl?.put) { console.error('[MenuItems] routerImpl.put is not available!'); return; }
         const payload = { units_today: n };
         if (n > 0 && soldOut) payload.is_sold_out = false;
-        routerImpl.put(`/portal/menu-items/${item.id}`, payload, { preserveScroll: true });
+        if (n === 0) payload.is_sold_out = true;
+        console.debug('[MenuItems] Sending PUT:', payload);
+        routerImpl.put(`/portal/menu-items/${item.id}`, payload, {
+            preserveScroll: true,
+            onSuccess: (page) => {
+                console.debug('[MenuItems] PUT onSuccess, flash:', page.props?.flash);
+            },
+            onError: (errors) => {
+                console.error('[MenuItems] PUT onError:', errors);
+                alert('Failed to update quantity: ' + JSON.stringify(errors));
+            },
+        });
     };
 
     const toggleSoldOut = () => {
@@ -380,7 +399,11 @@ function MenuItemCard({ item, onEdit, onEnableClick, lowStockThreshold = 5 }) {
         if (soldOut) {
             onEnableClick?.(item);
         } else {
-            routerImpl.put(`/portal/menu-items/${item.id}`, { is_sold_out: true }, { preserveScroll: true });
+            routerImpl.put(`/portal/menu-items/${item.id}`, { is_sold_out: true, units_today: 0 }, {
+                preserveScroll: true,
+                onSuccess: () => console.debug('[MenuItems] soldOut=true success'),
+                onError: (errors) => { console.error('[MenuItems] toggleSoldOut error:', errors); alert('Failed: ' + JSON.stringify(errors)); },
+            });
         }
     };
 
@@ -434,7 +457,29 @@ function MenuItemCard({ item, onEdit, onEnableClick, lowStockThreshold = 5 }) {
                             >
                                 <Minus className="h-3 w-3" />
                             </button>
-                            <span className="min-w-[1.75rem] text-center font-semibold text-xs">{units}</span>
+                            {editingQty ? (
+                                <input
+                                    type="number"
+                                    min="0"
+                                    autoFocus
+                                    value={qtyInputVal}
+                                    onChange={(e) => setQtyInputVal(e.target.value)}
+                                    onBlur={() => { setEditingQty(false); setQuantity(qtyInputVal); }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') { setEditingQty(false); setQuantity(qtyInputVal); }
+                                        if (e.key === 'Escape') { setEditingQty(false); setQtyInputVal(String(units)); }
+                                    }}
+                                    className="w-10 text-center font-semibold text-xs bg-transparent outline-none border-b border-primary-500 dark:border-primary-400"
+                                />
+                            ) : (
+                                <span
+                                    className="min-w-[1.75rem] text-center font-semibold text-xs cursor-pointer hover:text-primary-600 dark:hover:text-primary-400"
+                                    onClick={() => { setQtyInputVal(String(units)); setEditingQty(true); }}
+                                    title="Click to edit"
+                                >
+                                    {units}
+                                </span>
+                            )}
                             <button
                                 type="button"
                                 onClick={() => setQuantity(units + 1)}

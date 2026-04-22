@@ -3,6 +3,20 @@ import { useForm } from '@inertiajs/react';
 import PortalLayout from '../Layouts/PortalLayout';
 import { PageHeader } from '../components/ui';
 
+function getPasswordStrength(pwd) {
+    if (!pwd) return null;
+    let score = 0;
+    if (pwd.length >= 8) score++;
+    if (pwd.length >= 12) score++;
+    if (/[A-Z]/.test(pwd)) score++;
+    if (/[0-9]/.test(pwd)) score++;
+    if (/[^A-Za-z0-9]/.test(pwd)) score++;
+    if (score <= 1) return { bars: 1, label: 'Weak', barColor: 'bg-red-500', textColor: 'text-red-500' };
+    if (score === 2) return { bars: 2, label: 'Fair', barColor: 'bg-amber-500', textColor: 'text-amber-500' };
+    if (score === 3) return { bars: 3, label: 'Good', barColor: 'bg-yellow-400', textColor: 'text-yellow-500' };
+    return { bars: 4, label: 'Strong', barColor: 'bg-green-500', textColor: 'text-green-500' };
+}
+
 export default function Account({ user = {} }) {
     const accountForm = useForm({
         name: user.name ?? '',
@@ -29,8 +43,12 @@ export default function Account({ user = {} }) {
 
     const handlePasswordSubmit = (e) => {
         e.preventDefault();
-        passwordForm.put('/portal/account/password');
+        passwordForm.put('/portal/account/password', {
+            onSuccess: () => passwordForm.reset(),
+        });
     };
+
+    const newPasswordStrength = getPasswordStrength(passwordForm.data.password);
 
     return (
         <PortalLayout>
@@ -110,21 +128,38 @@ export default function Account({ user = {} }) {
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{passwordForm.errors.current_password}</p>
                             )}
                         </label>
-                        <label className="block">
-                            <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">New password</span>
-                            <input
-                                type="password"
-                                required
-                                minLength={8}
-                                value={passwordForm.data.password}
-                                onChange={(e) => passwordForm.setData('password', e.target.value)}
-                                className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
-                                autoComplete="new-password"
-                            />
+                        <div className="block">
+                            <label className="block">
+                                <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">New password</span>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={8}
+                                    value={passwordForm.data.password}
+                                    onChange={(e) => passwordForm.setData('password', e.target.value)}
+                                    className="mt-1 w-full rounded-lg border-2 border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 px-3 py-2 text-sm"
+                                    autoComplete="new-password"
+                                />
+                            </label>
+                            {newPasswordStrength && (
+                                <div className="mt-2">
+                                    <div className="flex gap-1">
+                                        {[1, 2, 3, 4].map((i) => (
+                                            <div
+                                                key={i}
+                                                className={`h-1.5 flex-1 rounded-full transition-colors ${i <= newPasswordStrength.bars ? newPasswordStrength.barColor : 'bg-surface-200 dark:bg-surface-700'}`}
+                                            />
+                                        ))}
+                                    </div>
+                                    <p className={`mt-1 text-xs font-medium ${newPasswordStrength.textColor}`}>
+                                        {newPasswordStrength.label}
+                                    </p>
+                                </div>
+                            )}
                             {passwordForm.errors.password && (
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{passwordForm.errors.password}</p>
                             )}
-                        </label>
+                        </div>
                         <label className="block">
                             <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">Confirm new password</span>
                             <input

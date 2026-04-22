@@ -1,1 +1,0 @@
-import{c as s}from"./menu-B8gCc2sG.js";const c=[["path",{d:"M5 12h14",key:"1ays0h"}]],a=s("minus",c);const e=[["path",{d:"M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2",key:"cjf0a3"}],["path",{d:"M7 2v20",key:"1473qp"}],["path",{d:"M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7",key:"j28e5"}]],o=s("utensils",e);export{a as M,o as U};

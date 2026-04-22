@@ -43,9 +43,10 @@ if (! function_exists('run_deploy_update')) {
     function run_deploy_update(Application $app): void
     {
         $steps = [
-            'migrate'      => ['--force' => true],
-            'config:cache' => [],
-            'route:cache'  => [],
+            'package:discover' => ['--ansi' => false],
+            'migrate'          => ['--force' => true],
+            'config:cache'     => [],
+            'route:cache'      => [],
         ];
 
         foreach ($steps as $command => $params) {

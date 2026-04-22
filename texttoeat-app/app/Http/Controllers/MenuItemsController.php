@@ -61,7 +61,7 @@ class MenuItemsController extends Controller
             $arr['current_orders'] = $currentOrders[$item->id] ?? 0;
 
             $stock = $stockByItem->get($item->id);
-            $arr['units_today'] = $stock ? (int) $stock->units_leftover : 0;
+            $arr['units_today'] = $stock ? (int) $stock->units_set : 0;
 
             return $arr;
         });
@@ -127,7 +127,9 @@ class MenuItemsController extends Controller
 
     public function update(UpdateMenuItemRequest $request, MenuItem $menuItem): RedirectResponse
     {
+        \Log::debug('[MenuItemsController] update() called for menuItem.id: ' . $menuItem->id . ' with: ' . json_encode($request->all()));
         $validated = $request->validated();
+        \Log::debug('[MenuItemsController] validated: ' . json_encode($validated));
         unset($validated['image'], $validated['remove_image']);
 
         if ($request->boolean('remove_image') || $request->hasFile('image')) {
@@ -165,12 +167,16 @@ class MenuItemsController extends Controller
                     'units_leftover' => $set,
                 ]);
             }
+            // Keep MenuItem.units_today in sync with MenuItemDailyStock
+            $validated['units_today'] = $set;
             if ($set > 0) {
                 $validated['is_sold_out'] = false;
             }
         }
 
+        \Log::debug('[MenuItemsController] update() validated keys: ' . implode(',', array_keys($validated)) . ' | menuItem.id: ' . $menuItem->id);
         $menuItem->update($validated);
+        \Log::debug('[MenuItemsController] after update, MenuItem.units_today: ' . $menuItem->units_today . ' | is_sold_out: ' . ($menuItem->is_sold_out ? 'true' : 'false'));
 
         return redirect()->back()->with('success', 'Menu item updated.');
     }
